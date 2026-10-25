@@ -1,0 +1,36 @@
+<udt>
+    <node id="main">
+        <node class="test text" value="Normal text."/>
+        <node class="test text outline" value="Outlined text."/>
+        <node class="test text outline thick" value="Thick outlined text."/>
+        <node class="test text outline red" value="Red outlined text."/>
+        <node class="test text outline thick red" value="Thick red outlined text."/>
+    </node>
+    
+    <![CDATA[
+    #main {
+        flow: vertical;
+        gap: 10;
+        
+        .test {
+            padding: 10;
+            background-color: 0xFF3a3c3c;
+            border-color: 0xA0FFFFFF;
+            border-width: 1;
+            border-radius: 6;
+            
+            &.text {
+                color: 0xFFFFFFFF;
+                
+                &.outline {
+                    outline-color: 0xFF000000;
+                    outline-size: 1;
+                    
+                    &.red { outline-color: 0xFF0000FF; }
+                    &.thick { outline-size: 3; }
+                }
+            }
+        }
+    }
+    ]]>
+</udt>

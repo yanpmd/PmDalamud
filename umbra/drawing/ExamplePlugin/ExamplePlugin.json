@@ -1,0 +1,9 @@
+{
+  "Author": "Una",
+  "Name": "Una.Drawing.ExamplePlugin",
+  "Description": "An example plugin showing the capabilities of the Una.Drawing library.",
+  "InternalName": "UnaDrawingExamplePlugin",
+  "Punchline":  "",
+  "RepoUrl": "https://github.com/una-xiv/drawing",
+  "Tags": []
+}

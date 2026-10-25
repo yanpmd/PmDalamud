@@ -1,0 +1,94 @@
+﻿<udt>
+    <![CDATA[
+    @import "tests";
+    
+    #main {
+        flow: vertical;
+        background-color: 0xff212021;
+        padding: 10;
+        gap: 20;
+        size: 900 0;
+        
+        & .row {
+            flow: horizontal;
+            gap: 20;
+            auto-size: grow fit;
+            background-color: 0xff2a292a;
+        }
+        
+        .test-container {
+            auto-size: grow fit;
+        }
+        
+        .test-wrapper {
+            stroke-color: 0xffffffff;
+            stroke-width: 2;
+            
+            .test {
+                & .text {
+                    margin: 2; // Add 2px margin to accomodate for the stroke.
+                    padding: 5;
+                    border-radius: 0;
+                    color: 0xffffffff;
+                }
+            }
+        }
+    }
+    ]]>
+
+    <template name="margin-test">
+        <argument name="margin"/>
+
+        <node class="test-container">
+            <node class="test-wrapper">
+                <node class="test" style="margin: ${margin};">
+                    <node class="box text" value="Margin: ${margin}"/>
+                </node>
+            </node>
+        </node>
+    </template>
+
+    <n id="main">
+        <n class="row">
+            <margin-test margin="32 0 0 0"/>
+            <margin-test margin="0 32 0 0"/>
+            <margin-test margin="0 0 32 0"/>
+            <margin-test margin="0 0 0 32"/>
+        </n>
+
+        <n class="row">
+            <margin-test margin="32 32 0 0"/>
+            <margin-test margin="32 0 32 0"/>
+            <margin-test margin="32 0 0 32"/>
+            <margin-test margin="0 32 32 0"/>
+        </n>
+
+        <n class="row">
+            <margin-test margin="0 32 0 32"/>
+            <margin-test margin="0 0 32 32"/>
+            <margin-test margin="32 32 32 0"/>
+            <margin-test margin="32 32 0 32"/>
+        </n>
+
+        <n class="row">
+            <margin-test margin="32 0 32 32"/>
+            <margin-test margin="0 32 32 32"/>
+            <margin-test margin="32 32 32 32"/>
+            <margin-test margin="0 0 0 0"/>
+        </n>
+
+        <n class="row">
+            <margin-test margin="32 0 32 0"/>
+            <margin-test margin="0 32 0 32"/>
+            <margin-test margin="0 0 32 0"/>
+            <margin-test margin="0 0 32 32"/>
+        </n>
+
+        <n class="row">
+            <margin-test margin="0 32 32 0"/>
+            <margin-test margin="32 0 0 32"/>
+            <margin-test margin="32 32 0 0"/>
+            <margin-test margin="0 32 32 32"/>
+        </n>
+    </n>
+</udt>

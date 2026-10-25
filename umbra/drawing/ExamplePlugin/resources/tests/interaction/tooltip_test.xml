@@ -1,0 +1,11 @@
+﻿<udt>
+    <import from="shared.box.xml"/>
+    
+    <![CDATA[
+    .box {
+        padding: 10;
+    }
+    ]]>
+    
+    <n class="box" tooltip="I am a tooltip!\nNeat-o!" value="Hover me!"/>
+</udt>

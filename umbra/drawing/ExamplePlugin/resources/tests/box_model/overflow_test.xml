@@ -1,0 +1,69 @@
+﻿<udt>
+    <import from="shared.window.xml"/>
+    
+    <![CDATA[
+    #main {
+        flow: horizontal;
+        gap: 32;
+    }
+    
+    .junk {
+        auto-size: grow;
+        gap: 4;
+        padding: 10;
+        stroke-color: 0xff212021;
+        stroke-width: 1;
+        background-color: 0x50ffffff;
+    }
+    
+    .vertical {
+        flow: vertical;
+        
+        .text {
+            auto-size: grow fit;
+            word-wrap: true;
+            padding: 0 4;
+        }
+    }
+    
+    .horizontal {
+        flow: horizontal;
+        gap: 10;
+        
+        .text {
+            size: 80 0;
+            word-wrap: true;
+            padding: 0 4;
+        }
+    }
+    ]]>
+    
+    <n id="main">
+        <window width="300" height="300">
+            <n slot="header-text" class="text" value="Vertical scrollbar"/>
+            <junk direction="vertical"/>
+        </window>
+        
+        <window width="300" height="300">
+            <n slot="header-text" class="text" value="Horizontal scrollbar"/>
+            <junk direction="horizontal" h-scroll="true"/>
+        </window>
+    </n>
+    
+    <template name="junk">
+        <argument name="direction" default="horizontal"/>
+        <argument name="h-scroll" default="false"/>
+        
+        <n class="junk ${direction}" overflow="false" horizontal-scrollbar="${h-scroll}">
+            <n class="text" value="This is some text."/>
+            <n class="text" value="The text serves no purpose."/>
+            <n class="text" value="It is just here to fill space."/>
+            <n class="text" value="If it is here for a reason,"/>
+            <n class="text" value="does it actually have purpose?"/>
+            <n class="text" value="Purpose. Everything has purpose."/>
+            <n class="text" value="Something that has no meaning,"/>
+            <n class="text" value="has a purpose of being meaningless."/>
+            <n class="text" value="You are meaningless, therefore you have purpose."/>
+        </n>
+    </template>
+</udt>

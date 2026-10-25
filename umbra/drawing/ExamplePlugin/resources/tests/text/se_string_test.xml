@@ -1,0 +1,84 @@
+﻿<udt>
+    <node id="main">
+        <node class="bounding-box-test">
+            <node id="SeString" class="test"/>
+            <node id="String" class="test"/>
+        </node>
+        <node class="alignment-test">
+            <node class="c top-left" se-string-value="Top Left &lt;icon(1)&gt; Foobar!"/>
+            <node class="c top-center" se-string-value="Top Center"/>
+            <node class="c top-right" se-string-value="Top Right"/>
+            <node class="c middle-left" se-string-value="Middle Left"/>
+            <node class="c middle-center" se-string-value="Middle Center"/>
+            <node class="c middle-right" se-string-value="Middle Right"/>
+            <node class="c bottom-left" se-string-value="Bottom Left"/>
+            <node class="c bottom-center" se-string-value="Bottom Center"/>
+            <node class="c bottom-right" se-string-value="Bottom Right"/>
+        </node>
+        <node class="ellipsis-test" se-string-value="This is text that should be &lt;icon(63)&gt; &lt;icon(61)&gt; truncated with an ellipsis."/>
+        <node class="word-wrap-test" se-string-value="This is text that should &lt;icon(83)&gt; be wrapped &lt;icon(2)&gt;&lt;icon(3)&gt;&lt;icon(4)&gt; to the next line as &lt;icon(11)&gt; the sentence &lt;icon(21)&gt; continues to render. &lt;icon(22)&gt;"/>
+    </node>
+    
+    <![CDATA[
+    #main {
+        flow: vertical;
+        gap: 20;
+        
+        & > .bounding-box-test {
+            padding: 5;
+            gap: 5;
+        }
+        
+        & > .alignment-test {
+            size: 500 200;
+            
+            & > .c {
+                size: 150 50;
+                background-color: 0xffeaeaea;
+                color: 0xff000000;
+                padding: 0 5;
+            }
+            
+            & > .top-left { anchor: top-left; text-align: top-left; }
+            & > .top-center { anchor: top-center; text-align: top-center; }
+            & > .top-right { anchor: top-right; text-align: top-right; }
+            & > .middle-left { anchor: middle-left; text-align: middle-left; }
+            & > .middle-center { anchor: middle-center; text-align: middle-center; }
+            & > .middle-right { anchor: middle-right; text-align: middle-right; }
+            & > .bottom-left { anchor: bottom-left; text-align: bottom-left; }
+            & > .bottom-center { anchor: bottom-center; text-align: bottom-center; }
+            & > .bottom-right { anchor: bottom-right; text-align: bottom-right; }
+        }
+        
+        & > .ellipsis-test {
+            size: 270 0;
+            word-wrap: false;
+            text-overflow: false;
+            background-color: 0xffeaeaea;
+            color: 0xff000000;
+            padding: 0 5;
+        }
+        
+        & > .word-wrap-test {
+            padding: 0 5;
+            size: 250 0;
+            word-wrap: true;
+            text-overflow: false;
+            background-color: 0xffeaeaea;
+            color: 0xff000000;
+            line-height: 0.9;
+            text-align: middle-right;
+        }
+    }
+    
+    .test {
+        padding: 2;
+        background-color: 0xFF000000;
+        border-color: 0xA0FFFFFF;
+        font-size: 13;
+        // size: 120 0;
+        word-wrap: false;
+        text-overflow: false;
+    }
+    ]]>
+</udt>

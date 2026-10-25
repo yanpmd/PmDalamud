@@ -1,0 +1,29 @@
+<udt>
+    <node id="main">
+        <node class="icon" style="iconId: 82271;"/>
+        <node class="icon" style="iconId: 82272;"/>
+        <node class="icon" style="iconId: 82273;"/>
+        <node class="icon" style="iconId: 82274;"/>
+        <node class="icon" style="iconId: 82275;"/>
+        <node class="icon" style="iconId: 82276;"/>
+    </node>
+    
+    <![CDATA[
+    #main {
+        flow: horizontal;
+        gap: 10;
+     
+        .icon {   
+            size: 64 64;
+            border-color: 0xffffffff;
+            border-width: 1;
+            border-radius: 3;
+            iconId: 82271;
+            
+            &:hover {
+                border-color: 0xffaaeeff;
+            }
+        }
+    }
+    ]]>
+</udt>

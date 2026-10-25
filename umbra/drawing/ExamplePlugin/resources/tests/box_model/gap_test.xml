@@ -1,0 +1,49 @@
+﻿<udt>
+    <![CDATA[
+    @import "tests";
+    
+    #main {
+        flow: horizontal;
+        background-color: 0xff212021;
+        padding: 10;
+        gap: 30;
+        size: 800 0;
+        
+        #left {
+            flow: vertical;
+            gap: 10;
+            auto-size: grow;
+            padding: 10;
+            stroke-color: 0xff484848;
+            stroke-width: 1;
+        }
+        
+        #right {
+            flow: horizontal;
+            gap: 10;
+            auto-size: grow;
+            padding: 10;
+            stroke-color: 0xff484848;
+            stroke-width: 1;
+        }
+        
+        .box {
+            auto-size: grow;
+            padding: 10;
+        }
+    }
+    ]]>
+    
+    <node id="main">
+        <node id="left">
+            <node class="box" value="Top"/>
+            <node class="box" value="Middle"/>
+            <node class="box" value="Bottom"/>
+        </node>
+        <node id="right">
+            <node class="box" value="Left"/>
+            <node class="box" value="Center"/>
+            <node class="box" value="Right"/>
+        </node>
+    </node>
+</udt>

@@ -1,0 +1,46 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <Platforms>x64</Platforms>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <OutputPath>..\out\$(Configuration)\</OutputPath>
+        <EnableDefaultNoneItems>true</EnableDefaultNoneItems>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Authors>Una</Authors>
+        <Company>-</Company>
+        <Version>1.0.0.0</Version>
+        <Description>Una.Drawing</Description>
+        <Copyright>(C)2025 - Una's FFXIV Plugins</Copyright>
+        <PackageProjectUrl>https://github.com/una-xiv/drawing</PackageProjectUrl>
+        <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Content Include="ExamplePlugin.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="images\icon.png">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="templates\**\*.tpl"/>
+        <EmbeddedResource Include="resources\**\*.*"/>
+    </ItemGroup>
+    
+    <ItemGroup>
+        <ProjectReference Include="..\Una.Drawing\Una.Drawing.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <PackageReference Remove="DalamudPackager" />
+    </ItemGroup>
+</Project>

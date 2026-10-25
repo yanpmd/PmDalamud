@@ -1,0 +1,153 @@
+<udt>
+    <![CDATA[
+    @import "globals";
+
+    #main {
+        auto-size: grow;
+
+        & > .list-panel {
+            flow: vertical;
+            auto-size: fit grow;
+            size: 240 0;
+            border-color: "Window.Border";
+            border-width: 0 1 0 0;
+
+            & > .bindings {
+                flow: vertical;
+                auto-size: grow fit;
+                padding: 8;
+                gap: 4;
+                border-color: "Window.Border";
+                border-width: 0 0 1 0;
+            }
+
+            & > .list {
+                flow: vertical;
+                auto-size: grow;
+
+                & > #set-list {
+                    flow: vertical;
+                    auto-size: grow fit;
+                    gap: 2;
+                    padding: 8;
+                }
+            }
+
+            & > .footer {
+                flow: horizontal;
+                auto-size: grow fit;
+                padding: 6;
+            }
+        }
+
+        & > .body {
+            flow: vertical;
+            auto-size: grow;
+            margin: 10;
+            background-color: "Window.BackgroundLight";
+            border-radius: 5;
+            drop-shadow: 0 0 5 5;
+
+            & > .config {
+                flow: vertical;
+                auto-size: grow;
+                padding: 12;
+                gap: 8;
+
+                & > #editor {
+                    flow: vertical;
+                    auto-size: grow fit;
+                    gap: 8;
+                }
+            }
+        }
+    }
+
+    .set-row {
+        auto-size: grow fit;
+        padding: 6 8;
+        background-color: "Window.Background";
+        border-radius: 5;
+        font-size: 13;
+        color: "Window.Text";
+        outline-color: "Window.TextOutline";
+        outline-size: 1;
+        text-overflow: false;
+        word-wrap: false;
+
+        &:hover {
+            border-width: 0 0 0 3;
+            border-color: "Window.AccentColor";
+        }
+
+        &.selected {
+            background-color: "Window.BackgroundLight";
+            color: "Window.TextLight";
+            border-width: 0 0 0 3;
+            border-color: "Window.AccentColor";
+        }
+    }
+
+    .hint {
+        font-size: 12;
+        color: "Window.TextMuted";
+        outline-color: "Window.TextOutline";
+        outline-size: 1;
+    }
+
+    .bindings-label {
+        font-size: 12;
+        color: "Window.TextMuted";
+        outline-color: "Window.TextOutline";
+        outline-size: 1;
+    }
+
+    .condition-row {
+        flow: vertical;
+        auto-size: grow fit;
+        gap: 6;
+        padding: 8;
+        background-color: "Window.Background";
+        border-radius: 5;
+
+        & > .condition-head {
+            flow: horizontal;
+            auto-size: grow fit;
+            gap: 6;
+        }
+
+        & > .condition-params {
+            flow: vertical;
+            auto-size: grow fit;
+            gap: 4;
+        }
+    }
+    ]]>
+
+    <node id="main">
+        <node class="list-panel">
+            <node class="bindings">
+                <node class="bindings-label" value="工具栏显示条件"/>
+                <node id="toolbar-condition"/>
+            </node>
+            <node class="list scrollbars" overflow="false">
+                <node id="set-list"/>
+            </node>
+            <node class="footer">
+                <button-node
+                        id="add-set"
+                        is-ghost="true"
+                        is-small="true"
+                        icon="Plus"
+                        label="新建条件组"
+                        style="anchor: middle-center;"
+                />
+            </node>
+        </node>
+        <node class="body">
+            <node class="config scrollbars" overflow="false">
+                <node id="editor"/>
+            </node>
+        </node>
+    </node>
+</udt>

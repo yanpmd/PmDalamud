@@ -1,0 +1,25 @@
+﻿<udt>
+    <import from="shared.window.xml"/>
+    <import from="shared.box.xml"/>
+    
+    <![CDATA[
+    .header-text {
+        font-size: 14;
+        color: 0xfff0faff;
+        outline-size: 1;
+        outline-color: 0xc0000000;
+    }
+    
+    .body-box {
+        margin: 16 10;
+        padding: 30;
+    }
+    ]]>
+    
+    <window theme="dark">
+        <n slot="header-text" class="text" value="This is the header!"/>
+        <n slot="footer" class="text" value="This is the footer!"/>
+        
+        <n class="box body-box" value="This is a body box."/>
+    </window>
+</udt>

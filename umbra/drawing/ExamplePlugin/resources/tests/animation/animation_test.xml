@@ -1,0 +1,32 @@
+﻿<udt>
+    <import from="shared.box.xml"/>
+    
+    <node id="main">
+        <node class="box" value="This is a box." tooltip="Hover me!"/>
+    </node>
+    
+    <![CDATA[
+    #main {
+        size: 500;
+        background-color: 0xff000000;
+        
+        .box {
+            anchor: middle-center;
+            padding: 10;
+            transition-duration: 1500;
+            transition-type: EaseInBounce;
+            
+            color: 0xFFFF00FF;
+            size: 100 64;
+            
+            &:hover {
+                transition-type: EaseOutSine;
+                transition-duration: 250;
+                padding: 20;
+                color: 0xFF00FF00;
+                size: 200 128;
+            }
+        }
+    }
+    ]]>
+</udt>

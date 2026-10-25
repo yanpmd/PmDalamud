@@ -1,0 +1,90 @@
+﻿<udt>
+    <![CDATA[
+    @import "tests";
+    
+    #main {
+        flow: vertical;
+        background-color: 0xff212021;
+        padding: 10;
+        gap: 20;
+        size: 800 0;
+        
+        & .row {
+            flow: horizontal;
+            gap: 20;
+            auto-size: grow fit;
+            background-color: 0xff2a292a;
+        }
+        
+        .test-wrapper {
+            auto-size: grow fit;
+            
+            .test {
+                stroke-color: 0xffffffff;
+                stroke-width: 2;
+             
+                & .text {
+                    margin: 2; // Add 2px margin to accomodate for the stroke.
+                    padding: 5;
+                    border-radius: 0;
+                    color: 0xffffffff;
+                }
+            }
+        }
+    }
+    ]]>
+    
+    <template name="padding-test">
+        <argument name="padding"/>
+        
+        <node class="test-wrapper">
+            <node class="test" style="padding: ${padding};">
+                <node class="box text" value="Padding: ${padding}"/>
+            </node>
+        </node>
+    </template>
+    
+    <n id="main">
+        <n class="row">
+            <padding-test padding="32 0 0 0"/>
+            <padding-test padding="0 32 0 0"/>
+            <padding-test padding="0 0 32 0"/>
+            <padding-test padding="0 0 0 32"/>
+        </n>
+
+        <n class="row">
+            <padding-test padding="32 32 0 0"/>
+            <padding-test padding="32 0 32 0"/>
+            <padding-test padding="32 0 0 32"/>
+            <padding-test padding="0 32 32 0"/>
+        </n>
+
+        <n class="row">
+            <padding-test padding="0 32 0 32"/>
+            <padding-test padding="0 0 32 32"/>
+            <padding-test padding="32 32 32 0"/>
+            <padding-test padding="32 32 0 32"/>
+        </n>
+
+        <n class="row">
+            <padding-test padding="32 0 32 32"/>
+            <padding-test padding="0 32 32 32"/>
+            <padding-test padding="32 32 32 32"/>
+            <padding-test padding="0 0 0 0"/>
+        </n>
+
+        <n class="row">
+            <padding-test padding="32 0 32 0"/>
+            <padding-test padding="0 32 0 32"/>
+            <padding-test padding="0 0 32 0"/>
+            <padding-test padding="0 0 32 32"/>
+        </n>
+
+        <n class="row">
+            <padding-test padding="0 32 32 0"/>
+            <padding-test padding="32 0 0 32"/>
+            <padding-test padding="32 32 0 0"/>
+            <padding-test padding="0 32 32 32"/>
+        </n>
+    </n>
+</udt>

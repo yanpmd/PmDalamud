@@ -1,0 +1,51 @@
+﻿<udt>
+    <node id="main">
+        <node class="bar" tags="top" value="I should be flat on the top."/>
+        <node class="bar thing" tags="top" value="I should be red."/>
+        <node class="bar" tags="bottom" value="I should be flat on the bottom."/>
+        <node class="bar" tags="bottom floating" value="I should be fully rounded."/>
+    </node>
+    
+    <![CDATA[
+    #main {
+        flow: vertical;
+        auto-size: grow;
+        gap: 10;
+    
+        & > .bar {
+            background-color: 0xffc0c0c0;
+            border-color: 0xffffffff;
+            border-width: 1;
+            border-radius: 5;
+            size: 500 32;
+            color: 0xff212021;
+            padding: 0 8;
+            text-align: middle-left;
+                
+            &.thing {
+                &:top {
+                    background-color: 0xff0000ff; 
+                }
+            }
+            
+            &:top {
+                border-width: 0 1 1 1;
+                rounded-corners: bottom-left bottom-right;
+                background-color: 0xffffc0c0;
+            }
+            
+            &:bottom {
+                border-width: 1 1 0 1;
+                rounded-corners: top-left top-right;
+                border-radius: 5;
+            }
+            
+            &:floating {
+                rounded-corners: all;
+                border-radius: 16;
+                background-color: 0xff9acfcf;
+            }
+        }
+    }
+    ]]>
+</udt>

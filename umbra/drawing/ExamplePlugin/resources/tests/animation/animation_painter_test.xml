@@ -1,0 +1,46 @@
+﻿<udt>
+    <node id="main">
+        <row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/>
+        <row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/><row/>
+    </node>
+    
+    <template name="row">
+        <node class="row">
+            <c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/>
+            <c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/>
+            <c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/><c/>
+        </node>
+    </template>
+    
+    <template name="c">
+        <node class="cell"/>
+    </template>
+    
+    <![CDATA[
+    #main {
+        flow: vertical;
+        padding: 10;
+        background-color: 0xFF000000;
+        stroke-color: 0xFF787878;
+        stroke-width: 1;
+        stroke-inset: 1;
+        stroke-radius: 6;
+        border-radius: 8;
+        
+        & > .row {
+            & > .cell {
+                size: 16;
+                transition-duration: 2000;
+                transition-type: EaseOutSine;
+                background-color: 0xFF000000;
+                
+                &:hover {
+                    transition-duration: 25;
+                    transition-type: linear;
+                    background-color: 0xFF00FFFF;
+                }
+            }
+        }
+    }
+    ]]>
+</udt>

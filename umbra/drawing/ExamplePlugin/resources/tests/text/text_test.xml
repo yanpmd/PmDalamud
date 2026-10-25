@@ -1,0 +1,101 @@
+﻿<udt>
+    <![CDATA[
+    #main {
+        flow: vertical;
+        gap: 10;
+        size: 900 0;
+    }
+    
+    .test {
+        auto-size: grow fit;
+        flow: vertical;
+        background-color: 0xff000000;
+        border-radius: 8;
+        padding: 10;
+        gap: 10;
+        
+        & > .row {
+            auto-size: grow fit;
+            flow: horizontal;
+            gap: 10;
+            
+            & > .box {
+                background-color: 0xffffffff;
+                
+                &.grow { auto-size: grow fit; }
+                
+                & > .text {
+                    color: 0xff000000;
+                    line-height: 1;
+                    
+                    &.small { font-size: 11; }
+                    &.normal { font-size: 13; }
+                    &.large { font-size: 16; }
+                    &.x-large { font-size: 24; }
+                    
+                    &.wrapped { auto-size: grow fit; word-wrap: true; text-overflow: false; }
+                    &.ellipsis { auto-size: grow fit; word-wrap: false; text-overflow: false; }
+                }
+            }
+        }
+    }
+    
+    .default { font: 0; }
+    .monospace { font: 1; }
+    .fontAwesome { font: 2; }
+    ]]>
+    
+    <node id="main">
+        <font-test font="default"/>
+        <font-test font="monospace"/>
+    </node>
+    
+    <template name="font-test">
+        <argument name="font"/>
+
+        <node class="test">
+            <node class="row">
+                <node class="box">
+                    <node class="text ${font} small" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) small text."/>
+                </node>
+                <node class="box">
+                    <node class="text ${font} normal" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) normal text."/>
+                </node>
+                <node class="box">
+                    <node class="text ${font} large" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) large text."/>
+                </node>
+                <node class="box">
+                    <node class="text ${font} x-large" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) x-large text."/>
+                </node>
+            </node>
+            <node class="row">
+                <node class="box grow">
+                    <node class="text ${font} small ellipsis" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) a long text that should wrap to the next line."/>
+                </node>
+                <node class="box grow">
+                    <node class="text ${font} normal ellipsis" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) a long text that should wrap to the next line."/>
+                </node>
+                <node class="box grow">
+                    <node class="text ${font} large ellipsis" value="This SeIcon(BoxedLetterI)SeIcon(BoxedLetterS) another long text that should wrap to the next line."/>
+                </node>
+                <node class="box grow">
+                    <node class="text ${font} x-large ellipsis" value="This x-large text should wrap."/>
+                </node>
+            </node>
+            <node class="row">
+                <node class="box grow">
+                    <node class="text ${font} small wrapped" value="This is a long text that should wrap to the next line."/>
+                </node>
+                <node class="box grow">
+                    <node class="text ${font} normal wrapped" value="This is a long text that should wrap to the next line."/>
+                </node>
+                <node class="box grow">
+                    <node class="text ${font} large wrapped" value="This is another long text that should wrap to the next line."/>
+                </node>
+                <node class="box grow">
+                    <node class="text ${font} x-large wrapped" value="This x-large text should wrap."/>
+                </node>
+            </node>
+        </node>
+    </template>
+</udt>

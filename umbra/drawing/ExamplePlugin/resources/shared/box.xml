@@ -1,0 +1,17 @@
+﻿<udt>
+    <![CDATA[
+    .box {
+        background-color: 0xff484848;
+        background-gradient: vertical 0x20dcdcdc 0xff484848;
+        stroke-width: 1;
+        stroke-color: 0xff787a7a;
+        border-radius: 4;
+        drop-shadow: 0 3 6 6;
+        border-width: 1 0 1 0;
+        border-color: 0xffdadede 0 0xff000000 0;
+        border-inset: 1;
+        outline-size: 1;
+        outline-color: 0xc0000000;
+    }
+    ]]>
+</udt>

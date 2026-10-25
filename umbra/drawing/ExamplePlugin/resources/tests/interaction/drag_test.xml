@@ -1,0 +1,51 @@
+﻿<udt>
+    <![CDATA[
+    #main {
+        flow: vertical;
+        gap: 10;
+        background-color: 0xFF191919;
+        padding: 10;
+        border-radius: 8;
+    }
+    
+    .box {
+        flow: horizontal;
+        padding: 10;
+        background-color: 0xFF212021;
+        border-radius: 8;
+        stroke-color: 0xFF303c3f;
+        stroke-width: 1;
+        color: 0xFFACACAC;
+        
+        & > .left {
+            size: 100 0;
+            color: 0xFFACEDFF;
+        }
+        
+        & > .right {
+            size: 100 0;
+            color: 0xFFFFFFFF;
+        }
+        
+        &:hover {
+            stroke-color: 0xFF595959;
+            stroke-width: 2;
+            color: 0xFFFFFFFF;
+        }
+        
+        &:dragging {
+            opacity: 0.5;
+        }
+    }
+    ]]>
+    
+    <n id="main" sortable="true">
+        <n class="box draggable" value="Please drag me!"/>
+        
+        <n class="box draggable">
+            <n class="left" value="Nested Child #1"/>
+            <n class="right" value="Nested Child #2"/>
+        </n>
+        
+    </n>
+</udt>

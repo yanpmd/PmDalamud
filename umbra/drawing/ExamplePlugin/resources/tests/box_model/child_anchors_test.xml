@@ -1,0 +1,40 @@
+﻿<udt>
+    <![CDATA[
+    @import "tests";
+    
+    #main {
+        size: 500 500;
+        background-color: 0xff212021;
+        stroke-width: 1;
+        stroke-color: 0xff5f5f5;
+        border-radius: 10;
+        rounded-corners: all;
+        padding: 10;
+        
+        .test {
+            size: 100 100;
+            text-align: middle-center;
+        }
+    }
+    ]]>
+    
+    <template name="anchor-box">
+        <argument name="anchor"/>
+        
+        <node class="box test" style="anchor: ${anchor};" value="${anchor}"/>
+    </template>
+    
+    <node id="main">
+        <anchor-box anchor="top-left"/>
+        <anchor-box anchor="top-center"/>
+        <anchor-box anchor="top-right"/>
+        
+        <anchor-box anchor="middle-left"/>
+        <anchor-box anchor="middle-center"/>
+        <anchor-box anchor="middle-right"/>
+        
+        <anchor-box anchor="bottom-left"/>
+        <anchor-box anchor="bottom-center"/>
+        <anchor-box anchor="bottom-right"/>
+    </node>
+</udt>

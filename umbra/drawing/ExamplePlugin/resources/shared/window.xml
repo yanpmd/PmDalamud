@@ -1,0 +1,126 @@
+﻿<udt>
+    <![CDATA[
+    .window {
+        flow: vertical;
+        size: 640 480;
+        border-radius: 12;
+        
+        .text {
+            font-size: 13;
+            outline-size: 1;
+        }
+        
+        &.default {
+            background-color: 0xff212021;
+            
+            .text {
+                color: 0xffdcdcdc;
+                outline-color: 0xff000000;
+            }
+        }
+        
+        &.light {
+            .text {
+                color: 0xff000000;
+                outline-color: 0x00ffffff;
+            }
+        }
+        
+        &.classic {
+            .text {
+                color: 0xfff0f0f0;
+                outline-color: 0xff000000;
+            }
+        }
+        
+        & > .header {
+            flow: horizontal;
+            auto-size: grow fit;
+            size: 0 32;
+            
+            & > .tl { size: 12 32; uld-part-id: 0; }
+            & > .tc { size: 0 32; auto-size: grow fit; uld-part-id: 1; }
+            & > .tr { size: 14 32; uld-part-id: 2; }
+            
+            .title {
+                anchor: middle-left;
+                auto-size: grow fit;
+                padding: 8 0 0 8;
+                
+                .text {
+                    font-size: 12;
+                }
+            }
+            
+            .buttons {
+                padding: 8 8 0 0;
+                anchor: middle-left;
+                gap: 4;
+            }
+        }
+        
+        & > .body {
+            flow: horizontal;
+            auto-size: grow;
+            
+            & > .ml { size: 12 0; auto-size: fit grow; uld-part-id: 3; }
+            & > .mc { auto-size: grow; padding: 10; uld-part-id: 4; }
+            & > .mr { size: 14 0; auto-size: fit grow; uld-part-id: 5; }
+        }
+        
+        & > .footer {
+            flow: horizontal;
+            auto-size: grow fit;
+            size: 0 32;
+            
+            & > .bl { size: 12 24; uld-part-id: 6; }
+            & > .bc { size: 0 24; auto-size: grow fit; uld-part-id: 7; }
+            & > .br { size: 14 24; uld-part-id: 8;}
+        }
+        
+        .uld {
+            uld-resource: "ui/uld/CharaSelect_Info_Progress";
+            uld-parts-id: 2;
+            uld-style: "light";
+            image-tile-mode: repeat;
+            image-scale-mode: adapt;
+            image-scale: 0.5;
+        }
+    }
+    ]]>
+
+    <template name="window">
+        <argument name="width" default="640"/>
+        <argument name="height" default="480"/>
+        <argument name="theme" default="light"/>
+
+        <n class="window ${theme}" style="size: ${width} ${height};">
+            <n class="header">
+                <n class="uld tl"/>
+                <n class="uld tc">
+                    <n class="title">
+                        <slot name="header-text"/>
+                    </n>
+                    <n class="buttons">
+                        <slot name="header-buttons"/>
+                    </n>
+                </n>
+                <n class="uld tr"/>
+            </n>
+            <n class="body">
+                <n class="uld ml"/>
+                <n class="uld mc">
+                    <slot/>
+                </n>
+                <n class="uld mr"/>
+            </n>
+            <n class="footer">
+                <n class="uld bl"/>
+                <n class="uld bc">
+                    <slot name="footer"/>
+                </n>
+                <n class="uld br"/>
+            </n>
+        </n>
+    </template>
+</udt>

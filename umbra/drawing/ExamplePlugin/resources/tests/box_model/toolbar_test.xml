@@ -1,0 +1,58 @@
+<udt>
+    <![CDATA[
+    #toolbar {
+        size: 900 52;
+        background-color: 0xff212021;
+        border-width: 1 0 0 0;
+        border-color: 0xff484a4a;
+        
+        & > .section {
+            size: 0 52;
+            gap: 8;
+            padding: 0 8;
+            
+            .cell {
+                size: 0 48;
+                padding: 0 8;
+                text-align: middle-center;
+                color: 0xffffffff;
+                background-color: 0xc0484a4a;
+                border-radius: 5;
+                stroke-color: 0xff595959;
+                stroke-width: 1;
+                border-width: 1;
+                border-inset: 1;
+                border-color: 0xff000000;
+                outline-size: 2;
+                outline-color: 0xff000000;
+            }
+            
+            &.left { anchor: middle-left; }
+            &.center { anchor: middle-center; }
+            &.right { anchor: middle-right; }
+            
+            &.left > .cell { anchor: bottom-left; }
+            &.center > .cell { anchor: bottom-center; }
+            &.right > .cell { anchor: bottom-right; }
+        }
+    }
+    ]]>
+    
+    <node id="toolbar">
+        <node id="left" class="section left">
+            <node id="left1" class="cell" value="SeIcon(BoxedLetterD) Dalamud!" />
+            <node id="left2" class="cell" value="Two" />
+            <node id="left3" class="cell" value="Three" />
+        </node>
+        <node id="center" class="section center">
+            <node id="center1" class="cell" value="Four" />
+            <node id="center2" class="cell" value="--SeIcon(BoxedLetterU)SeIcon(BoxedLetterN)SeIcon(BoxedLetterA)--" />
+            <node id="center3" class="cell" value="Six" />
+        </node>
+        <node id="right" class="section right">
+            <node id="right1" class="cell" value="Seven" />
+            <node id="right2" class="cell" value="A SeIcon(Experience) appeared!" />
+            <node id="right3" class="cell" value="SeIcon(EorzeaTimeEn) 12:00" />
+        </node>
+    </node>
+</udt>

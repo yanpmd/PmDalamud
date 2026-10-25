@@ -1,0 +1,83 @@
+﻿<udt>
+    <![CDATA[
+    #main {
+        flow: horizontal;
+        gap: 16;
+        padding: 16;
+        background-color: 0xff161616;
+        border-radius: 8;
+        stroke-color: 0xFF303c3f;
+        stroke-width: 1;
+    }
+    
+    :dragging {
+        opacity: 0.5;
+    }
+    
+    .column {
+        flow: vertical;
+        auto-size: grow fit;
+        background-color: 0xff212021;
+        border-radius: 8;
+        stroke-color: 0xFF303c3f;
+        stroke-width: 1;
+        
+        & > .header {
+            auto-size: grow fit;
+            font-size: 16;
+            text-align: middle-center;
+            color: 0xffeaeaea;
+            padding: 8;
+        }
+    }
+    
+    .sortable-stuff {
+        flow: vertical;
+        gap: 8;
+        size: 300 0;
+        auto-size: fit grow;
+        padding: 8;
+        border-width: 2 0 0 0;
+        border-color: 0xFF303c3f;
+        
+        & > .item {
+            auto-size: grow fit;
+            padding: 8;
+            background-color: 0xFF595959;
+            border-radius: 8;
+            stroke-color: 0xFF787a7a;
+            stroke-width: 1;
+            color: 0xffffffff;
+            outline-color: 0xff000000;
+            outline-size: 1;
+        }
+    }
+    ]]>
+    
+    <n id="main" sortable="true">
+        <n class="column">
+            <n class="header" value="Column 1"/>
+            <n class="sortable-stuff" sortable="true">
+                <n class="item" value="Item 1"/>
+                <n class="item" value="Item 2"/>
+                <n class="item" value="Item 3"/>
+            </n>
+        </n>
+        <n class="column">
+            <n class="header" value="Column 2"/>
+            <n class="sortable-stuff" sortable="true">
+                <n class="item" value="Item 4"/>
+                <n class="item" value="Item 5"/>
+                <n class="item" value="Item 6"/>
+            </n>
+        </n>
+        <n class="column">
+            <n class="header" value="Column 3"/>
+            <n class="sortable-stuff" sortable="true">
+                <n class="item" value="Item 7"/>
+                <n class="item" value="Item 8"/>
+                <n class="item" value="Item 9"/>
+            </n>
+        </n>
+    </n>
+</udt>

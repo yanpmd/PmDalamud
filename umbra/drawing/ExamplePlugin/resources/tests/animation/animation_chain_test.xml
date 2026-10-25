@@ -1,0 +1,87 @@
+﻿<udt>
+    <node class="wrapper">
+        <node id="main"/>    
+    </node>
+    
+    <![CDATA[
+    .wrapper {
+        size: 500;
+        flow: vertical;
+    }
+    
+    #main {
+        anchor: middle-center;
+        padding: 10;
+        background-color: 0xFF0000FF;
+        size: 30;
+        transition-duration: 500;
+        transition-type: EaseInSine;
+            
+        &.keyframe1 {
+            size: 300;
+            border-radius: 150;
+            background-color: 0xFF00FFA0;
+            transition-duration: 500;
+            transition-type: EaseOutBack;
+            transition-add-class: "keyframe2";
+            transition-remove-class: "keyframe1";
+        }
+        
+        &.keyframe2 {
+            size: 150 100;
+            background-color: 0xFFFF00A0;
+            transition-duration: 500;
+            transition-type: EaseOutBack;
+            transition-add-class: "keyframe3";
+            transition-remove-class: "keyframe2";
+            drop-shadow: 0 0 0 0;
+        }
+        
+        &.keyframe3 {
+            size: 100 150;
+            background-color: 0xFFFF00A0;
+            transition-duration: 1000;
+            transition-type: ease-out-bounce;
+            transition-add-class: "keyframe4";
+            transition-remove-class: "keyframe3";
+            drop-shadow: 0 0 16 16;
+            background-gradient: horizontal 0x00000000 0xA00000FF;
+        }
+        
+         &.keyframe4 {
+            size: 150 150;
+            background-color: 0xFF787A7A;
+            transition-duration: 500;
+            transition-type: EaseOutBounce;
+            transition-add-class: "keyframe5";
+            transition-remove-class: "keyframe4";
+            drop-shadow: 4 0 16 16;
+            background-gradient: horizontal 0xA00000FF 0xA0FF0000;
+        }
+        
+        &.keyframe5 {
+            size: 150 150;
+            background-color: 0xFF787A7A;
+            transition-duration: 500;
+            transition-type: Linear;
+            transition-add-class: "keyframe6";
+            transition-remove-class: "keyframe5";
+            drop-shadow: 4 4 16 16;
+            background-gradient: horizontal 0x00000000 0x00000000;
+            border-radius: 75;
+        }
+        
+        &.keyframe6 {
+            size: 150 150;
+            background-color: 0xFFFFFFFF;
+            transition-duration: 500;
+            transition-type: EaseOutBounce;
+            transition-add-class: "keyframe1";
+            transition-remove-class: "keyframe6";
+            drop-shadow: 4 4 16 16;
+            border-radius: 75;
+            margin: 32;
+        }
+    }
+    ]]>
+</udt>

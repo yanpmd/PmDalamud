@@ -1,0 +1,39 @@
+﻿<udt>
+    <![CDATA[
+    .col {
+        flow: vertical;
+        gap: 2;
+        size: 940 0;
+        background-color: 0xa0212021;
+        padding: 16;
+    }
+    .row {
+        anchor: middle-center;
+        flow: horizontal;
+        gap: 2;
+    }
+    .cell {
+        anchor: middle-left;
+        background-color: 0xc0484a4a;
+        border-radius: 8;
+        size: 16;
+        
+        &.highlight {
+            background-color: 0xffffffff;
+        }
+        
+        &.highlight2 {
+            margin: 16;
+        }
+        
+        &:hover {
+            stroke-color: 0xffffffff;
+            stroke-width: 2;
+        }
+    }
+    ]]>
+    
+    <node id="main" class="col">
+        <!-- Content is generated in the C# code -->
+    </node>
+</udt>

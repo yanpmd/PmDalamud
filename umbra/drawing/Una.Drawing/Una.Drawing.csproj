@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+    <PropertyGroup>
+        <OutputPath>..\out\$(Configuration)\</OutputPath>
+		<Use_DalamudPackager>false</Use_DalamudPackager>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Authors>Una</Authors>
+        <Version>1.0.0.0</Version>
+        <Description>Una.Drawing</Description>
+        <PackageProjectUrl>https://github.com/una-xiv/drawing</PackageProjectUrl>
+        <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="assets\shadow.png" LogicalName="Shadow.png" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="SkiaSharp" Version="3.118.0-preview.1.2" />
+        <Reference Include="TerraFX.Interop.Windows">
+            <HintPath>$(DalamudLibPath)TerraFX.Interop.Windows.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+</Project>

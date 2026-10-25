@@ -1,0 +1,83 @@
+﻿<udt>
+    <![CDATA[
+    #main {
+        flow: vertical;
+        gap: 10;
+        size: 900 0;
+    }
+    
+    .alignment-test {
+        flow: vertical;
+        gap: 10;
+        
+        & > .row {
+            flow: horizontal;
+            gap: 10;
+            
+            & > .text {
+                font-size: 16;
+                size: 250 100;
+                background-color: 0xffffffff;
+                color: 0xff000000;
+                font: 1;
+                
+                &.top-left { text-align: top-left; }
+                &.top-center { text-align: top-center; }
+                &.top-right { text-align: top-right; }
+                &.middle-left { text-align: middle-left; }
+                &.middle-center { text-align: middle-center; }
+                &.middle-right { text-align: middle-right; }
+                &.bottom-left { text-align: bottom-left; }
+                &.bottom-center { text-align: bottom-center; }
+                &.bottom-right { text-align: bottom-right; }
+            }
+            
+            & > .text.middle-center > .line {
+                anchor: middle-center;
+                size: 250 1;
+                background-color: 0xa00000ff;
+            }
+        }
+    }
+    
+    .default { font: 0; }
+    .monospace { font: 1; }
+    .fontAwesome { font: 2; }
+    ]]>
+    
+    <node id="main">
+        <alignment-test font="monospace"/>
+    </node>
+
+    <template name="alignment-test">
+        <argument name="font"/>
+
+        <node class="alignment-test">
+            <node class="row">
+                <at font="${font}" align="top-left"/>
+                <at font="${font}" align="top-center"/>
+                <at font="${font}" align="top-right"/>
+            </node>
+            <node class="row">
+                <at font="${font}" align="middle-left"/>
+                <at font="${font}" align="middle-center"/>
+                <at font="${font}" align="middle-right"/>
+            </node>
+            <node class="row">
+                <at font="${font}" align="bottom-left"/>
+                <at font="${font}" align="bottom-center"/>
+                <at font="${font}" align="bottom-right"/>
+            </node>
+        </node>
+    </template>
+
+
+    <template name="at">
+        <argument name="font"/>
+        <argument name="align"/>
+
+        <node class="text ${align} ${font}" value="Alignment SeIcon(Buff) ${align}">
+            <node class="line"/>
+        </node>
+    </template>
+</udt>

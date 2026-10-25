@@ -1,0 +1,92 @@
+﻿<udt>
+    <![CDATA[
+    #main {
+        flow: horizontal;
+        gap: 8;
+        padding: 8;
+        background-color: 0xff161616;
+        border-radius: 8;
+        stroke-color: 0xFF303c3f;
+        stroke-width: 1;
+        size: 900 600;
+        
+        .box {
+            padding: 8;
+            gap: 8;
+            background-color: 0xff212021;
+            border-radius: 4;
+            stroke-color: 0xFF303c3f;
+            stroke-width: 1;
+            
+            &.grow { auto-size: grow; }
+            &.grow-h { auto-size: grow fit; &.leaf { size: 0 32; } }
+            &.grow-v { auto-size: fit grow; &.leaf { size: 32 0; } }
+            
+            &.c1 { background-color: 0xb0aa0000; }
+            &.c2 { background-color: 0xb000aa00; }
+            &.c3 { background-color: 0xb00000aa; }
+            &.c4 { background-color: 0xb0aaaa00; }
+            &.c5 { background-color: 0xb000aaaa; }
+            &.c6 { background-color: 0xb0aaaaaa; }
+            
+            &.v { flow: vertical; }
+            &.h { flow: horizontal; }
+        }
+    }
+    ]]>
+    
+    <n id="main">
+        <n class="box v grow c1">
+            <n class="box h grow-h c1">
+                <n class="box grow-h c3 leaf"/>
+                <n class="box grow-h c3 leaf"/>
+                <n class="box grow-h c3 leaf"/>
+            </n>
+            <n class="box v grow c2">
+                <n class="box grow-h c3 leaf"/>
+                <n class="box grow c3 leaf"/>
+                <n class="box grow-h c3 leaf"/>
+            </n>
+            <n class="box h grow-h c1">
+                <n class="box grow-h c3 leaf"/>
+                <n class="box grow-h c3 leaf"/>
+                <n class="box grow-h c3 leaf"/>
+            </n>
+        </n>
+        <n class="box grow v c1">
+            <n class="box grow c2 leaf"/>
+            <n class="box grow c2 leaf"/>
+        </n>
+        <n class="box grow c1">
+            <n class="box grow v c2">
+                <n class="box grow-h c3 leaf"/>
+                <n class="box grow v c3">
+                    <n class="box grow-h c4 leaf"/>
+                    <n class="box grow-h c4 leaf"/>
+                    <n class="box grow-h c4 leaf"/>
+                    <n class="box grow c4">
+                        <n class="box grow v c5">
+                            <n class="box grow c6 leaf"/>
+                            <n class="box grow c6 leaf"/>
+                        </n>
+                        <n class="box grow v c5">
+                            <n class="box grow c6 leaf"/>
+                            <n class="box grow c6 leaf"/>
+                            <n class="box grow c6 leaf"/>
+                            <n class="box grow c6 leaf"/>
+                            <n class="box grow c6 leaf"/>
+                        </n>
+                        <n class="box grow v c5">
+                            <n class="box grow c6 leaf"/>
+                            <n class="box grow c6 leaf"/>
+                        </n>
+                    </n>
+                    <n class="box grow-h c4 leaf"/>
+                    <n class="box grow-h c4 leaf"/>
+                    <n class="box grow-h c4 leaf"/>
+                </n>
+                <n class="box grow-h c3 leaf"/>
+            </n>
+        </n>
+    </n>
+</udt>

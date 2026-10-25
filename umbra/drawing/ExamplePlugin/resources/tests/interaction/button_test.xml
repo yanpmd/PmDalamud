@@ -1,0 +1,53 @@
+﻿<udt>
+    <import from="shared.box.xml"/>
+    
+    <![CDATA[
+    
+    #main {
+        flow: vertical;
+        gap: 10;
+        
+        & > .row {
+            flow: horizontal;
+            gap: 10;
+            
+            &.text {
+                font: 1;
+                font-size: 14;
+                color: 0xffffffff;
+            }
+        }
+    }
+   
+    .box {
+        font-size: 13;
+        color: 0xffdadede;
+        padding: 10;
+        text-offset: 0 -2;
+        
+        &:hover {
+            border-color: 0xffffffff;
+            border-width: 6;
+            color: 0xffffffff;
+        }
+        
+        &:disabled {
+            opacity: 0.5;
+        }
+    }
+    ]]>
+    
+    <n id="main">
+        <n class="row">
+            <n class="box button" value="Click me with whatever mouse button."/>
+            
+            <n class="box left-click" tooltip="I react to a left-click only." value="Left-click me."/>
+            <n class="box middle-click" tooltip="I react to a middle-click only." value="Middle-click me."/>
+            <n class="box right-click" tooltip="I react to a right-click only." value="Right-click me."/>
+            <n class="box button" tooltip="I am disabled." is-disabled="true" value="I am disabled."/>
+        </n>
+        <n class="row text" id="left-click-counter"/>
+        <n class="row text" id="middle-click-counter"/>
+        <n class="row text" id="right-click-counter"/>
+    </n>
+</udt>

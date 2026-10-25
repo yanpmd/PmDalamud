@@ -1,0 +1,12 @@
+﻿<udt>
+    <![CDATA[
+    @import "tests";
+
+    .test {
+        size: 125 125;
+        text-align: middle-center;    
+    }
+    ]]>
+
+    <node class="box test"/>
+</udt>

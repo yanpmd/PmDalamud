@@ -1,0 +1,70 @@
+<udt>
+    <node id="main">
+        <node id="button" value="Spawn one!"/>
+        <node id="remove" value="Remove last"/>
+        
+        <node id="list"/>
+    </node>
+    
+    <template name="item">
+        <argument name="count"/>
+        <node class="item">
+            <node class="icon"/>
+            <node class="text" value="I am spawned from a template, #${count}"/>
+            <node class="alt" value="Alternative text."/>
+        </node>
+    </template>
+    
+    <![CDATA[
+    #main {
+        flow: vertical;
+        gap: 16;
+        
+        & > #button {
+            background-color: 0xffeaeaea;
+            color: 0xff000000;
+            padding: 5;
+        }
+        
+        & > #list {
+            flow: vertical;
+            gap: 5;
+            auto-size: grow fit;
+            
+            & > .item {
+                auto-size: grow fit;
+                
+                padding: 5;
+                background-color: 0xffeaeaea;
+                transition-type: ease-out-sine;
+                transition-duration: 200;
+                
+                &:hover {
+                    background-color: 0xffa0a0a0;
+                    transition-duration: 1;
+                }
+                
+                & > .icon {
+                    anchor: middle-left;
+                    size: 16;
+                    background-color: 0xffaa44ff;
+                    border-radius: 8;
+                }
+                
+                & > .text {
+                    anchor: middle-left;
+                    text-align: middle-center;
+                    padding: 0 32 0 0;
+                    color: 0xff000000;
+                }
+                
+                & > .alt {
+                    anchor: middle-left;
+                    color: 0xff787a7a;
+                    font-size: 10;
+                }
+            }
+        }
+    }
+    ]]>
+</udt>
