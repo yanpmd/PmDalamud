@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+    </PropertyGroup>
+    <PropertyGroup>
+        <!-- Points to the installed Umbra plugin directory. Mind the trailing backslash. -->
+        <!-- Set this to your local Umbra build output if you are developing against a local build. -->
+        <UmbraLibPath>$([System.IO.Directory]::GetDirectories($(appdata)\XIVLauncher\installedPlugins\Umbra\)[0])\</UmbraLibPath>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <Platforms>x64</Platforms>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <OutputPath>..\out\$(Configuration)\</OutputPath>
+        <AssemblyName>Umbra.QoLBar</AssemblyName>
+        <RootNamespace>Umbra.QoLBar</RootNamespace>
+        <!--
+            The ported QoLBarCN code predates nullable reference types, so the
+            corresponding diagnostics are not actionable here.
+        -->
+        <NoWarn>$(NoWarn);CS0649;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS8765</NoWarn>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <ProductName>QoL Bar for Umbra</ProductName>
+        <Authors>QoLBarCN</Authors>
+        <Company>QoLBarCN</Company>
+        <Version>1.0.0</Version>
+        <Description>A port of QoL Bar CN to the Umbra plugin API.</Description>
+        <Copyright>(C)2025</Copyright>
+        <PackageProjectUrl>https://github.com/una-xiv/umbra</PackageProjectUrl>
+        <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="Umbra">
+            <HintPath>$(UmbraLibPath)Umbra.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Umbra.Common">
+            <HintPath>$(UmbraLibPath)Umbra.Common.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Umbra.Game">
+            <HintPath>$(UmbraLibPath)Umbra.Game.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Una.Drawing">
+            <HintPath>$(UmbraLibPath)Una.Drawing.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Dalamud">
+            <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Dalamud.Bindings.ImGui">
+            <HintPath>$(DalamudLibPath)Dalamud.Bindings.ImGui.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="FFXIVClientStructs">
+            <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="InteropGenerator.Runtime">
+            <HintPath>$(DalamudLibPath)InteropGenerator.Runtime.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Lumina">
+            <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="Lumina.Excel">
+            <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Newtonsoft.Json is not forward-referenced by Umbra's plugin loader, so it must ship with the plugin. -->
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" GeneratePathProperty="true" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="loc\*.json" />
+    </ItemGroup>
+
+    <!--
+        Newtonsoft.Json is not covered by Umbra's forward-referenced assemblies,
+        so the assembly has to be present in the plugin output directory.
+    -->
+    <Target Name="CopyNewtonsoftJson" AfterTargets="Build">
+        <Copy SourceFiles="$(PkgNewtonsoft_Json)\lib\net6.0\Newtonsoft.Json.dll"
+              DestinationFolder="$(OutputPath)"
+              SkipUnchangedFiles="true"
+              Condition="'$(PkgNewtonsoft_Json)' != '' AND Exists('$(PkgNewtonsoft_Json)\lib\net6.0\Newtonsoft.Json.dll')" />
+    </Target>
+</Project>

@@ -1,0 +1,439 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
+using AetherBags.Configuration;
+using AetherBags.Inventory.Categories;
+using AetherBags.Inventory.Items;
+using FFXIVClientStructs.FFXIV.Client.Game;
+
+namespace AetherBags.IPC.ExternalCategorySystem;
+
+public static class ExternalCategoryManager
+{
+    private static readonly List<IExternalItemSource> Sources = new();
+    private static readonly Dictionary<uint, ExternalCategoryAssignment> CategoryCache = new();
+    private static readonly Dictionary<uint, ItemDecoration> DecorationCache = new();
+    private static readonly Dictionary<uint, List<string>> SearchTagCache = new();
+    private static readonly Dictionary<uint, string> BucketKeyToSourceName = new();
+    private static int _lastCombinedVersion;
+
+    public static IReadOnlyList<IExternalItemSource> RegisteredSources => Sources;
+
+    public static IReadOnlyList<InventoryType> GetActiveInventoryTypes()
+        => GetActiveInventoryTypes(Inventory.Scanning.InventorySourceType.MainBags);
+
+    public static IReadOnlyList<InventoryType> GetActiveInventoryTypes(Inventory.Scanning.InventorySourceType sourceType)
+    {
+        HashSet<InventoryType>? set = null;
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (source is not IInventoryTypeProvidingSource provider) continue;
+            foreach (var type in provider.AdditionalInventoryTypesFor(sourceType))
+            {
+                set ??= new HashSet<InventoryType>();
+                set.Add(type);
+            }
+        }
+        return set is null ? Array.Empty<InventoryType>() : set.ToArray();
+    }
+
+    public static bool IsContainerDragOutLocked(InventoryType container)
+        => IsContainerLocked(container, dragOut: true);
+
+    public static bool IsContainerDragInLocked(InventoryType container)
+        => IsContainerLocked(container, dragOut: false);
+
+    private static bool IsContainerLocked(InventoryType container, bool dragOut)
+    {
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (source is not IInventoryTypeProvidingSource provider) continue;
+            bool locked = dragOut ? provider.LocksDragOut : provider.LocksDragIn;
+            if (!locked) continue;
+            foreach (var type in provider.AdditionalInventoryTypes)
+            {
+                if (type == container) return true;
+            }
+        }
+        return false;
+    }
+
+    public static bool IsContainerClaimedByExternalSource(InventoryType container)
+    {
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (source is not IInventoryTypeProvidingSource provider) continue;
+            foreach (var type in provider.AdditionalInventoryTypes)
+            {
+                if (type == container) return true;
+            }
+        }
+        return false;
+    }
+
+    public static FFXIVClientStructs.FFXIV.Component.GUI.DragDropType GetDragDropTypeForContainer(InventoryType container)
+    {
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (source is not IInventoryTypeProvidingSource provider) continue;
+            foreach (var type in provider.AdditionalInventoryTypes)
+            {
+                if (type == container)
+                    return provider.GetDragDropTypeFor(container);
+            }
+        }
+        return FFXIVClientStructs.FFXIV.Component.GUI.DragDropType.Item;
+    }
+
+    public static bool ShouldAutoRouteDeposit(InventoryType container)
+    {
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (source is not IInventoryTypeProvidingSource provider) continue;
+            foreach (var type in provider.AdditionalInventoryTypes)
+            {
+                if (type == container)
+                    return provider.AutoRoutesDeposits(container);
+            }
+        }
+        return false;
+    }
+
+    public static void RegisterSource(IExternalItemSource source)
+    {
+        if (Sources.Any(s => s.SourceName == source.SourceName))
+            return;
+
+        Sources.Add(source);
+        Sources.Sort((a, b) => b.Priority.CompareTo(a.Priority));
+        source.OnDataChanged += InvalidateCache;
+        InvalidateCache();
+
+        Services.Logger.Information($"Registered external category source: {source.SourceName}");
+    }
+
+    public static void UnregisterSource(string sourceName)
+    {
+        var source = Sources.FirstOrDefault(s => s.SourceName == sourceName);
+        if (source == null) return;
+
+        source.OnDataChanged -= InvalidateCache;
+        Sources.Remove(source);
+        InvalidateCache();
+
+        Services.Logger.Information($"Unregistered external category source: {sourceName}");
+    }
+
+    public static void InvalidateCache()
+    {
+        _lastCombinedVersion = -1;
+        CategoryCache.Clear();
+        DecorationCache.Clear();
+        SearchTagCache.Clear();
+        BucketKeyToSourceName.Clear();
+    }
+
+    public static bool TryGetSourceForBucketKey(uint bucketKey, out string sourceName)
+    {
+        RebuildCacheIfNeeded();
+        return BucketKeyToSourceName.TryGetValue(bucketKey, out sourceName!);
+    }
+
+    private static int ComputeCombinedVersion()
+    {
+        int version = 0;
+        foreach (var source in Sources)
+            version = unchecked(version * 31 + source.Version);
+        return version;
+    }
+
+    public static void RebuildCacheIfNeeded()
+    {
+        int currentVersion = ComputeCombinedVersion();
+        if (currentVersion == _lastCombinedVersion && CategoryCache.Count > 0)
+            return;
+
+        Services.Logger.DebugOnly($"[ExternalCategoryManager] Rebuilding cache, version {_lastCombinedVersion} -> {currentVersion}, sources={Sources.Count}");
+        _lastCombinedVersion = currentVersion;
+        CategoryCache.Clear();
+        DecorationCache.Clear();
+        SearchTagCache.Clear();
+        BucketKeyToSourceName.Clear();
+
+        foreach (var source in Sources)
+        {
+            Services.Logger.DebugOnly($"[ExternalCategoryManager] Source {source.SourceName}: IsReady={source.IsReady}, Caps={source.Capabilities}");
+            if (!source.IsReady) continue;
+
+            if (source.Capabilities.HasFlag(SourceCapabilities.Categories))
+            {
+                var categories = source.GetCategoryAssignments();
+                Services.Logger.DebugOnly($"[ExternalCategoryManager] Categories from {source.SourceName}: {categories?.Count ?? 0}");
+                if (categories != null)
+                {
+                    foreach (var (itemId, assignment) in categories)
+                    {
+                        CategoryCache.TryAdd(itemId, assignment);
+                        BucketKeyToSourceName.TryAdd(assignment.CategoryKey, source.SourceName);
+                    }
+                }
+            }
+
+            if (source.Capabilities.HasFlag(SourceCapabilities.ItemColors) ||
+                source.Capabilities.HasFlag(SourceCapabilities.Badges))
+            {
+                var decorations = source.GetItemDecorations();
+                Services.Logger.DebugOnly($"[ExternalCategoryManager] Decorations from {source.SourceName}: {decorations?.Count ?? 0}");
+                if (decorations != null)
+                {
+                    foreach (var (itemId, decoration) in decorations)
+                    {
+                        if (DecorationCache.TryGetValue(itemId, out var existing))
+                        {
+                            DecorationCache[itemId] = MergeDecorations(existing, decoration, source.ConflictBehavior);
+                        }
+                        else
+                        {
+                            DecorationCache[itemId] = decoration;
+                        }
+                    }
+                }
+            }
+
+            if (source.Capabilities.HasFlag(SourceCapabilities.SearchTags))
+            {
+                var searchTags = source.GetSearchTags();
+                if (searchTags != null)
+                {
+                    foreach (var (itemId, tags) in searchTags)
+                    {
+                        if (!SearchTagCache.TryGetValue(itemId, out var existingTags))
+                        {
+                            existingTags = new List<string>(tags.Length);
+                            SearchTagCache[itemId] = existingTags;
+                        }
+                        existingTags.AddRange(tags);
+                    }
+                }
+            }
+        }
+
+        Services.Logger.DebugOnly($"[ExternalCategoryManager] Cache built: Categories={CategoryCache.Count}, Decorations={DecorationCache.Count}");
+    }
+
+    private static ItemDecoration MergeDecorations(ItemDecoration existing, ItemDecoration incoming, ConflictBehavior behavior)
+    {
+        return behavior switch
+        {
+            ConflictBehavior.Replace => incoming,
+            ConflictBehavior.Defer => existing,
+            ConflictBehavior.Merge => new ItemDecoration
+            {
+                OverlayColor = incoming.OverlayColor ?? existing.OverlayColor,
+                Opacity = incoming.Opacity ?? existing.Opacity,
+                Badge = incoming.Badge ?? existing.Badge,
+                Border = incoming.Border != BorderStyle.None ? incoming.Border : existing.Border,
+                TooltipLine = CombineTooltips(existing.TooltipLine, incoming.TooltipLine),
+            },
+            _ => incoming
+        };
+    }
+
+    private static string? CombineTooltips(string? a, string? b)
+    {
+        if (string.IsNullOrEmpty(a)) return b;
+        if (string.IsNullOrEmpty(b)) return a;
+        return $"{a}\n{b}";
+    }
+
+    public static void BucketItems(
+        Dictionary<ulong, ItemInfo> itemInfoByKey,
+        Dictionary<uint, CategoryBucket> bucketsByKey,
+        HashSet<ulong> claimedKeys)
+    {
+        RebuildCacheIfNeeded();
+
+        if (CategoryCache.Count == 0) return;
+
+        var overrides = System.Config?.Categories?.BuiltInSourceOverrides;
+
+        foreach (var (itemKey, item) in itemInfoByKey)
+        {
+            if (claimedKeys.Contains(itemKey)) continue;
+
+            if (!CategoryCache.TryGetValue(item.Item.ItemId, out var assignment))
+                continue;
+
+            BuiltInSourceOverride? prefs = null;
+            if (overrides is not null
+                && BucketKeyToSourceName.TryGetValue(assignment.CategoryKey, out var sourceName)
+                && overrides.TryGetValue(sourceName, out var found))
+            {
+                prefs = found;
+            }
+
+            if (prefs is { Enabled: false }) continue;
+
+            ref var bucketRef = ref CollectionsMarshal.GetValueRefOrAddDefault(bucketsByKey, assignment.CategoryKey, out bool exists);
+
+            if (!exists)
+            {
+                bucketRef = new CategoryBucket
+                {
+                    Key = assignment.CategoryKey,
+                    Category = new CategoryInfo
+                    {
+                        Name = assignment.CategoryName,
+                        Description = assignment.CategoryDescription ?? string.Empty,
+                        Color = prefs?.Color ?? assignment.CategoryColor,
+                        IsPinned = prefs?.Pinned ?? assignment.IsPinned,
+                        Order = prefs?.Order ?? assignment.SubPriority,
+                    },
+                    Items = new List<ItemInfo>(16),
+                    FilteredItems = new List<ItemInfo>(16),
+                    ItemSortCriteria = prefs?.ItemSortCriteria.Count > 0 ? prefs.ItemSortCriteria : null,
+                    CustomItemOrder = prefs?.CustomItemOrder.Count > 0 ? prefs.CustomItemOrder : null,
+                    Used = true,
+                };
+            }
+            else
+            {
+                bucketRef!.Used = true;
+                bucketRef.Category.Name = assignment.CategoryName;
+                bucketRef.Category.Description = assignment.CategoryDescription ?? string.Empty;
+                bucketRef.Category.Color = prefs?.Color ?? assignment.CategoryColor;
+                bucketRef.Category.IsPinned = prefs?.Pinned ?? assignment.IsPinned;
+                bucketRef.Category.Order = prefs?.Order ?? assignment.SubPriority;
+                bucketRef.ItemSortCriteria = prefs?.ItemSortCriteria.Count > 0 ? prefs.ItemSortCriteria : null;
+                bucketRef.CustomItemOrder = prefs?.CustomItemOrder.Count > 0 ? prefs.CustomItemOrder : null;
+            }
+
+            bucketRef!.Items.Add(item);
+            claimedKeys.Add(itemKey);
+        }
+    }
+
+    public static ItemDecoration? GetDecoration(uint itemId)
+    {
+        RebuildCacheIfNeeded();
+        var found = DecorationCache.TryGetValue(itemId, out var dec);
+        if (found)
+        {
+            Services.Logger.DebugOnly($"[GetDecoration] Found decoration for {itemId}: Badge={dec.Badge.HasValue}, Border={dec.Border}, Overlay={dec.OverlayColor}");
+            // Extra detail for badge items
+            if (dec.Badge.HasValue)
+            {
+                Services.Logger.DebugOnly($"[GetDecoration] Badge details for {itemId}: IconId={dec.Badge.Value.IconId}, Position={dec.Badge.Value.Position}");
+            }
+        }
+        return found ? dec : null;
+    }
+
+    public static Vector3? GetItemOverlayColor(uint itemId)
+    {
+        RebuildCacheIfNeeded();
+
+        if (CategoryCache.TryGetValue(itemId, out var assignment))
+        {
+            Services.Logger.DebugOnly($"[GetItemOverlayColor] Item {itemId}: Found in CategoryCache, returning {assignment.ItemOverlayColor}");
+            return assignment.ItemOverlayColor;
+        }
+
+        if (DecorationCache.TryGetValue(itemId, out var decoration))
+        {
+            Services.Logger.DebugOnly($"[GetItemOverlayColor] Item {itemId}: Found in DecorationCache, returning {decoration.OverlayColor}");
+            return decoration.OverlayColor;
+        }
+
+        return null;
+    }
+
+    public static List<ContextMenuEntry>? GetContextMenuEntries(uint itemId)
+    {
+        List<ContextMenuEntry>? result = null;
+
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (!source.Capabilities.HasFlag(SourceCapabilities.ContextMenu)) continue;
+
+            var entries = source.GetContextMenuEntries(itemId);
+            if (entries == null || entries.Count == 0) continue;
+
+            foreach (var entry in entries)
+            {
+                if (entry.IsVisible != null && !entry.IsVisible(itemId)) continue;
+
+                result ??= new List<ContextMenuEntry>(4);
+                result.Add(entry);
+            }
+        }
+
+        result?.Sort((a, b) => a.Order.CompareTo(b.Order));
+        return result;
+    }
+
+    public static IReadOnlyList<string>? GetSearchTags(uint itemId)
+    {
+        RebuildCacheIfNeeded();
+        return SearchTagCache.TryGetValue(itemId, out var tags) ? tags : null;
+    }
+
+    public static bool MatchesSearchTag(uint itemId, string searchText)
+    {
+        RebuildCacheIfNeeded();
+        if (!SearchTagCache.TryGetValue(itemId, out var tags)) return false;
+
+        foreach (var tag in tags)
+        {
+            if (tag.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    public static List<ItemRelationship>? GetItemRelationships(uint itemId)
+    {
+        List<ItemRelationship>? result = null;
+
+        foreach (var source in Sources)
+        {
+            if (!source.IsReady) continue;
+            if (!source.Capabilities.HasFlag(SourceCapabilities.Relationships)) continue;
+
+            var relationships = source.GetItemRelationships(itemId);
+            if (relationships == null || relationships.Count == 0) continue;
+
+            result ??= new List<ItemRelationship>(4);
+            result.AddRange(relationships);
+        }
+
+        return result;
+    }
+
+    public static HashSet<uint>? GetRelatedItemIds(uint itemId, RelationshipType? filterType = null)
+    {
+        var relationships = GetItemRelationships(itemId);
+        if (relationships == null || relationships.Count == 0) return null;
+
+        var result = new HashSet<uint>();
+        foreach (var rel in relationships)
+        {
+            if (filterType.HasValue && rel.Type != filterType.Value) continue;
+
+            foreach (var relatedId in rel.RelatedItemIds)
+            {
+                result.Add(relatedId);
+            }
+        }
+
+        return result.Count > 0 ? result : null;
+    }
+}

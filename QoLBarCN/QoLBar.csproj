@@ -1,0 +1,15 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+    <PropertyGroup>
+        <Version>2.3.3.9</Version>
+        <Nullable>disable</Nullable>
+        <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
+        <AssemblyName>QoLBarCN</AssemblyName>
+        <RootNamespace>QoLBar</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="loc\*.json" />
+    </ItemGroup>
+
+</Project>

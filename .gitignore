@@ -1,0 +1,7 @@
+**/.github/**
+**/umbra/**
+
+obj/
+.vs/
+bin/
+Publish/
