@@ -1,8 +1,8 @@
-﻿{
+{
   "Author": "Una",
   "Name": "UmbraEx",
   "InternalName": "UmbraEx",
-  "AssemblyVersion": "3.1.18.3",
+  "AssemblyVersion": "3.1.18.4",
   "Description": "Consolidates common UI elements and actions into a single uniform interface in the form of a set of highly customizable toolbars.",
   "ApplicableVersion": "any",
   "RepoUrl": "https://github.com/una-xiv/umbra",
