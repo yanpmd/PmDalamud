@@ -1,25 +1,19 @@
 {
 	"folders": [
 		{
-			"path": "umbra"
+			"path": "UmbraEx"
 		},
 		{
 			"path": "Umbra.SamplePlugin"
 		},
 		{
-			"path": "Umbra.QoLBar"
+			"path": "AetherBagsEx"
 		},
 		{
-			"path": "AetherBagsCN"
-		},
-		{
-			"path": "QoLBarCN"
+			"path": "QoLBarEx"
 		},
 		{
 			"path": "."
-		},
-		{
-			"path": "Umbra.MoreControls"
 		}
 	]
 }

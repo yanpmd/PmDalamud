@@ -1,0 +1,359 @@
+using System;
+using System.Collections.Generic;
+using AetherBags.Configuration;
+using AetherBags.Helpers;
+using AetherBags.Inventory;
+using AetherBags.Inventory.Categories;
+using AetherBags.Inventory.Context;
+using AetherBags.Inventory.Items;
+using AetherBags.Inventory.State;
+using Dalamud.Bindings.ImGui;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using KamiToolKit.ContextMenu;
+
+namespace AetherBags.Addons;
+
+public static class InventoryAddonContextMenu
+{
+    private static ContextMenuItem Separator => new()
+    {
+        Name = "---------------------------",
+        IsEnabled = false,
+        OnClick = () => { }
+    };
+
+    // Temporary method, since OwnerAddon is never set for Overlays we need to set this or else the contextmenu will close immediately
+    // TODO: Figure out how to do this in the ContextMenu itself or have Kami come up with a solution
+    // The better solution is to use agentContextMenu->OpenContextMenu(false, true); in KTK when it's an overlay so it doesn't bind to the addon
+    private static unsafe void SetAgentOwnerAddon(int addonId)
+    {
+        var agentContext = AgentContext.Instance();
+        agentContext->OwnerAddon = (uint) addonId;
+    }
+
+    public static void OpenMain(InventoryAddonBase? parent)
+    {
+        if (parent?.ContextMenu == null || System.Config == null) return;
+
+        var menu = parent.ContextMenu;
+        menu.Clear();
+
+        SetAgentOwnerAddon(parent.AddonId);
+
+        bool hasActiveAtFilter = !string.IsNullOrEmpty(HighlightState.SelectedAllaganToolsFilterKey);
+        string searchText = parent.GetSearchText();
+        if (HighlightState.IsFilterActive || hasActiveAtFilter || !string.IsNullOrEmpty(searchText))
+        {
+            menu.AddItem(Localization.Get("ContextMenu.ClearAllFilters"), () =>
+            {
+                HighlightState.ClearAll();
+                parent.SetSearchText(string.Empty);
+                InventoryOrchestrator.RefreshAll(updateMaps: false);
+            });
+            menu.AddItem(Separator);
+        }
+
+        var currentMode = System.Config.General.SearchMode;
+        string modeLabel = currentMode == SearchMode.Filter
+            ? Localization.Get("ContextMenu.ModeHide")
+            : Localization.Get("ContextMenu.ModeFade");
+        menu.AddItem(modeLabel, () =>
+        {
+            System.Config.General.SearchMode = currentMode == SearchMode.Filter ? SearchMode.Highlight :  SearchMode.Filter;
+            parent.ManualRefresh();
+        });
+
+        menu.AddItem(CreateUtilitiesSubMenu(parent));
+        menu.AddItem(CreateVisibilitySubMenu());
+        menu.AddItem(CreateStackingSubMenu());
+
+        var allaganToolsSubMenu = CreateAllaganToolsFilterSubMenu();
+        if (allaganToolsSubMenu != null)
+        {
+            menu.AddItem(allaganToolsSubMenu);
+        }
+
+        menu.Open();
+    }
+
+    /// <summary>
+    /// Context menu opened by right-clicking a category name. Only offers
+    /// whole-category transfers whose target is currently reachable; when none
+    /// applies nothing is opened.
+    /// </summary>
+    public static void OpenCategoryActions(InventoryAddonBase? parent, CategorizedInventory category)
+    {
+        if (parent?.ContextMenu == null || System.Config == null) return;
+
+        // Snapshot the stacks now: the menu outlives this refresh and the
+        // underlying category list is recycled by the next one.
+        var items = new List<ItemInfo>(category.Items);
+
+        var actions = new List<ContextMenuItem>();
+
+        if (parent.IsSaddleBagWindow)
+        {
+            if (SaddleBagState.AreContainersLoaded)
+                actions.Add(CreateCategoryAction("ContextMenu.WithdrawAll", () => CategoryTransferQueue.MoveAllFromSaddleBag(items)));
+        }
+        else if (parent.IsMainBagsWindow)
+        {
+            if (SaddleBagState.AreContainersLoaded)
+                actions.Add(CreateCategoryAction("ContextMenu.DepositAll", () => CategoryTransferQueue.MoveAllToSaddleBag(items)));
+
+            if (RetainerState.AreContainersLoaded)
+                actions.Add(CreateCategoryAction("ContextMenu.DepositAllRetainer", () => CategoryTransferQueue.MoveAllToRetainer(items)));
+        }
+        else if (parent.IsRetainerWindow)
+        {
+            if (RetainerState.AreContainersLoaded)
+                actions.Add(CreateCategoryAction("ContextMenu.WithdrawAllRetainer", () => CategoryTransferQueue.MoveAllFromRetainer(items)));
+        }
+
+        if (actions.Count == 0) return;
+
+        var menu = parent.ContextMenu;
+        menu.Clear();
+
+        SetAgentOwnerAddon(parent.AddonId);
+
+        foreach (var action in actions)
+            menu.AddItem(action);
+
+        menu.Open();
+    }
+
+    private static ContextMenuItem CreateCategoryAction(string labelKey, Action onClick) => new()
+    {
+        Name = Localization.Get(labelKey),
+        OnClick = onClick
+    };
+
+    private static ContextMenuSubItem CreateUtilitiesSubMenu(InventoryAddonBase parent)
+    {
+        var subMenu = new ContextMenuSubItem
+        {
+            Name = Localization.Get("ContextMenu.Utilities"),
+            OnClick = () => { }
+        };
+
+        subMenu.AddItem(Localization.Get("ContextMenu.RefreshInventory"), () => InventoryOrchestrator.RefreshAll(updateMaps: true));
+        subMenu.AddItem(Localization.Get("ContextMenu.RefreshExternalSources"), () =>
+        {
+            System.IPC.RefreshExternalSources();
+            RefreshInventory();
+        });
+        subMenu.AddItem(Localization.Get("ContextMenu.CopyVisibleItemIds"), () => CopyVisibleItemIds(parent));
+        subMenu.AddItem(Localization.Get("ContextMenu.CopyVisibleItemList"), () => CopyVisibleItemList(parent));
+        subMenu.AddItem(Localization.Get("ContextMenu.PrintInventoryStats"), () => PrintInventoryStats(parent));
+
+        return subMenu;
+    }
+
+    private static ContextMenuSubItem CreateVisibilitySubMenu()
+    {
+        var config = System.Config.Categories;
+        var generalConfig = System.Config.General;
+        var subMenu = new ContextMenuSubItem
+        {
+            Name = Localization.Get("ContextMenu.Visibility"),
+            OnClick = () => { }
+        };
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.Categories", config.CategoriesEnabled), () =>
+        {
+            config.CategoriesEnabled = !config.CategoriesEnabled;
+            System.IPC.RefreshExternalSources();
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.GameCategories", config.GameCategoriesEnabled), () =>
+        {
+            config.GameCategoriesEnabled = !config.GameCategoriesEnabled;
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.UserCategories", config.UserCategoriesEnabled), () =>
+        {
+            config.UserCategoriesEnabled = !config.UserCategoriesEnabled;
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.Crystals", config.CrystalsEnabled), () =>
+        {
+            config.CrystalsEnabled = !config.CrystalsEnabled;
+            System.IPC.RefreshExternalSources();
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.KeyItems", config.KeyItemsEnabled), () =>
+        {
+            config.KeyItemsEnabled = !config.KeyItemsEnabled;
+            System.IPC.RefreshExternalSources();
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.RecentlyLootedSection", generalConfig.ShowRecentlyLooted), () =>
+        {
+            generalConfig.ShowRecentlyLooted = !generalConfig.ShowRecentlyLooted;
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.CategoryItemCounts", generalConfig.ShowCategoryItemCount), () =>
+        {
+            generalConfig.ShowCategoryItemCount = !generalConfig.ShowCategoryItemCount;
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        return subMenu;
+    }
+
+    private static ContextMenuSubItem CreateStackingSubMenu()
+    {
+        var config = System.Config.General;
+        var subMenu = new ContextMenuSubItem
+        {
+            Name = Localization.Get("ContextMenu.Stacking"),
+            OnClick = () => { }
+        };
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.SplitStacks", config.StackMode == InventoryStackMode.NaturalStacks), () =>
+        {
+            config.StackMode = InventoryStackMode.NaturalStacks;
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(GetCheckedLabel("ContextMenu.MergeStacks", config.StackMode == InventoryStackMode.AggregateByItemId), () =>
+        {
+            config.StackMode = InventoryStackMode.AggregateByItemId;
+            SaveConfig();
+            RefreshInventory();
+        });
+
+        subMenu.AddItem(new ContextMenuItem
+        {
+            Name = GetCheckedLabel("ContextMenu.CombineUnstackableItems", config.AggregateUnstackableItems),
+            IsEnabled = config.StackMode == InventoryStackMode.AggregateByItemId,
+            OnClick = () =>
+            {
+                config.AggregateUnstackableItems = !config.AggregateUnstackableItems;
+                SaveConfig();
+                RefreshInventory();
+            }
+        });
+
+        return subMenu;
+    }
+
+    private static ContextMenuSubItem? CreateAllaganToolsFilterSubMenu()
+    {
+        if (System.IPC.AllaganTools is { IsReady: true } && System.Config.Categories.AllaganToolsCategoriesEnabled)
+        {
+            var atFilters = System.IPC.AllaganTools.GetSearchFilters();
+            if (atFilters is { Count: > 0 })
+            {
+                var subMenu = new ContextMenuSubItem
+                {
+                    Name = Localization.Get("ContextMenu.AllaganToolsFilters"),
+                    OnClick = () => { }
+                };
+
+                foreach (var (key, name) in atFilters)
+                {
+                    var capturedKey = key;
+                    bool isActive = HighlightState.SelectedAllaganToolsFilterKey == key;
+                    subMenu.AddItem(isActive ?$"✓ {name}" : $" {name}", () =>
+                    {
+                        HighlightState.SelectedAllaganToolsFilterKey = isActive ? string.Empty : capturedKey;
+                        InventoryOrchestrator.RefreshAll(updateMaps: false);
+                    });
+                }
+
+                return subMenu;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetCheckedLabel(string key, bool isChecked)
+    {
+        var label = Localization.Get(key);
+        return isChecked ? $"✓ {label}" : $" {label}";
+    }
+
+    private static void CopyVisibleItemIds(InventoryAddonBase parent)
+    {
+        var categories = parent.GetVisibleCategories();
+        if (categories == null || categories.Count == 0)
+        {
+            PrintChat(Localization.Get("ContextMenu.NoVisibleItems"));
+            return;
+        }
+
+        var seen = new HashSet<uint>();
+        var ids = new List<uint>();
+        foreach (var category in categories)
+        {
+            foreach (var item in category.Items)
+            {
+                if (seen.Add(item.Item.ItemId))
+                    ids.Add(item.Item.ItemId);
+            }
+        }
+
+        ImGui.SetClipboardText(string.Join(", ", ids));
+        PrintChat(Localization.F("ContextMenu.CopiedUniqueIds", ids.Count));
+    }
+
+    private static void CopyVisibleItemList(InventoryAddonBase parent)
+    {
+        var categories = parent.GetVisibleCategories();
+        if (categories == null || categories.Count == 0)
+        {
+            PrintChat(Localization.Get("ContextMenu.NoVisibleItems"));
+            return;
+        }
+
+        var lines = new List<string>();
+        foreach (var category in categories)
+        {
+            foreach (var item in category.Items)
+            {
+                lines.Add($"{item.Item.ItemId}: {item.Name} x{item.ItemCount}");
+            }
+        }
+
+        ImGui.SetClipboardText(string.Join("\n", lines));
+        PrintChat(Localization.F("ContextMenu.CopiedVisibleItems", lines.Count));
+    }
+
+    private static void PrintInventoryStats(InventoryAddonBase parent)
+    {
+        var stats = parent.GetStats();
+        PrintChat(Localization.F("ContextMenu.StatsLine", stats.UsedSlots, stats.TotalSlots, stats.UsagePercent, stats.TotalItems, stats.CategoryCount));
+    }
+
+    private static void PrintChat(string message) => Services.ChatGui.Print(message, "AetherBagsEx");
+
+    private static void SaveConfig() => Util.SaveConfig(System.Config);
+
+    private static void RefreshInventory() => InventoryOrchestrator.RefreshAll(updateMaps: true);
+
+    public static unsafe void Close()
+    {
+        var agent = AgentContext.Instance();
+        if (agent != null)
+        {
+            agent->ClearMenu();
+        }
+    }
+}
