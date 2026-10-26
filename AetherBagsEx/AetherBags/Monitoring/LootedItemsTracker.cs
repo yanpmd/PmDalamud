@@ -27,6 +27,13 @@ public sealed unsafe class LootedItemsTracker : IDisposable
     private bool _hasPendingRemoval;
     private int _nextIndex;
 
+    /// <summary>
+    /// Bumped for every bulk commit (more than one item changed in the same batch).
+    /// Windows use it to re-arm the compact packing once after such a commit, so the
+    /// layout gets tidied up again instead of only on the initial open.
+    /// </summary>
+    public long BulkCommitVersion { get; private set; }
+
     public readonly HashSet<uint> UnseenLootItemIds = new();
 
     public event Action<IReadOnlyList<LootedItemInfo>>? OnLootedItemsChanged;
@@ -101,9 +108,17 @@ public sealed unsafe class LootedItemsTracker : IDisposable
     {
         if (_pendingChanges.Count == 0 && !_hasPendingRemoval) return;
 
+        // Sample the commit size before the pending map is cleared, so a single pickup can
+        // be told apart from a batch of changes.
+        int changedItems = _pendingChanges.Count + (_hasPendingRemoval ? 1 : 0);
+
         ProcessPendingChanges();
 
         _hasPendingRemoval = false;
+
+        if (changedItems > 1)
+            BulkCommitVersion++;
+
         OnLootedItemsChanged?.Invoke(_lootedItems);
     }
 

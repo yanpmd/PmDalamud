@@ -53,7 +53,9 @@ internal sealed partial class SocietiesWidget(
         Society? society        = Player.Societies.FirstOrDefault(s => s.Id == trackedTribeId);
 
         if (0 == trackedTribeId || !society.HasValue) {
-            SetText(GetConfigValue<string>("ButtonLabel"));
+            // The button label used to be a config value that stuck to whatever language was
+            // active when the widget was created; always use the localized widget name instead.
+            SetText(Info.Name);
             SetSubText(default);
             tooltip = null;
         } else {

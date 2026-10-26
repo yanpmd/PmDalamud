@@ -378,6 +378,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
         // Must match emitted type or AtkComponentDragDrop rejects matching payloads from other windows.
         node.AcceptedType = dragDropType;
         node.IconNode.IconExtras.AntsNode.IsVisible = data.IsRelationshipHighlighted;
+        node.IsCollected = CollectionStatus.IsCollected(item.ItemId);
 
         if (data.IsRelationshipHighlighted && config.AnimationEnabled)
             node.IconNode.IconExtras.AntsNode.Timeline?.PlayAnimation(26);
@@ -427,6 +428,8 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
 
             bool draggable = !info.IsSlotBlocked && !ExternalCategoryManager.IsContainerDragOutLocked(info.Item.Container);
             if (itemNode.IsDraggable != draggable) itemNode.IsDraggable = draggable;
+
+            itemNode.IsCollected = CollectionStatus.IsCollected(info.Item.ItemId);
 
             bool ants = info.IsRelationshipHighlighted;
             if (itemNode.IconNode.IconExtras.AntsNode.IsVisible != ants) itemNode.IconNode.IconExtras.AntsNode.IsVisible = ants;

@@ -95,6 +95,11 @@ public unsafe class IconNode : ComponentNode<AtkComponentIcon, AtkUldComponentDa
         set => Component->SetIsRecipe(value);
     }
 
+    public bool IsGlamoured {
+        get => Component->Flags.HasFlag(IconComponentFlags.IsGlamoured);
+        set => Component->SetIsGlamoured(value);
+    }
+
     public bool IsBeingDragged
         => Component->Flags.HasFlag(IconComponentFlags.IsBeingDragged);
 

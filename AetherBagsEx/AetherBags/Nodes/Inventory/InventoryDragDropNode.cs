@@ -108,6 +108,21 @@ public class InventoryDragDropNode : DragDropNode
         }
     }
 
+    /// <summary>
+    /// Shows the game's native "collected" checkmark on the icon, used for orchestrion
+    /// rolls, triad cards, mounts and minions the player has already unlocked.
+    /// </summary>
+    public bool IsCollected
+    {
+        set
+        {
+            if (IconNode.IsGlamoured == value)
+                return;
+
+            IconNode.IsGlamoured = value;
+        }
+    }
+
     private void ApplyBadge(BadgeInfo badge)
     {
         bool wasNull = _badgeNode == null;
@@ -373,6 +388,7 @@ private void ApplyBorder(BorderStyle style)
         Alpha = 1.0f;
         IconNode.AddColor = Vector3.Zero;
         IconNode.IsIconDisabled = false;
+        IconNode.IsGlamoured = false;
         IsDraggable = true;
         IconNode.IconExtras.AntsNode.IsVisible = false;
     }

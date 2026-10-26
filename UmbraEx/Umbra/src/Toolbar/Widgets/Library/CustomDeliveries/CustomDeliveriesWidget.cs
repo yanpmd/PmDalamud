@@ -44,7 +44,9 @@ internal sealed class CustomDeliveriesWidget(
                 "ButtonLabel",
                 I18N.Translate("Widget.CustomDeliveries.Config.ButtonLabel.Name"),
                 I18N.Translate("Widget.CustomDeliveries.Config.ButtonLabel.Description"),
-                Info.Name
+                // Empty means "use the localized widget name", so the label follows the UI
+                // language instead of freezing whatever language was active at creation time.
+                string.Empty
             ),
             new SelectWidgetConfigVariable(
                 "PrimaryAction",
@@ -93,7 +95,8 @@ internal sealed class CustomDeliveriesWidget(
         Popup.ReverseOrder  = GetConfigValue<bool>("ReverseOrder");
 
         if (npcId == 0 || npc == null) {
-            SetText(GetConfigValue<string>("ButtonLabel"));
+            string label = GetConfigValue<string>("ButtonLabel");
+            SetText(string.IsNullOrWhiteSpace(label) ? Info.Name : label);
             SetSubText(default);
         } else {
             SetText(npc.Name);

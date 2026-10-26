@@ -92,6 +92,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     private int _refreshFromLifecycleCount;
     private long _lastLogTick;
     private long _lastRefreshTick;
+    private long _lastSeenBulkCommitVersion;
 
     /// <summary>
     /// The addon asks for an update on every frame. A full inventory scan,
@@ -167,6 +168,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
             _isRefreshing = true;
             InventoryState.RefreshFromGame();
             System.LootedItemsTracker.FlushPendingChanges();
+            ApplyPendingBulkCompact();
             RefreshCategoriesCore(autosize);
         }
         finally
@@ -179,6 +181,26 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     {
         _refreshFromLifecycleCount++;
         ExecuteRefresh(autosize: true);
+    }
+
+    /// <summary>
+    /// A bulk commit (looting a full chest, moving an entire page, ...) changes far more
+    /// items than a single pickup and leaves the compact layout with gaps for the rest of
+    /// the session. "Compact once per open" would only tidy that up on the next reopen, so
+    /// re-arm the gate once for every bulk commit. Single pickups are ignored deliberately:
+    /// re-flowing for them would reshuffle items while the cursor is still moving.
+    /// </summary>
+    private void ApplyPendingBulkCompact()
+    {
+        long version = System.LootedItemsTracker.BulkCommitVersion;
+
+        if (version == _lastSeenBulkCommitVersion)
+            return;
+
+        _lastSeenBulkCommitVersion = version;
+
+        CategoriesNode?.ResetCompactPackingGate();
+        CategoriesNode?.InvalidateLayout();
     }
 
     protected virtual void RefreshCategoriesCore(bool autosize)
@@ -834,6 +856,10 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
 
         // Re-arm "compact once per open" so a fresh window compacts again.
         CategoriesNode?.ResetCompactPackingGate();
+
+        // The opening pass already compacts; don't replay a bulk commit that happened
+        // while this window was closed.
+        _lastSeenBulkCommitVersion = System.LootedItemsTracker.BulkCommitVersion;
 
         System.AetherBagsAPI?.API.RaiseInventoryOpened();
 
