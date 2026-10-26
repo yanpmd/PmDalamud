@@ -81,7 +81,16 @@ public abstract class WidgetPopup : IDisposable
     /// </summary>
     public bool IsOpen => _isOpen;
 
-    public bool Render(ToolbarWidget activator)
+    /// <summary>
+    /// Renders the popup.
+    /// </summary>
+    /// <param name="activator">The widget this popup belongs to.</param>
+    /// <param name="anchor">
+    /// The widget that is used to position the popup on the screen. This is
+    /// only different from the activator when the popup belongs to a widget
+    /// that is hosted by another widget, such as a menu.
+    /// </param>
+    public bool Render(ToolbarWidget activator, ToolbarWidget? anchor = null)
     {
         if (_isCrashed) return false;
 
@@ -93,7 +102,7 @@ public abstract class WidgetPopup : IDisposable
         bool keepOpen = false;
 
         try {
-            keepOpen = RenderInternal(activator);
+            keepOpen = RenderInternal(activator, anchor ?? activator);
         } catch (Exception e) {
             _isCrashed = true;
             Logger.Error(e.Message);
@@ -120,7 +129,7 @@ public abstract class WidgetPopup : IDisposable
         _yOffsetDest = 0;
     }
 
-    private bool RenderInternal(ToolbarWidget activator)
+    private bool RenderInternal(ToolbarWidget activator, ToolbarWidget anchor)
     {
         UpdateConfigVariables(activator);
 
@@ -141,8 +150,8 @@ public abstract class WidgetPopup : IDisposable
             _popupNode.ComputeBoundingSize();
         }
 
-        bool isAuxWidget = activator.Node.ParentNode?.Id?.StartsWith("aux") ?? false;
-        bool isDownward  = IsPopupOpenDownward(activator);
+        bool isAuxWidget = anchor.Node.ParentNode?.Id?.StartsWith("aux") ?? false;
+        bool isDownward  = IsPopupOpenDownward(anchor);
         bool isFloating  = !Toolbar.IsStretched || WidgetManager.EnforceFloatingPopups || isAuxWidget;
 
         _popupNode.ToggleTag("top", !isFloating && isDownward);
@@ -154,8 +163,8 @@ public abstract class WidgetPopup : IDisposable
         Size = new(_popupNode.OuterWidth, _popupNode.OuterHeight);
 
         Position = PopupAlignmentMethod == "Aligned"
-            ? GetPopupPositionAligned(activator, Size)
-            : GetPopupPositionCentered(activator, Size);
+            ? GetPopupPositionAligned(anchor, Size)
+            : GetPopupPositionCentered(anchor, Size);
 
         float deltaTime = ImGui.GetIO().DeltaTime * 10;
 
@@ -165,7 +174,7 @@ public abstract class WidgetPopup : IDisposable
         _opacity = _opacity += (_opacityDest - _opacity) * deltaTime;
         _yOffset = _yOffset += (_yOffsetDest - _yOffset) * deltaTime;
 
-        switch (IsPopupOpenDownward(activator)) {
+        switch (IsPopupOpenDownward(anchor)) {
             case true when _yOffset > -1:
             case false when _yOffset < 1:
                 _yOffset = 0;

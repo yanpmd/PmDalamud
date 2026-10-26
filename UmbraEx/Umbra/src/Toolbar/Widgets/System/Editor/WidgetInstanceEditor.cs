@@ -98,12 +98,19 @@ internal sealed class WidgetInstanceEditor : IDisposable
             _copyButton.OnMouseUp  += _ => Widget.CopyInstanceSettingsToClipboard();
             _pasteButton.OnMouseUp += _ => PasteSettings();
 
+            List<Node> extraButtons = [_copyButton, _pasteButton];
+
+            // Widgets that manage their own content can expose an extra button.
+            if (widget.CreateSettingsExtraButton() is { } extraButton) {
+                extraButtons.Insert(0, extraButton);
+            }
+
             windowManager.Present(
                 "WidgetInstanceEditor",
                 new VariablesEditorWindow(
                     widget.GetInstanceName(),
                     _variables.Keys.ToList(),
-                    [_copyButton, _pasteButton]
+                    extraButtons
                 ),
                 _ => {
                     Dispose();
@@ -274,6 +281,20 @@ internal sealed class WidgetInstanceEditor : IDisposable
                     colorVar.ValueChanged += v => widget.SetConfigValue(c.Id, v);
 
                     return colorVar;
+                }
+                case ImagePathWidgetConfigVariable img: {
+                    ImagePathVariable imgVar = new(img.Id) {
+                        Category    = img.Category,
+                        Name        = img.Name,
+                        Description = img.Description,
+                        Group       = img.Group,
+                        Value       = img.Value,
+                        DisplayIf   = img.DisplayIf,
+                    };
+
+                    imgVar.ValueChanged += v => widget.SetConfigValue(img.Id, v);
+
+                    return imgVar;
                 }
                 case FaIconWidgetConfigVariable fa: {
                     FaIconVariable faVar = new(fa.Id) {

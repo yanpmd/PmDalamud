@@ -120,6 +120,16 @@ public abstract class ToolbarWidget(
         return Info.Name;
     }
 
+    /// <summary>
+    /// Returns an optional button node that is displayed in the footer of this
+    /// widget's settings window. Widgets that provide their own content editor
+    /// can override this method to expose it.
+    /// </summary>
+    public virtual Node? CreateSettingsExtraButton()
+    {
+        return null;
+    }
+
     public void Update()
     {
         Node.Style.IsVisible = IsEnabled && IsVisible && ConditionSetManager.IsMatchSafe(ConditionSetId);

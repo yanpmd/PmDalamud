@@ -1,0 +1,105 @@
+<udt>
+    <node id="main">
+        <node class="body scrollbars" overflow="false">
+            <node class="list" id="list"/>
+        </node>
+        <node class="footer ui-window-footer">
+            <node class="buttons">
+                <button-node id="add-button" label="_L(Widget.DynamicMenuNew.Editor.AddWidget)"/>
+            </node>
+            <node class="spacer"/>
+            <node class="buttons">
+                <button-node id="close-button" label="_L(Close)"/>
+            </node>
+        </node>
+    </node>
+
+    <template name="entry">
+        <argument name="label"/>
+
+        <node class="entry">
+            <node class="label ui-text-default" value="${label}"/>
+            <node class="buttons"/>
+        </node>
+    </template>
+
+    <template name="empty">
+        <argument name="label"/>
+
+        <node class="empty ui-text-muted" value="${label}"/>
+    </template>
+
+    <![CDATA[
+    @import "globals";
+
+    #main {
+        flow: vertical;
+        auto-size: grow;
+
+        & > .body {
+            auto-size: grow;
+            background-color: "Window.Background";
+
+            & > .list {
+                flow: vertical;
+                auto-size: grow fit;
+                padding: 8;
+                margin: 8;
+                gap: 8;
+            }
+        }
+
+        & > .footer {
+            & > .spacer {
+                auto-size: grow fit;
+            }
+
+            & > .buttons {
+                padding: 8;
+                gap: 8;
+            }
+        }
+    }
+
+    .empty {
+        auto-size: grow fit;
+        padding: 16;
+        margin: 8;
+        font: 0;
+        font-size: 12;
+        word-wrap: true;
+        text-align: middle-center;
+    }
+
+    .entry {
+        flow: horizontal;
+        auto-size: grow fit;
+        size: 0 36;
+        padding: 0 8;
+        gap: 8;
+        background-color: "Input.Background";
+        stroke-width: 1;
+        stroke-inset: 1;
+        stroke-color: "Input.Border";
+        stroke-radius: 4;
+        border-radius: 5;
+
+        & > .label {
+            anchor: middle-left;
+            auto-size: grow fit;
+            word-wrap: false;
+            text-overflow: true;
+        }
+
+        & > .buttons {
+            anchor: middle-right;
+            size: 0 26;
+            gap: 4;
+        }
+
+        &:hover {
+            stroke-color: "Window.AccentColor";
+        }
+    }
+    ]]>
+</udt>

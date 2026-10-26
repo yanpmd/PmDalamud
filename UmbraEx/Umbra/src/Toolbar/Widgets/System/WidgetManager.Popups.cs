@@ -7,6 +7,7 @@ internal partial class WidgetManager
 
     private WidgetPopup?   _currentPopup;
     private ToolbarWidget? _currentActivator;
+    private ToolbarWidget? _popupAnchorWidget;
 
     /// <summary>
     /// True if a popup is currently open.
@@ -18,6 +19,11 @@ internal partial class WidgetManager
     /// </summary>
     private void OpenPopup(ToolbarWidget activator, WidgetPopup popup)
     {
+        OpenPopupInternal(activator, popup, activator);
+    }
+
+    private void OpenPopupInternal(ToolbarWidget activator, WidgetPopup popup, ToolbarWidget anchor)
+    {
         if (_currentActivator == activator && _currentPopup == popup) {
             return;
         }
@@ -26,12 +32,24 @@ internal partial class WidgetManager
 
         popup.Reset();
 
-        _currentActivator = activator;
-        _currentPopup     = popup;
+        _currentActivator  = activator;
+        _currentPopup      = popup;
+        _popupAnchorWidget = anchor ?? activator;
 
         _currentPopup.OnPopupOpen += InvokeOnPopupOpened;
 
         Toolbar.AllowAutoHide = false;
+    }
+
+    /// <summary>
+    /// Opens a popup that belongs to a widget that is hosted by another widget,
+    /// such as a widget that was added to a menu. The popup still reads its
+    /// configuration from the widget it belongs to, but it is positioned on the
+    /// screen relative to the widget that hosts it.
+    /// </summary>
+    public void OpenHostedPopup(ToolbarWidget widget, WidgetPopup popup, ToolbarWidget anchor)
+    {
+        OpenPopupInternal(widget, popup, anchor);
     }
 
     /// <summary>
@@ -54,8 +72,9 @@ internal partial class WidgetManager
 
         _currentPopup?.Reset();
 
-        _currentActivator = null;
-        _currentPopup     = null;
+        _currentActivator  = null;
+        _currentPopup      = null;
+        _popupAnchorWidget = null;
 
         Toolbar.AllowAutoHide = true;
     }
@@ -65,7 +84,7 @@ internal partial class WidgetManager
     {
         if (_currentPopup is null || _currentActivator is null) return;
 
-        if (!_currentPopup.Render(_currentActivator)) {
+        if (!_currentPopup.Render(_currentActivator, _popupAnchorWidget)) {
             ClosePopup();
             return;
         }

@@ -173,6 +173,9 @@ public class VariablesEditorWindow(string title, List<Variable> variables, List<
             case BitmapIconVariable bitmapIconVariable:
                 RenderBitmapIconVariable(bitmapIconVariable, targetNode);
                 break;
+            case ImagePathVariable imagePathVariable:
+                RenderImagePathVariable(imagePathVariable, targetNode);
+                break;
             case IEnumVariable enumVariable:
                 RenderEnumVariable(enumVariable, targetNode);
                 break;
@@ -347,6 +350,23 @@ public class VariablesEditorWindow(string title, List<Variable> variables, List<
     private void RenderBitmapIconVariable(BitmapIconVariable variable, Node targetNode)
     {
         BitmapIconInputNode node = new(
+            GetNextControlId(variable),
+            variable.Value,
+            variable.Name,
+            variable.Description
+        );
+
+        node.OnValueChanged   += (v) => variable.Value = v;
+        variable.ValueChanged += (v) => node.Value     = v;
+
+        _variableNodes[node] = variable;
+
+        targetNode.AppendChild(node);
+    }
+
+    private void RenderImagePathVariable(ImagePathVariable variable, Node targetNode)
+    {
+        ImageInputNode node = new(
             GetNextControlId(variable),
             variable.Value,
             variable.Name,

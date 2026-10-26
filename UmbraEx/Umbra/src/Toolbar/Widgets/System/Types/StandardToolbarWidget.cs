@@ -146,6 +146,9 @@ public abstract class StandardToolbarWidget(
                     case IconTypeBitmapIcon:
                         SetGfdIcon(GetConfigValue<BitmapFontIcon>(CvarNameBitmapFontIcon));
                         break;
+                    case IconTypeImage:
+                        SetCustomImageIcon(GetConfigValue<string>(CvarNameCustomImagePath));
+                        break;
                 }
             }
 
@@ -273,6 +276,7 @@ public abstract class StandardToolbarWidget(
         IconNode.NodeValue            = default;
         IconNode.Style.IconId         = iconId;
         IconNode.Style.BitmapFontIcon = null;
+        IconNode.Style.ImageBytes     = null;
         IconNode.Style.UldPartId      = null;
         IconNode.Style.UldPartsId     = null;
         IconNode.Style.UldResource    = null;
@@ -288,6 +292,7 @@ public abstract class StandardToolbarWidget(
         IconNode.NodeValue            = icon.ToIconString();
         IconNode.Style.IconId         = null;
         IconNode.Style.BitmapFontIcon = null;
+        IconNode.Style.ImageBytes     = null;
         IconNode.Style.UldPartId      = null;
         IconNode.Style.UldPartsId     = null;
         IconNode.Style.UldResource    = null;
@@ -303,6 +308,7 @@ public abstract class StandardToolbarWidget(
         IconNode.NodeValue            = iconChar.ToIconString();
         IconNode.Style.IconId         = null;
         IconNode.Style.BitmapFontIcon = null;
+        IconNode.Style.ImageBytes     = null;
         IconNode.Style.UldPartId      = null;
         IconNode.Style.UldPartsId     = null;
         IconNode.Style.UldResource    = null;
@@ -318,6 +324,7 @@ public abstract class StandardToolbarWidget(
         IconNode.NodeValue            = "";
         IconNode.Style.IconId         = null;
         IconNode.Style.BitmapFontIcon = icon;
+        IconNode.Style.ImageBytes     = null;
         IconNode.Style.UldPartId      = null;
         IconNode.Style.UldPartsId     = null;
         IconNode.Style.UldResource    = null;
@@ -333,6 +340,7 @@ public abstract class StandardToolbarWidget(
         IconNode.NodeValue            = default;
         IconNode.Style.IconId         = null;
         IconNode.Style.BitmapFontIcon = null;
+        IconNode.Style.ImageBytes     = null;
         IconNode.Style.UldPartId      = uldPartId;
         IconNode.Style.UldResource    = uldResource;
         IconNode.Style.UldPartsId     = uldPartsId;
@@ -343,11 +351,38 @@ public abstract class StandardToolbarWidget(
         IconNode.ToggleClass("uld", true);
     }
 
+    /// <summary>
+    /// Displays a user-provided image file as the icon of this widget.
+    /// </summary>
+    protected void SetCustomImageIcon(string path)
+    {
+        byte[]? bytes = CustomImages.GetBytes(path);
+
+        IconNode.NodeValue            = default;
+        IconNode.Style.IconId         = null;
+        IconNode.Style.BitmapFontIcon = null;
+        IconNode.Style.UldPartId      = null;
+        IconNode.Style.UldPartsId     = null;
+        IconNode.Style.UldResource    = null;
+
+        // Only assign when the image changed to avoid an invalidated texture
+        // on every frame.
+        if (!ReferenceEquals(IconNode.Style.ImageBytes, bytes)) {
+            IconNode.Style.ImageBytes = bytes;
+        }
+
+        IconNode.ToggleClass("fa-icon", false);
+        IconNode.ToggleClass("glyph-icon", false);
+        IconNode.ToggleClass("game-icon", true);
+        IconNode.ToggleClass("uld", false);
+    }
+
     protected void ClearIcon()
     {
         IconNode.NodeValue            = default;
         IconNode.Style.IconId         = null;
         IconNode.Style.BitmapFontIcon = null;
+        IconNode.Style.ImageBytes     = null;
         IconNode.Style.UldPartId      = null;
         IconNode.Style.UldResource    = null;
         IconNode.Style.UldPartsId     = null;
@@ -415,6 +450,7 @@ public abstract class StandardToolbarWidget(
     protected const string IconTypeFontAwesome    = "FA";
     protected const string IconTypeGlyphIcon      = "Glyph";
     protected const string IconTypeBitmapIcon     = "Bitmap";
+    protected const string IconTypeImage          = "Image";
     protected const string DisplayModeTextAndIcon = "TextAndIcon";
     protected const string DisplayModeTextOnly    = "TextOnly";
     protected const string DisplayModeIconOnly    = "IconOnly";
@@ -482,7 +518,8 @@ public abstract class StandardToolbarWidget(
                     ConfigVariableFaIcon(),
                     ConfigVariableGameGlyph(),
                     ConfigVariableBitmapIcon(),
-                ]);
+                    ConfigVariableCustomImage(),
+                    ]);
             }
 
             variables.AddRange([
@@ -563,6 +600,7 @@ public abstract class StandardToolbarWidget(
     private const string CvarNameFontAwesomeIcon                = "FaIcon";
     private const string CvarNameGameGlyphIcon                  = "GlyphIcon";
     private const string CvarNameBitmapFontIcon                 = "BitmapIcon";
+    private const string CvarNameCustomImagePath                = "CustomImagePath";
     private const string CvarNameIconLocation                   = "IconLocation";
     private const string CvarNameIconColor                      = "IconColor";
     private const string CvarNameTextAlign                      = "TextAlign";
@@ -727,7 +765,8 @@ public abstract class StandardToolbarWidget(
             { IconTypeGameIcon, I18N.Translate("Widgets.Standard.Config.IconType.Option.Game") },
             { IconTypeFontAwesome, I18N.Translate("Widgets.Standard.Config.IconType.Option.FA") },
             { IconTypeGlyphIcon, I18N.Translate("Widgets.Standard.Config.IconType.Option.Glyph") },
-            { IconTypeBitmapIcon, I18N.Translate("Widgets.Standard.Config.IconType.Option.Bitmap") }
+            { IconTypeBitmapIcon, I18N.Translate("Widgets.Standard.Config.IconType.Option.Bitmap") },
+            { IconTypeImage, I18N.Translate("Widgets.Standard.Config.IconType.Option.Image") }
         }
     ) { Category = I18N.Translate("Widgets.Standard.Config.Category.Icon") };
 
@@ -771,6 +810,16 @@ public abstract class StandardToolbarWidget(
         DisplayIf = () => IsIconCustomizable() && GetConfigValue<string>(CvarNameIconType) == IconTypeBitmapIcon,
     };
 
+    private ImagePathWidgetConfigVariable ConfigVariableCustomImage() => new(
+        CvarNameCustomImagePath,
+        I18N.Translate("Widgets.Standard.Config.CustomImage.Name"),
+        I18N.Translate("Widgets.Standard.Config.CustomImage.Description"),
+        ""
+    ) {
+        Category  = I18N.Translate("Widgets.Standard.Config.Category.Icon"),
+        DisplayIf = () => IsIconCustomizable() && GetConfigValue<string>(CvarNameIconType) == IconTypeImage,
+    };
+
     private SelectWidgetConfigVariable ConfigVariableIconLocation() => new(
         CvarNameIconLocation,
         I18N.Translate("Widgets.Standard.Config.IconLocation.Name"),
@@ -792,7 +841,7 @@ public abstract class StandardToolbarWidget(
         DefaultIconColor
     ) {
         Category  = I18N.Translate("Widgets.Standard.Config.Category.Icon"),
-        DisplayIf = () => IsIconCustomizable() && GetConfigValue<string>(CvarNameIconType) == IconTypeGameIcon,
+        DisplayIf = () => IsIconCustomizable() && GetConfigValue<string>(CvarNameIconType) is IconTypeGameIcon or IconTypeImage,
     };
 
     private IntegerWidgetConfigVariable ConfigVariableIconSize() => new(
