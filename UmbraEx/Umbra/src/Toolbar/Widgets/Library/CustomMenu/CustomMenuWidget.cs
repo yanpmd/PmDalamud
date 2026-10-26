@@ -33,6 +33,13 @@ internal sealed partial class CustomMenuWidget(
         return $"{I18N.Translate("Widget.CustomMenu.Name")} - {GetConfigValue<string>("Label")}";
     }
 
+    public override string GetMenuLabel()
+    {
+        string label = GetConfigValue<string>("Label").Trim();
+
+        return label.Length > 0 ? label : base.GetMenuLabel();
+    }
+
     protected override void OnLoad()
     {
         Popup.OnPopupOpen += UpdateItemList;

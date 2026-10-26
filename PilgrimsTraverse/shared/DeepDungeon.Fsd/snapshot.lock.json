@@ -1,0 +1,810 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "3.0.1",
+  "files": [
+    {
+      "path": "Core/BossTargetPriority.cs",
+      "sha256": "adb177abb6e8dc85a988e88b6ab447a57818e000c0c47687081a19c9f75d0c28"
+    },
+    {
+      "path": "Core/CombatPositionPolicy.cs",
+      "sha256": "454573a75317264207e23415177a03a716b43c6a9123f459ab3f7fda9cd485a2"
+    },
+    {
+      "path": "Core/ControlledPtSurveyPolicy.cs",
+      "sha256": "f4cca2158071fe1fc03e4bf072163fbc83e6170fa814a1b2ac7e726d9e02016a"
+    },
+    {
+      "path": "Core/CurrentIntuitionResolutionPlanner.cs",
+      "sha256": "4499cf07bc12c32769e6b3024cf7b056d165009239581e5859ecf0c677bdaf75"
+    },
+    {
+      "path": "Core/DeepDungeon.Fsd.Core.csproj",
+      "sha256": "5a75bed670ab2419a1c15b6b7477f693adf9534cf347b8d1b33de0fbb1907f25"
+    },
+    {
+      "path": "Core/DeepDungeonBoardForm.cs",
+      "sha256": "548e7153d0ea4ca6e5466986df4a532833d51160ab55fb04ba729f17ff95fd5a"
+    },
+    {
+      "path": "Core/DeepDungeonFloorEffectPolicy.cs",
+      "sha256": "28fa3f58a7f90c4c09d0727074651d9fb468f729e633341d21d591a65ae8ee54"
+    },
+    {
+      "path": "Core/DeepDungeonFloorItemUsePolicy.cs",
+      "sha256": "99bac97992c925c5b1d45562953adc6ff28b0440197caee548e7f0e260743c03"
+    },
+    {
+      "path": "Core/DetailedMapCatalogContracts.cs",
+      "sha256": "09940f4c7811abb714e9c1313203127a7745c07293d41f55d00167f76f6cbaeb"
+    },
+    {
+      "path": "Core/DetailedMapCatalogTrust.cs",
+      "sha256": "24bda5ae767fb54a263b173f489315aba8ca49fa02e633c6ff78d74a13f1e34f"
+    },
+    {
+      "path": "Core/DetailedMapEvidenceContracts.cs",
+      "sha256": "d696af534fde5c64536e379255968f955d7e8fc9098e5b0f0811eb6f87bbe270"
+    },
+    {
+      "path": "Core/DetailedMapEvidenceProjector.cs",
+      "sha256": "e4ff8cc60d4042445a5a0b6c0d6e323a6eb1f37e52e777dbbd623c62c03e93b7"
+    },
+    {
+      "path": "Core/DetailedMapResearchKnowledge.cs",
+      "sha256": "69484429d03b1a8a57286fa34c8a4daeeff546dbe8ebc46d41be64e362bfb7ae"
+    },
+    {
+      "path": "Core/DetailedMapRoomGraphPresentation.cs",
+      "sha256": "bfd247ded86ef3d7916163980a6f7d14a4f0d60e686c539a0866bf878dad38c4"
+    },
+    {
+      "path": "Core/DetailedMapScenarioCatalog.cs",
+      "sha256": "8a3f87671dcb8e365390a7c396179c66dfc4c9ec14bdc79e85bfdef6bddbad91"
+    },
+    {
+      "path": "Core/EnemyChaseAttackWindow.cs",
+      "sha256": "2edcacacc7fadf5113662f8b4a1c4c64df04691c6cab10305ac5cc35537682ef"
+    },
+    {
+      "path": "Core/FarmingHarvestPolicy.cs",
+      "sha256": "a29846427c0a99e49a6d5878f40980ac49479fba31a0ba436df9cd7e3b0ecc68"
+    },
+    {
+      "path": "Core/FarmingItemPolicy.cs",
+      "sha256": "3f4e981d616c04b8051c4d29d3a24af465197c1e67c67039a90fc615f3b8def6"
+    },
+    {
+      "path": "Core/FarmingPlan.cs",
+      "sha256": "66570d919c246a28adfa7531f016691a689382f6d375ddb902e822b850d65dc8"
+    },
+    {
+      "path": "Core/FarmingSessionPolicy.cs",
+      "sha256": "c88a564f5fe0d9eb7e2acbc0668389f81f9d40ab7878ddfdb084a02f4cc45d66"
+    },
+    {
+      "path": "Core/FloorEvidenceJournalContracts.cs",
+      "sha256": "c40eaf351c3e1d5f3e8477eb26141c219767f06d7f75224aefc4673a90ffdf69"
+    },
+    {
+      "path": "Core/FloorInitPlanner.cs",
+      "sha256": "b9ca9763b6120766b44965d9e863eebc663a252b6ea336fd541b822484dbdf75"
+    },
+    {
+      "path": "Core/FloorInitSnapshot.cs",
+      "sha256": "8ec3c2e7d805d27ff2707bcf827e93194252bd1adb2c0346a54b0a154dadf54c"
+    },
+    {
+      "path": "Core/FloorItemUseConfirmationPolicy.cs",
+      "sha256": "bb2c1599a04fb7eff3e3687054de65b2a734d4cc13d0c466a2b7b68fdd685796"
+    },
+    {
+      "path": "Core/FloorObjectEvidenceRefreshPlanner.cs",
+      "sha256": "68bf108f7703df480d6d145d077f3c3cafb529d147adf6ecb9a3319b433d9c23"
+    },
+    {
+      "path": "Core/FloorObjectiveLedger.cs",
+      "sha256": "d642c9d64d706802aa26667e382f148ceb6b60ca916edb6150e5f3fdc9263426"
+    },
+    {
+      "path": "Core/FloorPlanSnapshot.cs",
+      "sha256": "4cb1f19759e4d08e20d44fbb0f3b3f6020d288e597b756e13bd4eec1179b5a25"
+    },
+    {
+      "path": "Core/FloorPlanTrace.cs",
+      "sha256": "ffccc688887a6337a696947340843e1856bc47fb6c91114623b932fad8ce0a0e"
+    },
+    {
+      "path": "Core/FloorsetHoardDistributionPolicy.cs",
+      "sha256": "74425b7a8d9ae78731d220cb218b1456338ce85a8e2f7cbb585d058e34af1fe0"
+    },
+    {
+      "path": "Core/GeneralAutoPomanderPlanner.cs",
+      "sha256": "90058e5de856f676ef8daad1d6ac37557ffee173a2dbca435d8fd6b8b3bc88e8"
+    },
+    {
+      "path": "Core/GeneralAutoPomanderSnapshot.cs",
+      "sha256": "88a99fa5e2dec08d521157bb621739d3899d325f5d33ba5eb79e816775de00a3"
+    },
+    {
+      "path": "Core/HoardIndicatorLifecyclePlanner.cs",
+      "sha256": "8b1e0db419a7daec3e5f949e71605785deaac0e522a4432b0f73d2c7b34f30ea"
+    },
+    {
+      "path": "Core/HoardWorkInvalidationPlanner.cs",
+      "sha256": "46d2cd6c1c581a4a241f8670e19b4da51905fb5e77a7cf97cf14bceee2087574"
+    },
+    {
+      "path": "Core/HoardYieldCatalogContracts.cs",
+      "sha256": "0dbbd2904dd2cd76f0397086695f387bbfc7a5445d624e8260e287d32955a5e6"
+    },
+    {
+      "path": "Core/IFloorEvidenceObserver.cs",
+      "sha256": "c20518643b3012cdf859eb0aff24c3b7a7fe4cc6f00a661a33d536502ea19d21"
+    },
+    {
+      "path": "Core/InheritedIntuitionResolutionPlanner.cs",
+      "sha256": "6b6796a7495fc8787f70bd2964a26dc9a632f9e50997e7a26277b8a0fd3386c7"
+    },
+    {
+      "path": "Core/IntuitionEvidenceAcceptancePlanner.cs",
+      "sha256": "bda1f6899a2d1d8e65eeb0e1a80f9b8f399d97a1be3be170b49dbe63e70d13d3"
+    },
+    {
+      "path": "Core/LateHoardEvidencePlanner.cs",
+      "sha256": "d3291df14cb0a88b7fde1ee838133a9b38483db202e792541956b86051fed39c"
+    },
+    {
+      "path": "Core/MobPullPolicy.cs",
+      "sha256": "b05ccc3632314da09b99016c2b2bd17d0ea37a853b6707fa0a4e6a252486874c"
+    },
+    {
+      "path": "Core/NativeTreasureCompletionPlanner.cs",
+      "sha256": "8ac52f329f7b356fe6ed87ffc945fca6db7a41fb6dc4e53ac272e39652f9e010"
+    },
+    {
+      "path": "Core/NaturalPassageAccelerationPolicy.cs",
+      "sha256": "302c8f75d511f9653137ef50cb07d16f21cab76af580b65f1894c75bb529f508"
+    },
+    {
+      "path": "Core/NaturalRevealInventoryPolicy.cs",
+      "sha256": "a53a7ec40839b5672bbe2822d868ac559143f6f37389ec56fae229ed63d95bd4"
+    },
+    {
+      "path": "Core/ObjectiveArbiter.cs",
+      "sha256": "829936a215ad49973f2e342cda7423edefa42685dddfbb3aac05de7b9dc4ae3b"
+    },
+    {
+      "path": "Core/OutsideDutyOperationConflictPlanner.cs",
+      "sha256": "7397c54f58996b1450a44ac31c544d364b1410e0e5790abe19abb9a951d7a90e"
+    },
+    {
+      "path": "Core/packages.lock.json",
+      "sha256": "a29c6aa8cfb81874ff8bb78dc369d7416f28c9b8cc47e99592bfc019b20c41eb"
+    },
+    {
+      "path": "Core/PalacePalImportContract.cs",
+      "sha256": "a493e509986ea77bf0baa043ac592e38ba749e515adaa481a3bb47cd41fd82f5"
+    },
+    {
+      "path": "Core/PassageNavigationPolicy.cs",
+      "sha256": "e0be2878f92cd4c9cc53670f781089f45908d5accc61a623a0093d91ea736870"
+    },
+    {
+      "path": "Core/PassageWorkPlanner.cs",
+      "sha256": "76f67a940dff8cca1484d22fc2da80a42fc187d9d583d928c46008927365e233"
+    },
+    {
+      "path": "Core/PlanGenerator.cs",
+      "sha256": "f4feb7ac37ed5cf549ebdf76a8aa64d7631ccaf6fe0e2c91a2b2f77789628f60"
+    },
+    {
+      "path": "Core/Pt100AltarPolicy.cs",
+      "sha256": "7ace998d434c8ceb0facfefc0da0dd96b5c188e6f21fab6610a536211aa9c8ef"
+    },
+    {
+      "path": "Core/Pt30BossGeometry.cs",
+      "sha256": "1c047954a478f287210bd66edcb0b15b7970ba5765e031a3f9f5ac75a3e0569a"
+    },
+    {
+      "path": "Core/Pt99TargetPolicy.cs",
+      "sha256": "8068b346384594ec888f24710f380bdda8e3710c10d11f78b997992827e7265b"
+    },
+    {
+      "path": "Core/Pt99TransitionPolicy.cs",
+      "sha256": "4f3478a6aaa59b4d877171c34b16d7591422a51565d11c98f70bb339a8160eec"
+    },
+    {
+      "path": "Core/ReadyFloorIntuitionPlanner.cs",
+      "sha256": "e81f20af93547452404f75ae108ce5fe35bc2ed88ee0b99a34b20d5af59a6ee9"
+    },
+    {
+      "path": "Core/RoomFinishPomanderPlanner.cs",
+      "sha256": "ccebc1c5c9c7eef2de36a46c9acbb2bd9107cf25158396c328b6a5e210eacd3b"
+    },
+    {
+      "path": "Core/RoomFinishPomanderSnapshot.cs",
+      "sha256": "f2a3f00fcac8e8ac37cbca1d569c43a2c20e46f81b35edcc05f86e1d44140504"
+    },
+    {
+      "path": "Core/RoomObjectiveOutcomePlanner.cs",
+      "sha256": "6d631881f349628d387cd8dbf188f3aa899e50ee54953d9ed130ab9355ac70bb"
+    },
+    {
+      "path": "Core/RoomSearchBuilder.cs",
+      "sha256": "084d6c92551b618957063169c863e15cb2ff16b4f85256ff9181ef23bcf97b61"
+    },
+    {
+      "path": "Core/RoomSearchResult.cs",
+      "sha256": "38b6a1b59fbe188c63aa62f6f72dd9b974d9ab9b45784abf11ef435aee08f7cf"
+    },
+    {
+      "path": "Core/RoomSearchSnapshot.cs",
+      "sha256": "e521337bd7b3794b89d3710e8470b52b3618c183d212792bf688806372074611"
+    },
+    {
+      "path": "Core/ScenarioPostDutyPlanner.cs",
+      "sha256": "33c797decd1ee90997882a999670f043ad269327e7e559589fb4de299ce6732e"
+    },
+    {
+      "path": "Core/SightResearchPolicy.cs",
+      "sha256": "2a9892cc9152c9ece88cb635dbb66a4ba0d5380957f25243cf531cdeec4b5c7f"
+    },
+    {
+      "path": "Core/SightUseState.cs",
+      "sha256": "9e8c0fbff4c4c597b19c2eaf65bea9c40d0da6ab57cfaa7c116c0109c9a30cef"
+    },
+    {
+      "path": "Core/SilverChestOvercapPolicy.cs",
+      "sha256": "4541473867c80692533635b9c16113f40452181d256eade05b99e2db4d540b3a"
+    },
+    {
+      "path": "Dalamud/Actions/FsdActionExecutor.cs",
+      "sha256": "1a97ff613ed80e503cfad4ef375bb32168de29cfbfa713f4019a6f6abd97ff7a"
+    },
+    {
+      "path": "Dalamud/Actions/FsdItemExecutor.cs",
+      "sha256": "925c76c45efb159d6ebb79b3db19e13d2c4ae9b0d641e1c1e8180261ae2be0f2"
+    },
+    {
+      "path": "Dalamud/DeepDungeon.Fsd.Dalamud.csproj",
+      "sha256": "54d289a31f4215fe009df8449b43c8f829bb5f2add78600c7528876e25150b9d"
+    },
+    {
+      "path": "Dalamud/DetailedMapHostOptions.cs",
+      "sha256": "97a0a494f2f071d8672f47b4ae19fe4d816e0931fa26871ea9e847123d65abdd"
+    },
+    {
+      "path": "Dalamud/Fsd/Debug/BgCollision/BgCollisionDebugOverlay.cs",
+      "sha256": "f2df458a9871a78f4afcdf058f5fbf9d473ed7747b108c152849486de7ecbfbc"
+    },
+    {
+      "path": "Dalamud/Fsd/DeepDungeon-Fsd.md",
+      "sha256": "febbf5abe71bd907cca8893ed915eb6d36bd928b160ef76d595b4c4bd7a0fe67"
+    },
+    {
+      "path": "Dalamud/Fsd/DeepDungeonHelper.cs",
+      "sha256": "2b5f78062cd0131bba0dd62bae8830247101ef4d7610fa9538be5a420084f19f"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdChestInteraction.cs",
+      "sha256": "2d5cc6d8c5ff542b392e0c58aa5d86e51eccc296b6d779f6c70c6cff7146467c"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.Bridge.cs",
+      "sha256": "50a4760c9c0f44a7c13ebeded3103d9df57c53058b721cfd0f6269fde8973249"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.Companions.cs",
+      "sha256": "7031326010f62e9115ad37f7af7c5784151ac7927dbf1b32a9bba8786aa48204"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.cs",
+      "sha256": "24e1bcae813a2aa424c2eb09d68739731f682f79e2b834004a1f0f0689296a1f"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.Farming.cs",
+      "sha256": "fde24dc660f1534eeda282ac871c6c2f69092b41d9fe2f98d43a91dfab0078bc"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.OutsideDuty.cs",
+      "sha256": "856c5f9d77014850c01be48bb9d3ce9c4afcc4ad21d276c35f9bd91708b614ad"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.RoomPresentation.cs",
+      "sha256": "4b4718072f0eb4f5a4e513c14055626bafa66fb08575e1d36484db049c8d91dd"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.Rotation.cs",
+      "sha256": "46090252593aded42499f8868df8ec526cbe3b2dd731624c568365ae0f7e4803"
+    },
+    {
+      "path": "Dalamud/Fsd/FsdEngine.Ui.cs",
+      "sha256": "77cced7c5033be4f9aaaba89ec3cee9be4fe888f23e1a628fc0c80cc1ef6cfcf"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DeepDungeonFloorsetTracker.cs",
+      "sha256": "620758959ff340b34a21aad0fb0e2a627f9cd37fbf5d9beb9a3a1f3f12a9ae24"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DeepDungeonLootTracker.cs",
+      "sha256": "3ed30ae924d21ae8acdd2fa353fc3c1ee9605d25cdb6b36f66f8add33ac9e597"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DeepDungeonUi.cs",
+      "sha256": "4cfb645340bc73d1f1c729387ba926274c97d2dd82d1eb7cac23232a0d43235b"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DetailedMapCatalogManager.cs",
+      "sha256": "5dc68872b18d5de62f88c8c31610653137b25291876593c43cdef7b1d9172570"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DungeonCatalog.cs",
+      "sha256": "cee7c6a7f812d0496c3a14c9e37dbe7b2d7c8ad03b368014efd94695f9053145"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DungeonData.cs",
+      "sha256": "f42b165ae67dfd50b7234d689916f784c5516cabc865166f1ac58d4833d9480b"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/DutyState.cs",
+      "sha256": "c52c0b621e494be963c07b942b600f4de7a6e0e51baf37f8dad89e84573e3e86"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/NormalFloorGraphSnapshot.cs",
+      "sha256": "0b373aefc0da4d512355df6930dfc0164addef4af65678bc2fea151cddf2974d"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/PalacePalProvider.cs",
+      "sha256": "aef29ecc59d0091b73f386c48464718fc80e71b5ba31d806986c9ac29f0e7af2"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/PassageLocator.cs",
+      "sha256": "1465e69558c03f03c446f0a5846b219624a786b839c6027eaf8ece6bc1c8fe15"
+    },
+    {
+      "path": "Dalamud/Fsd/GameState/RoomGraph.cs",
+      "sha256": "7f5fd5c482c3049d8435e60d4ef7bb3216917b4149f0f4b6588a0ee5ec0cd9b6"
+    },
+    {
+      "path": "Dalamud/Fsd/MagiciteSlotMapping.cs",
+      "sha256": "201f13efaac09244aba187ac60239c963c3a20f1ba9d9e725f9a0860beb47dd9"
+    },
+    {
+      "path": "Dalamud/Fsd/Map/BgCollisionShapeFinder.cs",
+      "sha256": "31663555ba8afe1c7a52f1cc5a7be5c53d49da2caed2f7f8a466edc6f6f1e0a7"
+    },
+    {
+      "path": "Dalamud/Fsd/Map/MapPos.cs",
+      "sha256": "daa0e06eddd6c5918f72849d7634e75958916fb4e8839f175e1ebdbaf91190b4"
+    },
+    {
+      "path": "Dalamud/Fsd/Map/MapPosGeneration.cs",
+      "sha256": "a66014d38ca077658c1f332dad43451967f88f6cd27faf065408b27ab201b33c"
+    },
+    {
+      "path": "Dalamud/Fsd/Map/PalacePalData.cs",
+      "sha256": "1a2dcab5839c918501f232d59709c35ecc74fa0b05b2e9c4e073e76f94087f9f"
+    },
+    {
+      "path": "Dalamud/Fsd/Map/RoomCenterGenerator.cs",
+      "sha256": "b8bf2ca5e248d21f9acfbf052e74e1a29230b46883f8ff2282ed097e005b2b4a"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Combat/CombatAssistPolicy.cs",
+      "sha256": "ed24ab4e9a903dfa93f372e2989a3710f9cbda0c8380524a37e2f9eff4f9248a"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Combat/Pt99CombatController.cs",
+      "sha256": "07c7847466f9d55fdc3784e62aac7693d618f57d0c69dfd2589990d34b7eccc0"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/DeepDungeonRunLogExporter.cs",
+      "sha256": "3e03abb867d46a42bbdf43f092cef6326cb92b8bc5739fc14e475012742e2f35"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/DeepDungeonRunRecorder.cs",
+      "sha256": "c4f008e23e5f47e87f57a72cc615330dfee77678e84a3f127691ee5efc21a6aa"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/ControlledPtOccupiedEntryFlow.cs",
+      "sha256": "74eaa79011fb0d7a27fb91e9c2848f8ce0506389a4ea3ff8431d9880cdf4917a"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/ControlledPtSaveVerificationFlow.cs",
+      "sha256": "f6e96efc7882cb8ed883b1d20aeec572da9d08f7eec47dc1f22fdeb57e75b3f3"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/GenericDeleteSaveFlow.cs",
+      "sha256": "2ed1fb71ee95f46bdd61d8edaa753a801ec33d031382f6ab92eafc315e7fbcbc"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/GenericEntryFlow.cs",
+      "sha256": "c5a2948b7c627f4067bdfc56e60c5852b542c22d16afb67cc08f79ce7dce0c39"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/LeaveDutyFlow.cs",
+      "sha256": "e696551575b9f61775fe69de59023e4f0e22da54a7d5f7681431c7d50e7536fb"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/NpcInteractionGuard.cs",
+      "sha256": "825f42c00ae1f51fc22b2c2aa8d286fdf7fd7a0d5fec58412b71db04198381e3"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/PilgrimsTraverseRestExitFlow.cs",
+      "sha256": "30c948de32a14d1eb4d0099782bfcbe4bcd8462f6dc7da14351bb118ce5dc3b6"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Entry/PreparedSaveFlow.cs",
+      "sha256": "0d83be71cc19371e104740cb986a0b31c70bcc42b0077044e2c57d30bf5ade05"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/CombatPositionRecoveryController.cs",
+      "sha256": "8ecc62122f7158e49bcfbb27d8831efeb479449ebf4f46933b73ff079cfb5672"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/EnemyChaseHelper.cs",
+      "sha256": "b8ace999a268a317e8ae7525aacbf984f11657af9c16604873468ef6f1ad38cb"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/ExitPolicyController.cs",
+      "sha256": "45f5042b3f8dda6632e68ab7183dac7ba98f70a1422ae6254c297fed9351dd9e"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorBossController.cs",
+      "sha256": "b0de2500237128a5b088f7a620e5f806f8f0c00b0f77f572c8bbf5cd82f8b708"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorEvidenceJournal.cs",
+      "sha256": "a9880cb751210f60b3c7e987f7dd72fd803a1fd3fd24dc5706802198d714e8f6"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorExplorationController.cs",
+      "sha256": "6ba743652355a31fdf4b5bc8403f962b899c21e9e4db047fdd839c3d049420e2"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorExplorationController.Farming.cs",
+      "sha256": "403712c82339bc016d7349de7c60df14810dcedf9e34317fcc46d381177587ac"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorExplorationController.MobMechanics.cs",
+      "sha256": "fa21207b0696dbeaabebcd96097ea821fcadd19419285069a369916254b2dfac"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorExplorationController.RunFloorState.cs",
+      "sha256": "58cfa494a7d82cde618cd07254de717165553dd811459e8e61aad9c021c769dd"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorItemExecutor.cs",
+      "sha256": "6684b096b3572490ab6a82aba05a3d2d1139be67f15ee5cf0fb5197be1f3a961"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorObjectEvidenceTracker.cs",
+      "sha256": "d0f2d9c12b31e222a778516d6919908fc7ce743df7d34abcf80eaa326516b7cb"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorPhase.cs",
+      "sha256": "d994052332930860e2df4fe05b55d1afc49b264a1ab0c2ef3d012f740887f0d0"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorPhaseController.BossTelemetry.cs",
+      "sha256": "a568785676a292ba0a73c38106e006a15509c39d99fc1b6200b15644b63ab68b"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorPhaseController.cs",
+      "sha256": "00963ab399b3ceab73bbac49a5148e3a431b8611408e7e59152973202b2a261e"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorPhaseController.RunTelemetry.cs",
+      "sha256": "2e69239a55056ae0c820d26f0a195de231a570f39d5e4f54c00908110c3f011b"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/FloorSurveyController.cs",
+      "sha256": "e5776113c3d2b43fb16827fcfaa16a877e5f085e3f769f44e3c218e140a9e009"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/MobMechanicsMovementGuard.cs",
+      "sha256": "04434ba6b58621359d9ca263a7d4b0dbafbcce709e0cfe0ecd4685daf442a658"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/PassageDestinationResolver.cs",
+      "sha256": "96728487e01157ad77f60d28991ff16805f45c0f54658c59759727003d132e29"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/Pt30DivineFavorFlashHelper.cs",
+      "sha256": "4c8e8c112adc9dbc6a32cb2ace914c9b7b2411bea213b6cba8471e2d99fc85c1"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/Pt50ChaseOutputGuard.cs",
+      "sha256": "bca180535451221d5d3910811b90bd7eac76c9e370159b3130d5879fe791d068"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/RunFloorTelemetryTrace.cs",
+      "sha256": "687f6acba44908e2fe90f360b25822546e34965ab9581da3c8388d237d9e7144"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/RunWaypointTelemetryTrace.cs",
+      "sha256": "85d844dd4fdb5c1eccc431898b9ac5cc4d502b2a80f9f445dc070bc556ba499c"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/TerminalRoomController.cs",
+      "sha256": "7df08077479f40413c781c1ac3fe9b1faeb01ac0a4f736e909889811ec71d1c5"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/TerminalRoomController.Transfer.cs",
+      "sha256": "8bcdbcceeddff99fadf1e1645f671b28e6543ac1b1afe50bb83ef6355b4ff382"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Floor/WaypointTaskRunner.cs",
+      "sha256": "d39ea915f5a0f43238f0035417b92d850a04ddf3b8b84c321f3fd0caa11d62ef"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/ChatWatchers.cs",
+      "sha256": "c401d832437d1ae728cec86e8b8c1b0a7464f47e862de5bc9ea16e73700586a3"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/CombatTargetingHelpers.cs",
+      "sha256": "76d479361356fa63985bbde51035579fcd11f9a8e6aab12f557dcca0ddc40a7f"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/DutyTransitionUtil.cs",
+      "sha256": "c926bb51f2d1ee26306433327bfa2685aaaf4ccf90bf2883ec5fd9ce2b1a3478"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/LeaveDutyHelper.cs",
+      "sha256": "3d692b33a155fe5ef3d16dcb3793190fd5319b325e4f473708c3198721547a46"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/NativeDeepDungeonLogMessageSource.cs",
+      "sha256": "8de21768bd9d4bf9acd7a8bab35e48ed4b43963d179e722ac5059e8ee1eae162"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/PomanderManager.cs",
+      "sha256": "38a205d94b5f3b2ebd9943e0bd00a7712a1702b43e5ce8cb5fbf0ec40ecdf094"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/RecoveryPotionHelper.cs",
+      "sha256": "a6da7204bd15650e02b68bb5436d3328751770349646dc98b7b2e998fb7261bb"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Helpers/SaveSlotManager.cs",
+      "sha256": "cbbfe1c6dd3fe36fe8a2f3103c3fda0fe2f3208132965181e4af482c302c9a28"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/IScenario.cs",
+      "sha256": "ce008b37c2d19badcb2408e9246bc997b49f17dcc81eb0d4b4e16ed8229e65bf"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Navigation/CombatPositionNavigation.cs",
+      "sha256": "f6f4fe105145f28a97c8b847016077897695ee7047dc17c0b92e308c9b410330"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Navigation/INavigator.cs",
+      "sha256": "db8cf49969da1ff39d26ebc5ce49cdb707eae14c683ea321ff6ed05b7a574542"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Navigation/NavigationDriver.cs",
+      "sha256": "7b123c99ff0277df68bc4284723f6ba45310a21e1b716fb87a070d3a05e1dbc6"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Navigation/NavigationHelper.cs",
+      "sha256": "f19996fef9e2efa90240befcd2a560c4a128e9fc04e616a032c38baff8a9b942"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Navigation/NavigatorVNavAdapter.cs",
+      "sha256": "314f68baf2dcac4b9c9903b1d13cef98fadd3630cca745001a5af0a9c48a2626"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Navigation/ProgressiveRoomNavigator.cs",
+      "sha256": "c5a60e31d7024eab8275e14987590c61fa27f6038fd8bc85afda9a6a5eb84ea4"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/RunContext.cs",
+      "sha256": "859f47a21c4bcc194fbd3b995ae0f5c542190b1d4dfb49d3e55ebabeb9adc515"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/RunHost.cs",
+      "sha256": "5e8dce562df3dc902b22c4d16ffb73562cf93143dec1bf75da4014f0739b08c0"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/RunTelemetryContracts.cs",
+      "sha256": "6938c9a12a2ab669f2d0b2829291b5156cf1abe6633914779e177e89e9ba6cf2"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Scenarios/ControlledPt21To30Scenario.cs",
+      "sha256": "c1e64190bbbed5fd72845f2603e750ca430b22dbd22baa9f961f52342f8f3896"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Scenarios/ControlledPtSurveySession.cs",
+      "sha256": "52188b8378d84ebb3b86560acbc664023e2f079a77589b97963cf5fed9161bcc"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Scenarios/FarmingScenario.cs",
+      "sha256": "2dc528a7c6a6b874265ca97aed331b66d496445143e934c9579b579e797df386"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Scenarios/GenericDungeonScenario.cs",
+      "sha256": "8380023d66389ca22f881419278e4bf71eec62cb43b3fef030c50403ac523489"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Search/AutoPilotExecutor.cs",
+      "sha256": "dd7ea9ca11b2bf3c2ddde0f8a22e085a6ee35fe2ab37672e3e3a5d84572878a4"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Search/BandedChestLocator.cs",
+      "sha256": "5c1ecc8617394da214e4515c070d7c075e0fe3a51681913fe76ffd4dabd8ee7b"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Search/DeepDungeonChestData.cs",
+      "sha256": "214a3663939a7bd363baa7383dddaeaee2f68bc57643ce0776562c1127b38da4"
+    },
+    {
+      "path": "Dalamud/Fsd/Runtime/Search/RoomSearchContext.cs",
+      "sha256": "b4f9131db582018bfe93f29c07736577bf27a9c6aa779cbf021a13c5cae8ccc0"
+    },
+    {
+      "path": "Dalamud/FsdApplication.Commands.cs",
+      "sha256": "9ab40f8025727eb10c139e621bc34a44fbf99e6233b2f361828a4c846ff14d3f"
+    },
+    {
+      "path": "Dalamud/FsdApplication.cs",
+      "sha256": "08ccbc351be44775ed1b1f50bf280c14f8dfacbd53a0007b71b231a68a878327"
+    },
+    {
+      "path": "Dalamud/FsdSkillCatalog.cs",
+      "sha256": "5e98e34426c77a4188a9d9e9a0d6a392a11322217b13a5e22b924c85c7bf4c55"
+    },
+    {
+      "path": "Dalamud/FsdStatusIds.cs",
+      "sha256": "851e28b31f971fa4943d1e71a88b62253cd7275f643439a3dab14d4551825c59"
+    },
+    {
+      "path": "Dalamud/GlobalUsings.cs",
+      "sha256": "25610a56fe0a741b9b2bef7170cb3b0d9885c8877eb155d65601df8693c56e0d"
+    },
+    {
+      "path": "Dalamud/Items/DeepDungeonItems.cs",
+      "sha256": "9e3dbfd241b62e76181f3878c48591ba1705b539613a074a819de515335472f9"
+    },
+    {
+      "path": "Dalamud/Items/ItemInfo.cs",
+      "sha256": "3a41de002c44f3b5a7cf51623f1ca9455508b6fd8a608254f2f36119486301af"
+    },
+    {
+      "path": "Dalamud/Items/ItemManager.cs",
+      "sha256": "b34fb8005aa54aad253514cf0e93a11e60ce3597931f3d180de5a280c62c6a88"
+    },
+    {
+      "path": "Dalamud/Navigation/VNav.cs",
+      "sha256": "76941e0722bfaa1293dc7c12b4518f7a177b7e53385b02e68dd4a3073817d245"
+    },
+    {
+      "path": "Dalamud/Properties/AssemblyInfo.cs",
+      "sha256": "4c0a3e979acf1e3e55f44fae3ef0c370a35695b0bbd7ceb0c0e2bc462baa35d7"
+    },
+    {
+      "path": "Dalamud/Service.cs",
+      "sha256": "38c27180c9f1c50b6a77a89c3a4b2b126d9949adb6eddbf4244d81d5d770c658"
+    },
+    {
+      "path": "Dalamud/Utilities/GameInteraction.cs",
+      "sha256": "e6539f6d1f2b14cd56e6d64c998ea67ce01119f5498217ce8ef90531565bae0c"
+    },
+    {
+      "path": "Dalamud/Utilities/UiHelpers.cs",
+      "sha256": "f7e6031b3c7d919e43a0157e9a05e101af3a5ba427685dd04c8b3079414ccb69"
+    },
+    {
+      "path": "Dalamud/Utilities/WorldDrawHelper.cs",
+      "sha256": "f7a6e4423273ade6dea50d62e6f1d0f6f63b95310af2b3c32185e4c31dcacdc6"
+    },
+    {
+      "path": "GENERATED.md",
+      "sha256": "00b83d357d840e8706dcdad60032c16a4b4c634e473939df39151e76e6b24cfc"
+    },
+    {
+      "path": "Runtime/DeepDungeon.Fsd.Runtime.csproj",
+      "sha256": "c50e59ca3ceac365cb95e4ccc71b2805f482ba8780e411bd2967170eb768aa68"
+    },
+    {
+      "path": "Runtime/DeepDungeonFloorClassifier.cs",
+      "sha256": "46030c79050393d5dfa9d430e2847283a7da71f0a70909a0de3df65c912941b6"
+    },
+    {
+      "path": "Runtime/DeepDungeonStateSnapshot.cs",
+      "sha256": "50f56bd8b7c222a0bf104901b3bce32407c659a319cce59e4f239d19b5505f7f"
+    },
+    {
+      "path": "Runtime/FarmingSession.cs",
+      "sha256": "4622e67fe00641463ba582e145ce57a932289988d8ef69f917ba055335fd5e58"
+    },
+    {
+      "path": "Runtime/FarmingSettings.cs",
+      "sha256": "79e664abd36c1caaaa38284262dbca6831fd180574315720351c3ab303fbcd97"
+    },
+    {
+      "path": "Runtime/FloorItemUseSession.cs",
+      "sha256": "2274baa3bfeafb0341877a5d2a5e8431817aa7774594cf8a6f7f6f0da8a1d4ee"
+    },
+    {
+      "path": "Runtime/FloorObjectiveSession.cs",
+      "sha256": "3857f9386a60a5744964a43d882a0c0bd7007551a905b974b86de3698d896b47"
+    },
+    {
+      "path": "Runtime/FloorPlanningSession.cs",
+      "sha256": "9a19a334e02b0684e2d330a781768dd9816e56c8cddb89f23895dc729e1fb614"
+    },
+    {
+      "path": "Runtime/FsdApplicationSnapshot.cs",
+      "sha256": "d8afa645d4c2f8e2ea2ce6b29e5ee8df511dbd146e144f5afe49057e1fa9a879"
+    },
+    {
+      "path": "Runtime/FsdBossMechanicsController.cs",
+      "sha256": "5004f2af3589ade27d7323e09f4b063fd2191eecc9a31cdbf6214c2fda7d158d"
+    },
+    {
+      "path": "Runtime/FsdBossMechanicsSettings.cs",
+      "sha256": "da402e45b0fb34a2aef5dbf092d69e338a2fe30152cfb4a45190f35aa434901a"
+    },
+    {
+      "path": "Runtime/FsdControlContracts.cs",
+      "sha256": "7241fc0750ee2bcfbe6cfe5b646f12c44c81393c3f60dbcc4b073c15a1375f38"
+    },
+    {
+      "path": "Runtime/FsdEngineIdentity.cs",
+      "sha256": "993bdeca0e8d56281cfffc4b8fc7296e4358d7626b5b2fef3703a408ac78ce7f"
+    },
+    {
+      "path": "Runtime/FsdExecutionLease.cs",
+      "sha256": "e9cd16b7c10d2e4e293385132be2d7a7458238300d94797f2bd8ea945e40a776"
+    },
+    {
+      "path": "Runtime/FsdFacadeLifecycle.cs",
+      "sha256": "f2898fb154e9d709775015724887fd92d1e57a805edee19c65dea2dd582a2a1c"
+    },
+    {
+      "path": "Runtime/FsdRotationController.cs",
+      "sha256": "7cb1c9db30fcfce511eb74117f488741beb07fb2094851c775da429a3500b408"
+    },
+    {
+      "path": "Runtime/FsdRotationSettings.cs",
+      "sha256": "a5ea704e22b45b3340bf1799fcdb73134a3d146a1acc6ce0e9faf8042f7ba69f"
+    },
+    {
+      "path": "Runtime/FsdSettings.cs",
+      "sha256": "18d05758fb97052c2f237024f02a0c573cd8b376ea72c4eb76a94afaa28ba802"
+    },
+    {
+      "path": "Runtime/FsdSettingsValidator.cs",
+      "sha256": "a88c12c4252553d9c289bc55d43fea603d8a7b5b740957721c8d7e4fce24bdc2"
+    },
+    {
+      "path": "Runtime/FsdStartAuthorizationCallback.cs",
+      "sha256": "d207336efdc6e0fbad9d3477e5c0c873560f8765074186b7b5a8a5c4350a3c45"
+    },
+    {
+      "path": "Runtime/IFsdApplication.cs",
+      "sha256": "d9b1d08313858ac6f79e89db4ddc7f921a4bef7ed27ee64bf6b60d94e7ddd17f"
+    },
+    {
+      "path": "Runtime/IFsdSettingsStore.cs",
+      "sha256": "8933a9d3f6a6c577a032adac3498000eccaa9d7e6e949de2ecd6c76f0ddc1712"
+    },
+    {
+      "path": "Runtime/MultiLoopDriver.cs",
+      "sha256": "bfec09027748c6aa0ebc246af7aeb3d57c4464d791aced9ee4544e954a1f1ad2"
+    },
+    {
+      "path": "Runtime/PendingIntuitionState.cs",
+      "sha256": "13e896dcde16834996b23fd1f2ff7a013c3504257ed24b0fad56c7da1bcfb8be"
+    },
+    {
+      "path": "Runtime/Properties/AssemblyInfo.cs",
+      "sha256": "c40c75f0d80c21d992ab80202c8d98d43bb40947ac5d2988b70a88aa12993c8d"
+    },
+    {
+      "path": "Runtime/RunOptions.cs",
+      "sha256": "9df1f3bac79cbd487cd54c817401e33d0863a1dc830dc1b641dd0af3b10d7ddd"
+    }
+  ]
+}

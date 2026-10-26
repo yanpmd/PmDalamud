@@ -41,12 +41,35 @@ internal sealed partial class WidgetMenuPopup
             if (!_rows.TryGetValue(item.G, out Node? row)) continue;
 
             ToolbarWidget? child = menu.FindChild(item.G);
-            Node           icon  = row.QuerySelector<Node>(".icon")!;
-            Node           text  = row.QuerySelector<Node>(".text")!;
 
-            text.NodeValue      = child?.GetInstanceName() ?? GetWidgetTypeName(item.T);
-            text.Style.FontSize = EntryFontSize;
-            row.Style.Size      = new(0, EntryHeight);
+            // Display conditions are evaluated by the widget itself, so the
+            // visibility of the entry has to mirror that of the widget.
+            row.Style.IsVisible = child?.Node.Style.IsVisible ?? true;
+
+            if (child is SeparatorWidget separator) {
+                UpdateSeparatorNode(row, separator);
+
+                continue;
+            }
+
+            Node           icon       = row.QuerySelector<Node>(".icon")!;
+            Node           text       = row.QuerySelector<Node>(".text")!;
+            Node           altText    = row.QuerySelector<Node>(".text-alt")!;
+            bool           isDisabled = child?.Node.IsDisabled ?? false;
+            string?        alt        = child?.GetMenuAltText();
+
+            text.NodeValue       = child?.GetMenuLabel() ?? GetWidgetTypeName(item.T);
+            text.Style.FontSize  = EntryFontSize;
+            text.Style.IsVisible = child?.ShowMenuLabel ?? true;
+            text.ToggleClass("disabled", isDisabled);
+
+            altText.NodeValue       = alt ?? string.Empty;
+            altText.Style.IsVisible = !string.IsNullOrEmpty(alt);
+            altText.ToggleClass("disabled", isDisabled);
+
+            icon.ToggleClass("disabled", isDisabled);
+
+            row.Style.Size = new(0, EntryHeight);
 
             UpdateIconNode(icon, child);
         }
@@ -54,6 +77,15 @@ internal sealed partial class WidgetMenuPopup
 
     private Node CreateEntryNode(DynamicMenuNewWidget.WidgetMenuItem item, int index)
     {
+        if (WidgetRef?.FindChild(item.G) is SeparatorWidget) {
+            return new() {
+                ClassList   = ["separator"],
+                InheritTags = true,
+                SortIndex   = index,
+                ChildNodes  = [new() { ClassList = ["separator-line"], InheritTags = true }],
+            };
+        }
+
         Node icon = new() { ClassList = ["icon"], InheritTags = true };
         Node wrapper = new() {
             ClassList   = ["icon-wrapper"],
@@ -62,16 +94,17 @@ internal sealed partial class WidgetMenuPopup
             ChildNodes  = [icon],
         };
         Node text = new() { ClassList = ["text"], InheritTags = true };
+        Node alt  = new() { ClassList = ["text-alt"], InheritTags = true, Style = new() { IsVisible = false } };
 
         Node row = new() {
             ClassList   = ["item"],
             InheritTags = true,
             SortIndex   = index,
-            ChildNodes  = [wrapper, text],
+            ChildNodes  = [wrapper, text, alt],
         };
 
         row.OnMouseUp    += _ => ActivateEntry(item);
-        row.OnRightClick += _ => OpenContextMenuFor(item);
+        row.OnRightClick += _ => ForwardRightClick(item);
 
         return row;
     }
@@ -84,6 +117,21 @@ internal sealed partial class WidgetMenuPopup
 
         PendingActivation = child;
         Close();
+    }
+
+    /// <summary>
+    /// Renders a separator widget as a plain horizontal line instead of a menu
+    /// entry with an icon and a label.
+    /// </summary>
+    private static void UpdateSeparatorNode(Node row, SeparatorWidget separator)
+    {
+        Node line = row.QuerySelector<Node>(".separator-line")!;
+
+        int thickness = Math.Clamp(separator.GetConfigValue<int>("LineWidth"), 1, 8);
+
+        row.Style.Size             = new(0, thickness + 10);
+        line.Style.Size            = new(0, thickness);
+        line.Style.BackgroundColor = new(separator.GetConfigValue<string>("LineColor"));
     }
 
     private static string GetWidgetTypeName(string typeId)

@@ -61,6 +61,7 @@ internal static class JobData
         (40, "贤者", "SGE", JobRole.Healer),
         (41, "蛇武", "VPR", JobRole.Melee),
         (42, "绘灵", "PCT", JobRole.Caster),
+        (43, "驯兽师", "BST", JobRole.Melee),
     ];
 
     public static byte CurrentJobId

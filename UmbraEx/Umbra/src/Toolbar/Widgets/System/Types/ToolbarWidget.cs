@@ -121,6 +121,31 @@ public abstract class ToolbarWidget(
     }
 
     /// <summary>
+    /// Returns the label that is used when this widget is shown as an entry of
+    /// another widget, such as a dynamic menu.
+    /// </summary>
+    public virtual string GetMenuLabel()
+    {
+        return GetInstanceName();
+    }
+
+    /// <summary>
+    /// Whether the label should be rendered when this widget is shown as an
+    /// entry of another widget. Widgets that are configured to only display
+    /// their icon hide their label.
+    /// </summary>
+    public virtual bool ShowMenuLabel => true;
+
+    /// <summary>
+    /// Returns an optional line of text that is shown next to the menu label,
+    /// such as the enabled state of the plugin or collection it represents.
+    /// </summary>
+    public virtual string? GetMenuAltText()
+    {
+        return null;
+    }
+
+    /// <summary>
     /// Returns an optional button node that is displayed in the footer of this
     /// widget's settings window. Widgets that provide their own content editor
     /// can override this method to expose it.

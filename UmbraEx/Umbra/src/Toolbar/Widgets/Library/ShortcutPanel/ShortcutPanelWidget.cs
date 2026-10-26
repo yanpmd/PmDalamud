@@ -31,6 +31,13 @@ internal sealed partial class ShortcutPanelWidget(
         return $"{Info.Name} - {GetConfigValue<string>("ButtonLabel")}";
     }
 
+    public override string GetMenuLabel()
+    {
+        string label = GetConfigValue<string>("ButtonLabel").Trim();
+
+        return label.Length > 0 ? label : base.GetMenuLabel();
+    }
+
     protected override void OnDraw()
     {
         Popup.WidgetInstanceId = Id;

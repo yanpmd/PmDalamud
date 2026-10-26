@@ -1,0 +1,13 @@
+{
+  "Author": "John Smith",
+  "Name": "Pilgrim's Traverse",
+  "Punchline": "可以挖宝.",
+  "InternalName": "PilgrimsTraverse",
+  "IconUrl": "https://raw.githubusercontent.com/transparent-duck/PilgrimsTraverse/refs/heads/main/icon.png",
+  "AssemblyVersion": "0.7.55.18",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false
+}

@@ -30,6 +30,11 @@ internal sealed class MainMenuWidget(
             : $"{base.GetInstanceName()} - {_category.Name}";
     }
 
+    public override string GetMenuLabel()
+    {
+        return _category is null ? base.GetMenuLabel() : _category.Name;
+    }
+
     protected override void OnLoad()
     {
         _repository       =  Framework.Service<IMainMenuRepository>();

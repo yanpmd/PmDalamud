@@ -62,7 +62,7 @@ internal sealed partial class PluginCollectionSingleWidget(
         DalamudProfile? profile = FindProfile(name);
 
         if (profile is null) {
-            SetText(name);
+            SetText(GetButtonLabel(name));
             SetDisabled(true);
             SetTextColor(new("Widget.TextMuted"), null);
             Node.Tooltip = showTooltip ? I18N.Translate("Widget.PluginCollectionSingle.Unavailable") : null;
@@ -73,11 +73,15 @@ internal sealed partial class PluginCollectionSingleWidget(
         DalamudProfile selected = profile.Value;
 
         SetDisabled(false);
-        SetText(selected.Name);
+        SetText(GetButtonLabel(selected.Name));
         SetIconDesaturated(CvarDesaturateIcon() || !selected.IsEnabled);
 
         if (!selected.IsEnabled) {
             SetTextColor(new("Widget.TextMuted"), null);
+
+            // The default icon doubles as a state indicator so that disabled
+            // collections can be told apart at a glance.
+            if (IsUsingDefaultIcon()) SetFontAwesomeIcon(FontAwesomeIcon.ToggleOff);
         }
 
         Node.Tooltip = showTooltip
@@ -93,7 +97,53 @@ internal sealed partial class PluginCollectionSingleWidget(
     {
         string name = GetConfigValue<string>("SelectedCollection");
 
-        return name.Length > 0 ? $"{base.GetInstanceName()} - {name}" : base.GetInstanceName();
+        if (name.Length == 0) return base.GetInstanceName();
+
+        return $"{base.GetInstanceName()} - {GetButtonLabel(name)}";
+    }
+
+    public override string GetMenuLabel()
+    {
+        string name = GetConfigValue<string>("SelectedCollection");
+
+        return name.Length > 0 ? GetButtonLabel(name) : base.GetMenuLabel();
+    }
+
+    public override string? GetMenuAltText()
+    {
+        string name = GetConfigValue<string>("SelectedCollection");
+
+        if (name.Length == 0) return null;
+
+        DalamudProfile? profile = FindProfile(name);
+
+        if (profile is null) return null;
+
+        return I18N.Translate(
+            profile.Value.IsEnabled
+                ? "Widget.PluginCollections.State.Enabled"
+                : "Widget.PluginCollections.State.Disabled"
+        );
+    }
+
+    /// <summary>
+    /// Returns the custom label of this widget, or the given collection name
+    /// when no custom label is set.
+    /// </summary>
+    private string GetButtonLabel(string fallback)
+    {
+        string label = GetConfigValue<string>("ButtonLabel").Trim();
+
+        return label.Length > 0 ? label : fallback;
+    }
+
+    /// <summary>
+    /// True if the icon of this widget is still the default one. The icon is
+    /// then used to indicate whether the collection is enabled.
+    /// </summary>
+    private bool IsUsingDefaultIcon()
+    {
+        return CvarIconType() == IconTypeFontAwesome && CvarFontAwesomeIcon() == DefaultFontAwesomeIcon;
     }
 
     private void RefreshProfiles()

@@ -77,6 +77,13 @@ internal partial class DtrSingleWidget(
         return title.Length > 0 ? $"{base.GetInstanceName()} - {title}" : base.GetInstanceName();
     }
 
+    public override string GetMenuLabel()
+    {
+        string title = GetConfigValue<string>("SelectedEntry");
+
+        return title.Length > 0 ? title : base.GetMenuLabel();
+    }
+
     private void OnLeftClick(Node _)
     {
         if (DtrBarEntry is { HasClickAction: true }) {

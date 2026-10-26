@@ -21,6 +21,15 @@ internal sealed partial class PluginCollectionSingleWidget
                 GetCollectionOptions()
             ),
 
+            new StringWidgetConfigVariable(
+                "ButtonLabel",
+                I18N.Translate("Widget.PluginCollectionSingle.Config.ButtonLabel.Name"),
+                I18N.Translate("Widget.PluginCollectionSingle.Config.ButtonLabel.Description"),
+                "",
+                1024,
+                true
+            ),
+
             new BooleanWidgetConfigVariable(
                 "ShowTooltip",
                 I18N.Translate("Widget.PluginCollectionSingle.Config.ShowTooltip.Name"),

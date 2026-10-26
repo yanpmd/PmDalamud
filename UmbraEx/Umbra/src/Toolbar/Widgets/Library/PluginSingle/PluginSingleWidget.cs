@@ -47,7 +47,9 @@ internal sealed partial class PluginSingleWidget(
             return;
         }
 
-        SetText(plugin.Name);
+        string label = GetButtonLabel();
+
+        SetText(label.Length > 0 ? label : plugin.Name);
         SetDisabled(!plugin.IsLoaded);
 
         Node.Tooltip = GetConfigValue<bool>("ShowTooltip")
@@ -61,9 +63,29 @@ internal sealed partial class PluginSingleWidget(
 
     public override string GetInstanceName()
     {
+        string label = GetButtonLabel();
+
+        if (label.Length > 0) return $"{base.GetInstanceName()} - {label}";
+
         IExposedPlugin? plugin = GetSelectedPlugin();
 
         return plugin is null ? base.GetInstanceName() : $"{base.GetInstanceName()} - {plugin.Name}";
+    }
+
+    public override string GetMenuLabel()
+    {
+        string label = GetButtonLabel();
+
+        if (label.Length > 0) return label;
+
+        return GetSelectedPlugin()?.Name ?? base.GetMenuLabel();
+    }
+
+    public override string? GetMenuAltText()
+    {
+        IExposedPlugin? plugin = GetSelectedPlugin();
+
+        return plugin is { IsLoaded: false } ? I18N.Translate("Widget.PluginCollections.State.Disabled") : null;
     }
 
     private IExposedPlugin? GetSelectedPlugin()

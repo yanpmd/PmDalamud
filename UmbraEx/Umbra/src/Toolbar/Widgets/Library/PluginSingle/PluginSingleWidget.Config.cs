@@ -18,6 +18,15 @@ internal sealed partial class PluginSingleWidget
                 GetPluginOptions()
             ),
 
+            new StringWidgetConfigVariable(
+                "ButtonLabel",
+                I18N.Translate("Widget.PluginSingle.Config.ButtonLabel.Name"),
+                I18N.Translate("Widget.PluginSingle.Config.ButtonLabel.Description"),
+                "",
+                1024,
+                true
+            ),
+
             new BooleanWidgetConfigVariable(
                 "ShowTooltip",
                 I18N.Translate("Widget.PluginSingle.Config.ShowTooltip.Name"),
@@ -25,6 +34,15 @@ internal sealed partial class PluginSingleWidget
                 true
             ),
         ];
+    }
+
+    /// <summary>
+    /// Returns the user-provided label of this widget, or an empty string when
+    /// the name of the selected plugin should be used instead.
+    /// </summary>
+    private string GetButtonLabel()
+    {
+        return GetConfigValue<string>("ButtonLabel").Trim();
     }
 
     private static Dictionary<string, string> GetPluginOptions()

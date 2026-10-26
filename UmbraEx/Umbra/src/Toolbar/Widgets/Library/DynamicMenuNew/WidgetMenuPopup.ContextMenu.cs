@@ -4,69 +4,52 @@ namespace Umbra.Widgets;
 
 internal sealed partial class WidgetMenuPopup
 {
-    private DynamicMenuNewWidget.WidgetMenuItem? _selectedItem;
-
     private void CreateContextMenu()
     {
         ContextMenu = new([
             new ContextMenuEntry("Configure") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.Configure"),
+                Label = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.Configure"),
                 OnClick = () => {
-                    if (_selectedItem is null) return;
-
-                    DynamicMenuNewWidget.WidgetMenuItem item = _selectedItem;
-                    DynamicMenuNewWidget?              menu = WidgetRef;
+                    DynamicMenuNewWidget? menu = WidgetRef;
 
                     Close();
-                    menu?.OpenChildEditor(item);
+                    menu?.OpenSettingsWindow();
                 },
             },
-            new ContextMenuEntry("-"),
-            new ContextMenuEntry("MoveUp") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.MoveUp"),
-                OnClick = () => MoveSelected(item => WidgetRef?.MoveItem(item, -1)),
-            },
-            new ContextMenuEntry("MoveDown") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.MoveDown"),
-                OnClick = () => MoveSelected(item => WidgetRef?.MoveItem(item, 1)),
-            },
-            new ContextMenuEntry("MoveToTop") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.MoveToTop"),
-                OnClick = () => MoveSelected(item => WidgetRef?.MoveItemToEdge(item, false)),
-            },
-            new ContextMenuEntry("MoveToBottom") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.MoveToBottom"),
-                OnClick = () => MoveSelected(item => WidgetRef?.MoveItemToEdge(item, true)),
-            },
-            new ContextMenuEntry("-"),
             new ContextMenuEntry("Manage") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.Manage"),
+                Label = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.Manage"),
                 OnClick = () => {
+                    DynamicMenuNewWidget? menu = WidgetRef;
+
                     Close();
-                    WidgetRef?.OpenContentEditor();
+                    menu?.OpenContentEditor();
                 },
-            },
-            new ContextMenuEntry("Remove") {
-                Label   = I18N.Translate("Widget.DynamicMenuNew.ContextMenu.Remove"),
-                OnClick = () => MoveSelected(item => WidgetRef?.RemoveItem(item)),
             },
         ]);
     }
 
-    private void OpenContextMenuFor(DynamicMenuNewWidget.WidgetMenuItem item)
+    /// <summary>
+    /// Shows the context menu of the menu widget itself, which is presented
+    /// when the button of the menu is right-clicked.
+    /// </summary>
+    internal void PresentWidgetContextMenu()
     {
-        _selectedItem = item;
-
         ContextMenu?.Present();
     }
 
-    private void MoveSelected(Action<DynamicMenuNewWidget.WidgetMenuItem> action)
+    /// <summary>
+    /// Forwards a right click on a menu entry to the widget it represents so
+    /// that entries behave like their standalone counterparts.
+    /// </summary>
+    private void ForwardRightClick(DynamicMenuNewWidget.WidgetMenuItem item)
     {
-        if (_selectedItem is null) return;
+        ToolbarWidget? child = WidgetRef?.FindChild(item.G);
 
-        DynamicMenuNewWidget.WidgetMenuItem item = _selectedItem;
+        if (child is null) return;
+        if (!DynamicMenuNewWidget.HasNodeMouseHandler(child.Node, "OnRightClick")) return;
 
         Close();
-        action(item);
+
+        Framework.DalamudFramework.Run(() => DynamicMenuNewWidget.InvokeNodeMouseEvent(child.Node, "OnRightClick"));
     }
 }

@@ -1,19 +1,22 @@
 {
 	"folders": [
 		{
+			"path": "."
+		},
+		{
 			"path": "UmbraEx"
-		},
-		{
-			"path": "Umbra.SamplePlugin"
-		},
-		{
-			"path": "AetherBagsEx"
 		},
 		{
 			"path": "QoLBarEx"
 		},
 		{
-			"path": "."
+			"path": "AetherBagsEx"
+		},
+		{
+			"path": "PilgrimsTraverse"
+		},
+		{
+			"path": "D:/SteamLibrary/otherapps/XIVLauncherCN/icons"
 		}
 	]
 }

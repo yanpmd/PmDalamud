@@ -30,6 +30,11 @@ internal sealed partial class ItemButtonWidget(
             : $"{I18N.Translate("Widget.ItemButton.Name")}";
     }
 
+    public override string GetMenuLabel()
+    {
+        return string.IsNullOrWhiteSpace(ItemName) ? base.GetMenuLabel() : ItemName;
+    }
+
     protected override void OnLoad()
     {
         Node.OnClick += UseItem;

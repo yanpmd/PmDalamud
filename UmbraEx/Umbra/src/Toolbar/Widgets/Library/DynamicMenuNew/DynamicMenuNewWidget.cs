@@ -36,6 +36,7 @@ internal sealed partial class DynamicMenuNewWidget(
         Popup.WidgetRef = this;
 
         OnConfigValueChanged += OnWidgetConfigValueChanged;
+        Node.OnRightClick    += OnNodeRightClick;
 
         LoadItems();
         RebuildChildren();
@@ -44,8 +45,25 @@ internal sealed partial class DynamicMenuNewWidget(
     protected override void OnUnload()
     {
         OnConfigValueChanged -= OnWidgetConfigValueChanged;
+        Node.OnRightClick    -= OnNodeRightClick;
 
         DisposeChildren();
+    }
+
+    /// <summary>
+    /// Right-clicking the button of the menu shows the context menu of the
+    /// widget itself, which only offers to configure the widget or to manage
+    /// its contents.
+    /// </summary>
+    private void OnNodeRightClick(Node _)
+    {
+        // The context menu is drawn by the popup, which therefore has to be
+        // open for it to be visible.
+        if (!Popup.IsOpen) {
+            Framework.Service<WidgetManager>().OpenHostedPopup(this, Popup, this);
+        }
+
+        Popup.PresentWidgetContextMenu();
     }
 
     protected override void OnDraw()
@@ -95,7 +113,18 @@ internal sealed partial class DynamicMenuNewWidget(
         InvokeNodeMouseEvent(child.Node, "OnClick");
     }
 
-    private static void InvokeNodeMouseEvent(Node node, string eventName)
+    /// <summary>
+    /// Returns true if the given node has a handler bound to the named mouse
+    /// event.
+    /// </summary>
+    internal static bool HasNodeMouseHandler(Node node, string eventName)
+    {
+        FieldInfo? field = typeof(Node).GetField(eventName, BindingFlags.Instance | BindingFlags.NonPublic);
+
+        return field?.GetValue(node) is Delegate;
+    }
+
+    internal static void InvokeNodeMouseEvent(Node node, string eventName)
     {
         if (node.IsDisabled) return;
 

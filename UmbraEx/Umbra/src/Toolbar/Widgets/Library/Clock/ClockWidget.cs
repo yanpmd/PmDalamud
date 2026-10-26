@@ -27,6 +27,9 @@ internal partial class ClockWidget(
     public override string GetInstanceName()
         => $"{Info.Name} - {I18N.Translate($"Widget.Clock.Config.TimeSource.{GetConfigValue<string>("TimeSource")}")}";
 
+    public override string GetMenuLabel()
+        => I18N.Translate($"Widget.Clock.Config.TimeSource.{GetConfigValue<string>("TimeSource")}");
+
     protected override void OnLoad()
     {
         BodyNode.AppendChild(_clockNode);

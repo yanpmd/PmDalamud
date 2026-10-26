@@ -191,6 +191,16 @@ internal sealed partial class DynamicMenuNewWidget
 
     private void RebuildChildren()
     {
+        // A child widget keeps a reference to the dictionary that is stored in
+        // its menu item and clears it when it is disposed. Detach the items from
+        // the dictionaries first, otherwise rebuilding the children resets the
+        // configuration of every entry in the menu.
+        foreach (WidgetMenuItem item in _items) {
+            if (item.C is not null) {
+                item.C = new Dictionary<string, object>(item.C);
+            }
+        }
+
         DisposeChildren();
 
         foreach (WidgetMenuItem item in _items) {

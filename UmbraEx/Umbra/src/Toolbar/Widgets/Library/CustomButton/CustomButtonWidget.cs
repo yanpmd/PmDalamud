@@ -24,6 +24,13 @@ internal sealed partial class CustomButtonWidget(
         return $"{I18N.Translate("Widget.CustomButton.Name")} - {GetConfigValue<string>("Label")}";
     }
 
+    public override string GetMenuLabel()
+    {
+        string label = GetConfigValue<string>("Label").Trim();
+
+        return label.Length > 0 ? label : base.GetMenuLabel();
+    }
+
     protected override uint DefaultGameIconId => 14u;
 
     protected override void OnLoad()

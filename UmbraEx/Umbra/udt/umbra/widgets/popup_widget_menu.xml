@@ -34,6 +34,20 @@
         }
     }
 
+    .separator {
+        auto-size: grow fit;
+        size: 0 11;
+        margin: 0 4;
+        background-color: 0;
+
+        & > .separator-line {
+            anchor: middle-center;
+            auto-size: grow fit;
+            size: 0 1;
+            background-color: "Widget.PopupBorder";
+        }
+    }
+
     .item {
         auto-size: grow fit;
         gap: 8;
@@ -78,6 +92,16 @@
                     outline-size: 1;
                 }
 
+                &.fa-icon.disabled {
+                    color: "Widget.PopupMenuTextDisabled";
+                    outline-color: 0;
+                }
+
+                &.glyph-icon.disabled {
+                    color: "Widget.PopupMenuTextDisabled";
+                    outline-color: 0;
+                }
+
                 &.disabled { image-grayscale: true; }
             }
         }
@@ -106,6 +130,8 @@
             outline-color: "Widget.PopupMenuTextOutline";
             outline-size: 1;
             padding: 0 8 0 0;
+
+            &.disabled { color: "Widget.PopupMenuTextDisabled"; outline-color: 0; }
         }
     }
     ]]>

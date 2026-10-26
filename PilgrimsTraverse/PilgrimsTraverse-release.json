@@ -1,0 +1,17 @@
+[
+  {
+    "Author": "John Smith",
+    "Name": "Pilgrim's Traverse",
+    "Punchline": "可以挖宝.",
+    "InternalName": "PilgrimsTraverse",
+    "RepoUrl": "https://github.com/transparent-duck/PilgrimsTraverse",
+    "DownloadCount": 1,
+    "LastUpdate": 1791631190,
+    "DownloadLinkInstall": "https://github.com/transparent-duck/PilgrimsTraverse/raw/refs/heads/main/PilgrimsTraverse.zip",
+    "DownloadLinkUpdate": "https://github.com/transparent-duck/PilgrimsTraverse/raw/refs/heads/main/PilgrimsTraverse.zip",
+    "AssemblyVersion": "0.7.55.18",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 15,
+    "IconUrl": "https://raw.githubusercontent.com/transparent-duck/PilgrimsTraverse/refs/heads/main/icon.png"
+  }
+]

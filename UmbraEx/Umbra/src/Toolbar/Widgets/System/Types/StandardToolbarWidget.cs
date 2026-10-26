@@ -236,6 +236,15 @@ public abstract class StandardToolbarWidget(
 
     protected bool IsSubTextEnabled => IsMultiLabelFeature() && GetConfigValue<bool>(CvarNameShowSubText);
 
+    /// <summary>
+    /// True if this widget is configured to only display its icon.
+    /// </summary>
+    protected bool IsIconOnlyDisplayMode =>
+        HasIconAndTextFeature() && GetConfigValue<string>(CvarNameDisplayMode) == DisplayModeIconOnly;
+
+    /// <inheritdoc/>
+    public override bool ShowMenuLabel => !IsIconOnlyDisplayMode;
+
     protected void SetDisabled(bool disabled)
     {
         Node.IsDisabled = disabled;
