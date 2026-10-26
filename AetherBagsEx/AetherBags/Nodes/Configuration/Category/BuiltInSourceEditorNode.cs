@@ -250,7 +250,7 @@ public sealed class BuiltInSourceEditorNode : SimpleComponentNode
         _itemPicker ??= new AddonItemPicker
         {
             Title = Localization.Get("ItemPicker.SelectToOrder"),
-            InternalName = "AetherBagsCN_OrderItemPicker",
+            InternalName = "AetherBagsEx_OrderItemPicker",
             SearchOptions = Services.DataManager.GetExcelSheet<Item>()
                 .Where(i => i.RowId > 0 && !i.Name.IsEmpty)
                 .ToList(),

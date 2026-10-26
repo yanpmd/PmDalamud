@@ -364,10 +364,10 @@
 
   "Cmd.Help.Config": "打开配置菜单。",
   "Cmd.Help.Icons": "打开图标浏览器。",
-  "Cmd.Help.Visible": "使用名称或序号隐藏/显示快捷栏。用法：/qolvisiblecn [on|off|toggle] <bar>",
+  "Cmd.Help.Visible": "使用名称或序号隐藏/显示快捷栏。用法：/qolvisibleex [on|off|toggle] <bar>",
   "Cmd.Help.Performance": "开始演奏乐器。",
   "Cmd.Error.InvalidSubcommand": "无效的子命令。",
-  "Cmd.Error.UsageVisible": "用法：/qolvisiblecn [on|off|toggle] <bar>",
+  "Cmd.Error.UsageVisible": "用法：/qolvisibleex [on|off|toggle] <bar>",
   "Cmd.Error.InvalidInstrument": "无效的乐器。",
 
   "Error.MacroUsage": "无效的宏。用法：\"//m0\" 为个人宏 #0，\"//m100\" 为公共宏 #0，最大到 199。",

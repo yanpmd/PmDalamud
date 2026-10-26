@@ -12,8 +12,8 @@ namespace AetherBags.Commands;
 
 public class CommandHandler : IDisposable
 {
-    private const string MainCommand = "/aetherbagscn";
-    private const string ShortCommand = "/abcn";
+    private const string MainCommand = "/aetherbagsex";
+    private const string ShortCommand = "/abex";
     private const string HelpDescriptionKey = "Command.HelpDescription";
     private string? _debugVanillaBypassToken;
 
@@ -476,28 +476,28 @@ public class CommandHandler : IDisposable
     {
         var commands = new (string Command, string Description)[]
         {
-            ("/abcn", "Command.Help.Toggle"),
-            ("/abcn config", "Command.Help.Config"),
-            ("/abcn show", "Command.Help.Show"),
-            ("/abcn hide", "Command.Help.Hide"),
+            ("/abex", "Command.Help.Toggle"),
+            ("/abex config", "Command.Help.Config"),
+            ("/abex show", "Command.Help.Show"),
+            ("/abex hide", "Command.Help.Hide"),
 
-            ("/abcn search <term>", "Command.Help.Search"),
+            ("/abex search <term>", "Command.Help.Search"),
 
-            ("/abcn list", "Command.Help.List"),
-            ("/abcn list <n>", "Command.Help.ListN"),
-            ("/abcn list ids", "Command.Help.ListIds"),
-            ("/abcn list full", "Command.Help.ListFull"),
+            ("/abex list", "Command.Help.List"),
+            ("/abex list <n>", "Command.Help.ListN"),
+            ("/abex list ids", "Command.Help.ListIds"),
+            ("/abex list full", "Command.Help.ListFull"),
 
-            ("/abcn stats", "Command.Help.Stats"),
+            ("/abex stats", "Command.Help.Stats"),
 
-            ("/abcn import", "Command.Help.Import"),
-            ("/abcn import-sk", "Command.Help.ImportSk"),
-            ("/abcn export", "Command.Help.Export"),
-            ("/abcn export-categories", "Command.Help.ExportCategories"),
-            ("/abcn import-categories", "Command.Help.ImportCategories"),
-            ("/abcn reset", "Command.Help.Reset"),
+            ("/abex import", "Command.Help.Import"),
+            ("/abex import-sk", "Command.Help.ImportSk"),
+            ("/abex export", "Command.Help.Export"),
+            ("/abex export-categories", "Command.Help.ExportCategories"),
+            ("/abex import-categories", "Command.Help.ImportCategories"),
+            ("/abex reset", "Command.Help.Reset"),
 
-            ("/abcn help", "Command.Help.Help"),
+            ("/abex help", "Command.Help.Help"),
         };
 
         var lines = new List<string> { Localization.Get("Command.Help.Header") };
@@ -506,8 +506,8 @@ public class CommandHandler : IDisposable
             lines.Add($"  {cmd}  - {Localization.Get(desc)}");
 
         lines.Add(System.Config?.General?.DebugEnabled == true
-            ? $"  /abcn debug [saddle|retainer|test|refresh]  - {Localization.Get("Command.Help.Debug")}"
-            : $"  /abcn debug  - {Localization.Get("Command.Help.DebugDisabled")}");
+            ? $"  /abex debug [saddle|retainer|test|refresh]  - {Localization.Get("Command.Help.Debug")}"
+            : $"  /abex debug  - {Localization.Get("Command.Help.DebugDisabled")}");
 
         PrintChat(string.Join("\n", lines));
     }

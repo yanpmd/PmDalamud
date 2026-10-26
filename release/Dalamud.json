@@ -1,0 +1,50 @@
+[
+    {
+        "Author": "pmyan",
+        "Name": "AetherBagsEx",
+        "Punchline": "I have made some optimizations that I believe are worthwhile. Please take a look at the original repository.",
+        "Description": "This plugin replaces your inventory with it's own categorified inventory addon.",
+        "InternalName": "AetherBagsEx",
+        "RepoUrl": "https://github.com/UnknownX7/QoLBar",
+        "DownloadCount": 1,
+        "LastUpdate": 1791631190,
+        "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/AetherBagsEx/latest.zip",
+        "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/AetherBagsEx/latest.zip",
+        "AssemblyVersion": "2.0.0.5",
+        "ApplicableVersion": "any",
+        "DalamudApiLevel": 15,
+        "IconUrl": "https://raw.githubusercontent.com/Zeffuro/AetherBags/master/images/icon.png"
+    },
+    {
+        "Author": "pmyan",
+        "Name": "QoLBarEx",
+        "Punchline": "I have made some optimizations that I believe are worthwhile. Please take a look at the original repository.",
+        "Description": "A plugin designed to provide a simple, customizable and always available interface for chat commands\nor other plugins to alleviate the need for using macros and hotbar space to achieve similar results.\n\nThe plugin should initially appear as a small box on the bottom center of the game window.",
+        "InternalName": "QoLBarEx",
+        "RepoUrl": "https://github.com/UnknownX7/QoLBar",
+        "DownloadCount": 1,
+        "LastUpdate": 1791631190,
+        "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/QoLBarEx/latest.zip",
+        "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/QoLBarEx/latest.zip",
+        "AssemblyVersion": "3.3.3.9",
+        "ApplicableVersion": "any",
+        "DalamudApiLevel": 15,
+        "IconUrl": "https://raw.githubusercontent.com/goatcorp/PluginDistD17/main/stable/QoLBar/images/icon.png"
+    },
+    {
+        "Author": "pmyan",
+        "Name": "UmbraEx",
+        "Punchline": "I have made some optimizations that I believe are worthwhile. Please take a look at the original repository.",
+        "Description": "Consolidates common UI elements and actions into a single uniform interface in the form of a set of highly customizable toolbars.",
+        "InternalName": "QoLBarEx",
+        "RepoUrl": "https://github.com/UnknownX7/QoLBar",
+        "DownloadCount": 1,
+        "LastUpdate": 1791631190,
+        "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/UmbraEx/latest.zip",
+        "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/UmbraEx/latest.zip",
+        "AssemblyVersion": "3.1.18.0",
+        "ApplicableVersion": "any",
+        "DalamudApiLevel": 15,
+        "IconUrl": "https://raw.githubusercontent.com/una-xiv/umbra/main/Umbra/images/logo.png"
+    }
+]

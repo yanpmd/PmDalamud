@@ -3,6 +3,7 @@
     <PropertyGroup>
         <OutputPath>..\out\$(Configuration)\</OutputPath>
 		<EnableDefaultNoneItems>true</EnableDefaultNoneItems>
+		<AssemblyName>UmbraEx</AssemblyName>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -17,7 +18,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Content Include="Umbra.json" CopyToOutputDirectory="PreserveNewest" />
+        <Content Include="UmbraEx.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>

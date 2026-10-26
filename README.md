@@ -1,4 +1,5 @@
-> 复制自其他仓库的一些插件，增加一下多语言功能
+I have made some optimizations that I believe are worthwhile. Please take a look at the original repository.
 
-- [QoLBar](https://github.com/UnknownX7/QoLBar).
 - [AetherBags](https://github.com/Zeffuro/AetherBags).
+- [QoLBar](https://github.com/UnknownX7/QoLBar).
+- [umbra](https://github.com/una-xiv/umbra).

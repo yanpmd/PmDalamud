@@ -205,7 +205,7 @@ public sealed class CurrencyGeneralConfigurationNode : TabbedVerticalListNode
         var picker = new AddonCurrencyPicker
         {
             Title = Localization.Get("ItemPicker.SelectCurrencyToAdd"),
-            InternalName = "AetherBagsCN_CurrencyPicker",
+            InternalName = "AetherBagsEx_CurrencyPicker",
         };
         picker.SelectionResult = item =>
         {

@@ -6,7 +6,7 @@ namespace AetherBags.IPC.AetherBagsAPI;
 
 public class AetherBagsIPCProvider : IDisposable
 {
-    private const string IpcPrefix = "AetherBagsCN.";
+    private const string IpcPrefix = "AetherBagsEx.";
 
     private readonly AetherBagsAPIImpl _api;
 

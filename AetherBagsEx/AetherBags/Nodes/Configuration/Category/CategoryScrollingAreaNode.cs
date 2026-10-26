@@ -99,7 +99,7 @@ public sealed class CategoryScrollingAreaNode : ScrollingListNode
 
         _categoryConfigurationAddon = new AddonCategoryConfigurationWindow {
             Size = new Vector2(700.0f, 500.0f),
-            InternalName = "AetherBagsCN_CategoryConfig",
+            InternalName = "AetherBagsEx_CategoryConfig",
             Title = Localization.Get("CategoryConfig.WindowTitle"),
         };
     }

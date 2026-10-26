@@ -146,18 +146,18 @@ public static class ConditionSetUI
         ImGui.SameLine(listWidth);
         ImGui.TextUnformatted(Localization.Get("ConditionSet.DynamicPresets"));
 
-        ImGui.BeginChild("QoLBarCNConditionSetList", new Vector2(listWidth, listHeight), true);
+        ImGui.BeginChild("QoLBarExConditionSetList", new Vector2(listWidth, listHeight), true);
         DrawConditionSetList();
         ImGui.EndChild();
 
         ImGui.SameLine();
-        ImGui.BeginChild("QoLBarCNConditionSetPresetList", new Vector2(0, listHeight), true);
+        ImGui.BeginChild("QoLBarExConditionSetPresetList", new Vector2(0, listHeight), true);
         DrawDynamicPresetsList();
         ImGui.EndChild();
 
         if (!hasSelectedSet) return;
 
-        ImGui.BeginChild("QoLBarCNConditionSetEditor", ImGui.GetContentRegionAvail(), true);
+        ImGui.BeginChild("QoLBarExConditionSetEditor", ImGui.GetContentRegionAvail(), true);
         DrawConditionSetEditor(currentSet);
         ImGui.EndChild();
     }

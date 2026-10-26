@@ -79,7 +79,7 @@ public sealed class ListFiltersSection(Func<UserCategoryDefinition> getCategoryD
         _itemPicker ??= new AddonItemPicker
         {
             Title = Localization.Get("ItemPicker.SelectToAdd"),
-            InternalName = "AetherBagsCN_ItemPicker",
+            InternalName = "AetherBagsEx_ItemPicker",
             SearchOptions = Services.DataManager.GetExcelSheet<Item>()
                 .Where(i => i.RowId > 0 && !i.Name.IsEmpty)
                 .ToList(),
@@ -95,7 +95,7 @@ public sealed class ListFiltersSection(Func<UserCategoryDefinition> getCategoryD
     private void OpenCategoryPicker() {
         _categoryPicker ??= new AddonUICategoryPicker {
             Title = Localization.Get("ItemPicker.SelectCategoriesToAdd"),
-            InternalName = "AetherBagsCN_CategoryPicker",
+            InternalName = "AetherBagsEx_CategoryPicker",
             SearchOptions = Services.DataManager.GetExcelSheet<ItemUICategory>()
                 .Where(i => i.RowId > 0)
                 .ToList()

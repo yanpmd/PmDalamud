@@ -364,10 +364,10 @@
 
   "Cmd.Help.Config": "Open the configuration menu.",
   "Cmd.Help.Icons": "Open the icon browser.",
-  "Cmd.Help.Visible": "Hide or reveal a bar using its name or index. Usage: /qolvisiblecn [on|off|toggle] <bar>",
+  "Cmd.Help.Visible": "Hide or reveal a bar using its name or index. Usage: /qolvisibleex [on|off|toggle] <bar>",
   "Cmd.Help.Performance": "Starts playing an instrument.",
   "Cmd.Error.InvalidSubcommand": "Invalid subcommand.",
-  "Cmd.Error.UsageVisible": "Usage: /qolvisiblecn [on|off|toggle] <bar>",
+  "Cmd.Error.UsageVisible": "Usage: /qolvisibleex [on|off|toggle] <bar>",
   "Cmd.Error.InvalidInstrument": "Invalid instrument.",
 
   "Error.MacroUsage": "Invalid macro. Usage: \"//m0\" for individual macro #0, \"//m100\" for shared macro #0, valid up to 199.",

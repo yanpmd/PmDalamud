@@ -55,7 +55,7 @@ internal sealed partial class PluginListWidget
                 $"EnabledPlugin_{Crc32.Get(plugin.InternalName)}",
                 plugin.Name,
                 null,
-                plugin.InternalName == "Umbra"
+                plugin.InternalName == "UmbraEx"
             ) { Category = I18N.Translate("Widget.PluginList.Config.EnabledCategory") });
         }
 

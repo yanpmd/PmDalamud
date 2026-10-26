@@ -128,7 +128,7 @@ public class PluginUI : IDisposable
 
         var letterButtonSize = new Vector2(ImGui.CalcTextSize("O").X + ImGui.GetStyle().FramePadding.X * 2, 0);
 
-        ImGui.Columns(3, "QoLBarCNBarsList", false);
+        ImGui.Columns(3, "QoLBarExBarsList", false);
         for (int i = 0; i < bars.Count; i++)
         {
             ImGui.PushID(i);
@@ -392,7 +392,7 @@ public class PluginUI : IDisposable
             BackupFile(configFile);
 
         ImGui.Separator();
-        ImGui.Columns(3, "QoLBarCNBackups", false);
+        ImGui.Columns(3, "QoLBarExBackups", false);
         if (!string.IsNullOrEmpty(path))
         {
             var i = 0;

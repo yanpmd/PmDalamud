@@ -9,6 +9,7 @@ internal class PluginLoadContext(DirectoryInfo directoryInfo) : AssemblyLoadCont
 {
     private static Dictionary<string, Assembly> KnownAssemblies { get; } = new() {
         ["Umbra"]                  = typeof(Plugin).Assembly,
+        ["UmbraEx"]                = typeof(Plugin).Assembly,
         ["Umbra.Common"]           = typeof(Framework).Assembly,
         ["Umbra.Game"]             = typeof(IPlayer).Assembly,
         ["Una.Drawing"]            = typeof(Node).Assembly,
@@ -30,7 +31,7 @@ internal class PluginLoadContext(DirectoryInfo directoryInfo) : AssemblyLoadCont
 
             // Allow any of the following references to be seen as a valid Umbra plugin.
             hasUmbraReference = name.Name switch {
-                "Umbra" or "Umbra.Common" or "Umbra.Game" => true,
+                "Umbra" or "UmbraEx" or "Umbra.Common" or "Umbra.Game" => true,
                 _                                         => hasUmbraReference,
             };
 

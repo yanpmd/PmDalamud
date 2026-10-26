@@ -25,7 +25,7 @@ namespace Umbra;
 
 internal sealed class Plugin : IDalamudPlugin
 {
-    public static string Name => "Umbra";
+    public static string Name => "UmbraEx";
 
     [PluginService] private IClientState ClientState      { get; set; } = null!;
     [PluginService] private IPlayerState PlayerState      { get; set; } = null!;
@@ -72,7 +72,7 @@ internal sealed class Plugin : IDalamudPlugin
            .ContinueWith(task => {
                     if (task.IsFaulted) {
                         Logger.Error(
-                            $"Umbra failed to initialize: {task.Exception.InnerException?.Message ?? task.Exception.Message}"
+                            $"UmbraEx failed to initialize: {task.Exception.InnerException?.Message ?? task.Exception.Message}"
                         );
                     }
                 }
@@ -96,7 +96,7 @@ internal sealed class Plugin : IDalamudPlugin
         if (!PluginInterface.IsDevMenuOpen) return;
 
         if (ImGui.BeginMainMenuBar()) {
-            if (ImGui.BeginMenu("Umbra")) {
+            if (ImGui.BeginMenu("UmbraEx")) {
                 if (ImGui.MenuItem("Show Node Inspector", string.Empty, DrawingLib.ShowDebugWindow)) {
                     DrawingLib.ShowDebugWindow = !DrawingLib.ShowDebugWindow;
                 }

@@ -51,13 +51,13 @@ public sealed class DefaultLogTarget(IPluginLog pluginLog, IChatGui chatGui) : I
     {
         switch (level) {
             case LogLevel.Info:
-                chatGui.Print($"{message}", "Umbra", 27);
+                chatGui.Print($"{message}", "UmbraEx", 27);
                 break;
             case LogLevel.Warning:
-                chatGui.PrintError(new SeStringBuilder().AddIcon(BitmapFontIcon.Warning).AddText($"{message}").Build(), "Umbra", 28);
+                chatGui.PrintError(new SeStringBuilder().AddIcon(BitmapFontIcon.Warning).AddText($"{message}").Build(), "UmbraEx", 28);
                 break;
             case LogLevel.Error:
-                chatGui.PrintError(new SeStringBuilder().AddIcon(BitmapFontIcon.NoCircle).AddText($"{message}").Build(), "Umbra", 28);
+                chatGui.PrintError(new SeStringBuilder().AddIcon(BitmapFontIcon.NoCircle).AddText($"{message}").Build(), "UmbraEx", 28);
                 break;
             case LogLevel.Debug:
                 break;

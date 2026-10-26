@@ -53,7 +53,7 @@ public static class KeybindOptionNode
         {
             var addon = new KeybindConfigAddon
             {
-                InternalName = $"AetherBagsCN_KeybindConfig_{Guid.NewGuid():N}",
+                InternalName = $"AetherBagsEx_KeybindConfig_{Guid.NewGuid():N}",
                 Title = Localization.Get("Keybind.SetKeybind"),
                 InitialKeybind = currentKeybind,
                 ShowGameConflicts = showGameConflicts,

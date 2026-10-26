@@ -12,7 +12,7 @@ namespace AetherBags.Helpers;
 // Thanks Caraxi
 public static class BackupHelper {
     private const int MaxBackups = 10;
-    private const string Name = "AetherBagsCN";
+    private const string Name = "AetherBagsEx";
     public static void DoConfigBackup(IDalamudPluginInterface pluginInterface) {
         Services.Logger.DebugOnly("Backup configuration start.");
         try {

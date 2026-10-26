@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBags", "AetherBags\AetherBags.csproj", "{5BBE4215-8189-4A8A-AFD0-C5C6074DB47E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBagsEx", "AetherBags\AetherBags.csproj", "{5BBE4215-8189-4A8A-AFD0-C5C6074DB47E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KamiToolKit", "KamiToolKit\KamiToolKit.csproj", "{0907374F-93F8-427F-AD0A-49DB4B0A3DD4}"
 EndProject

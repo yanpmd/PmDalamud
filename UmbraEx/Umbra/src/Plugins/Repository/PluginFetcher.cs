@@ -83,7 +83,7 @@ internal static class PluginFetcher
     private static async Task<string?> DownloadAsset(string url, string dir)
     {
         using HttpClient client = new();
-        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Umbra", "3.0"));
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("UmbraEx", "3.0"));
 
         try {
             using HttpResponseMessage response = await client.GetAsync(url);
@@ -107,7 +107,7 @@ internal static class PluginFetcher
         string           apiUrl = $"https://api.github.com/repos/{repositoryOwner}/{repositoryName}/releases/latest";
         using HttpClient client = new();
 
-        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Umbra", "3.0"));
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("UmbraEx", "3.0"));
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
 
         try {

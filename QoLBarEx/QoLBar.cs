@@ -93,15 +93,15 @@ public class QoLBar : IDalamudPlugin
 
     public void ToggleConfig() => ui.ToggleConfig();
 
-    [Command("/qolbarcn")]
+    [Command("/qolbarex")]
     [HelpMessage("Cmd.Help.Config")]
     public void ToggleConfig(string command, string argument) => ToggleConfig();
 
-    [Command("/qoliconscn")]
+    [Command("/qoliconsex")]
     [HelpMessage("Cmd.Help.Icons")]
     public void ToggleIconBrowser(string command = null, string argument = null) => IconBrowserUI.ToggleIconBrowser();
 
-    [Command("/qolvisiblecn")]
+    [Command("/qolvisibleex")]
     [HelpMessage("Cmd.Help.Visible")]
     private void OnQoLVisible(string command, string argument)
     {
@@ -145,7 +145,7 @@ public class QoLBar : IDalamudPlugin
             PrintError(Localization.Get("Cmd.Error.UsageVisible"));
     }
 
-    [Command("/performancecn")]
+    [Command("/performanceex")]
     [HelpMessage("Cmd.Help.Performance")]
     public void OnPerformance(string command, string argument)
     {

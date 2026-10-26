@@ -1,14 +1,14 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
     <PropertyGroup>
         <Version>1.0.0.5</Version>
-        <AssemblyName>AetherBagsCN</AssemblyName>
+        <AssemblyName>AetherBagsEx</AssemblyName>
         <RootNamespace>AetherBags</RootNamespace>
     </PropertyGroup>
 
     <PropertyGroup>
         <Author>Zeffuro, Pie Lover</Author>
         <Name>AetherBagsEx</Name>
-        <InternalName>AetherBagsCN</InternalName>
+        <InternalName>AetherBagsEx</InternalName>
         <Punchline>Never think too hard about your bags again!</Punchline>
         <Description>This plugin replaces your inventory with it's own categorified inventory addon.</Description>
         <RepoUrl>https://github.com/Zeffuro/AetherBags</RepoUrl>

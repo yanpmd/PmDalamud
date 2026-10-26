@@ -38,35 +38,35 @@ public class Plugin : IDalamudPlugin
 
         System.AddonInventoryWindow = new AddonInventoryWindow
         {
-            InternalName = "AetherBagsCN_MainBags",
+            InternalName = "AetherBagsEx_MainBags",
             Title = Localization.Get("Window.Inventory"),
             Size = new Vector2(750, 750),
         };
 
         System.AddonSaddleBagWindow = new AddonSaddleBagWindow
         {
-            InternalName = "AetherBagsCN_SaddleBag",
+            InternalName = "AetherBagsEx_SaddleBag",
             Title = Localization.Get("Window.SaddleBag"),
             Size = new Vector2(750, 750),
         };
 
         System.AddonRetainerWindow = new AddonRetainerWindow
         {
-            InternalName = "AetherBagsCN_Retainer",
+            InternalName = "AetherBagsEx_Retainer",
             Title = Localization.Get("Window.Retainer"),
             Size = new Vector2(750, 750),
         };
 
         System.AddonConfigurationWindow = new AddonConfigurationWindow
         {
-            InternalName = "AetherBagsCN_Config",
+            InternalName = "AetherBagsEx_Config",
             Title = Localization.Get("Window.Config"),
             Size = new Vector2(640, 512),
         };
 
         System.AddonChangelogWindow = new AddonChangelogWindow
         {
-            InternalName = "AetherBagsCN_Changelog",
+            InternalName = "AetherBagsEx_Changelog",
             Title = Localization.Get("Window.Changelog"),
             Size = new Vector2(640, 512),
         };

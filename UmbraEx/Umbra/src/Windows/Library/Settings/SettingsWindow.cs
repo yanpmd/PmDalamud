@@ -23,8 +23,8 @@ public class SettingsWindow : Window
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         RootNode.QuerySelector("#version")!.NodeValue = version != null
-            ? $"Umbra v{version.ToString(3)}"
-            : "Umbra";
+            ? $"UmbraEx v{version.ToString(3)}"
+            : "UmbraEx";
 
         BindFooterButtonActions();
 

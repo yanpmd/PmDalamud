@@ -4,7 +4,7 @@ namespace AetherBags.Configuration;
 
 public class SystemConfiguration
 {
-    public const string FileName = "AetherBagsCN.json";
+    public const string FileName = "AetherBagsEx.json";
 
     public int Version { get; set; } = ConfigMigrator.CurrentVersion;
 
