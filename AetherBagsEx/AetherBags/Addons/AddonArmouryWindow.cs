@@ -334,18 +334,6 @@ public unsafe class AddonArmouryWindow : InventoryAddonBase
         ArmouryState.CurrentPart = part.Value;
     }
 
-    private static unsafe void CloseVanillaArmoury()
-    {
-        var unitManager = RaptureAtkUnitManager.Instance();
-        if (unitManager == null) return;
-
-        var armouryAddon = unitManager->GetAddonByName("ArmouryBoard");
-        if (armouryAddon == null) return;
-
-        armouryAddon->IsVisible = true;
-        armouryAddon->Close(true);
-    }
-
     protected override void OnFinalize(AtkUnitBase* addon)
     {
         IsSetupComplete = false;
@@ -353,23 +341,9 @@ public unsafe class AddonArmouryWindow : InventoryAddonBase
 
         _partButtons.Clear();
 
-        // This runs inside a reverse P/Invoke from the game's addon vtable: anything
-        // thrown here kills the process, so every step has to be guarded. During a
-        // plugin reload the config and services may already be gone.
-        try
-        {
-            if (System.Config?.General?.HideGameArmoury == true && Services.Framework is not null)
-            {
-                // Closing the vanilla addon from inside our own finalize re-enters the
-                // shared addon vtable hook and crashes the game, so defer it a few ticks.
-                Services.Framework.RunOnTick(CloseVanillaArmoury, delayTicks: 5);
-            }
-        }
-        catch (Exception ex)
-        {
-            Services.Logger.Error(ex, "[Armoury] Failed to schedule the vanilla board close");
-        }
-
+        // The vanilla board is only ever hidden, never closed from here. Closing it
+        // while our own addon is being finalized races the game's addon teardown and
+        // crashes inside the native finalizer that walks the node tree.
         base.OnFinalize(addon);
     }
 }

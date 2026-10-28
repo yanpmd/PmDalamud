@@ -13,6 +13,7 @@ public enum CategoryTransferKind
     FromSaddleBag,
     ToRetainer,
     FromRetainer,
+    FromArmoury,
 }
 
 /// <summary>
@@ -46,6 +47,10 @@ public static class CategoryTransferQueue
     public static bool MoveAllFromRetainer(IEnumerable<ItemInfo> items)
         => Start(items, CategoryTransferKind.FromRetainer);
 
+    /// <summary>Takes the given items out of the armoury chest into the player inventory.</summary>
+    public static bool MoveAllFromArmoury(IEnumerable<ItemInfo> items)
+        => Start(items, CategoryTransferKind.FromArmoury);
+
     public static bool IsRunning => _running;
 
     private static bool Start(IEnumerable<ItemInfo> items, CategoryTransferKind kind)
@@ -59,6 +64,7 @@ public static class CategoryTransferQueue
             CategoryTransferKind.ToSaddleBag or CategoryTransferKind.ToRetainer => container.IsMainInventory,
             CategoryTransferKind.FromSaddleBag => container.IsSaddleBag,
             CategoryTransferKind.FromRetainer => container.IsRetainer,
+            CategoryTransferKind.FromArmoury => container.IsArmory,
             _ => false,
         };
 
@@ -99,6 +105,7 @@ public static class CategoryTransferQueue
         CategoryTransferKind.ToSaddleBag => InventoryScanner.GetFirstEmptySlot(InventorySourceType.AllSaddleBags).IsValid,
         CategoryTransferKind.ToRetainer => InventoryScanner.GetFirstEmptySlot(InventorySourceType.Retainer).IsValid,
         CategoryTransferKind.FromSaddleBag or CategoryTransferKind.FromRetainer
+            or CategoryTransferKind.FromArmoury
             => InventoryScanner.GetFirstEmptySlot(InventorySourceType.MainBags).IsValid,
         _ => false,
     };
@@ -133,7 +140,8 @@ public static class CategoryTransferQueue
 
         bool moved = _kind switch
         {
-            CategoryTransferKind.ToSaddleBag or CategoryTransferKind.FromSaddleBag => MoveViaSlotSwap(next),
+            CategoryTransferKind.ToSaddleBag or CategoryTransferKind.FromSaddleBag
+                or CategoryTransferKind.FromArmoury => MoveViaSlotSwap(next),
             CategoryTransferKind.ToRetainer => RetainerCommands.TryEntrust(next.Container, next.Slot),
             CategoryTransferKind.FromRetainer => RetainerCommands.TryRetrieve(next.Container, next.Slot),
             _ => false,

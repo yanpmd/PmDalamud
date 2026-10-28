@@ -211,6 +211,7 @@
   "ContextMenu.WithdrawAll": "Withdraw All From Saddlebag",
   "ContextMenu.DepositAll": "Deposit All To Saddlebag",
   "ContextMenu.WithdrawAllRetainer": "Withdraw All From Retainer",
+  "ContextMenu.WithdrawAllArmoury": "Move All To Inventory",
   "ContextMenu.DepositAllRetainer": "Deposit All To Retainer",
   "ContextMenu.NoVisibleItems": "No visible items.",
   "ContextMenu.CopiedUniqueIds": "Copied {0} unique item IDs to the clipboard.",

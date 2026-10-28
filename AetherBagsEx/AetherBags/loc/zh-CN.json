@@ -211,6 +211,7 @@
   "ContextMenu.WithdrawAll": "全部取出鞍囊",
   "ContextMenu.DepositAll": "全部放入鞍囊",
   "ContextMenu.WithdrawAllRetainer": "全部取出雇员",
+  "ContextMenu.WithdrawAllArmoury": "全部取回到背包",
   "ContextMenu.DepositAllRetainer": "全部放入雇员",
   "ContextMenu.NoVisibleItems": "没有可见的道具。",
   "ContextMenu.CopiedUniqueIds": "已复制 {0} 个唯一道具 ID 到剪贴板。",

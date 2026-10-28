@@ -6,6 +6,7 @@ using AetherBags.Inventory;
 using AetherBags.Inventory.Categories;
 using AetherBags.Inventory.Context;
 using AetherBags.Inventory.Items;
+using AetherBags.Inventory.Scanning;
 using AetherBags.Inventory.State;
 using Dalamud.Bindings.ImGui;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
@@ -108,6 +109,11 @@ public static class InventoryAddonContextMenu
         {
             if (RetainerState.AreContainersLoaded)
                 actions.Add(CreateCategoryAction("ContextMenu.WithdrawAllRetainer", () => CategoryTransferQueue.MoveAllFromRetainer(items)));
+        }
+        else if (parent.IsArmouryWindow)
+        {
+            if (InventoryScanner.GetFirstEmptySlot(InventorySourceType.MainBags).IsValid)
+                actions.Add(CreateCategoryAction("ContextMenu.WithdrawAllArmoury", () => CategoryTransferQueue.MoveAllFromArmoury(items)));
         }
 
         if (actions.Count == 0) return;

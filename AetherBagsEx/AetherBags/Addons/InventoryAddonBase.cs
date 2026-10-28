@@ -117,6 +117,9 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     /// <summary>True when this window displays the active retainer's pages.</summary>
     public bool IsRetainerWindow => InventoryState.SourceType == InventorySourceType.Retainer;
 
+    /// <summary>True when this window displays the armoury chest.</summary>
+    public bool IsArmouryWindow => InventoryState.SourceType == InventorySourceType.Armoury;
+
     public string GetSearchText() => SearchInputNode?.SearchString.ExtractText() ?? string.Empty;
 
     public InventoryStats GetStats() => InventoryState.GetStats();
