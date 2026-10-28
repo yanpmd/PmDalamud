@@ -15,6 +15,7 @@ internal sealed class FunctionalConfigurationNode : TabbedVerticalListNode
     private readonly CheckboxNode _hideDefaultBagsCheckboxNode;
     private readonly CheckboxNode _hideSaddlebagsCheckboxNode;
     private readonly CheckboxNode _hideRetainerbagsCheckboxNode;
+    private readonly CheckboxNode _hideArmouryCheckboxNode;
     private readonly LabeledEnumDropdownNode<InventoryStackMode> _stackDropDown;
     private readonly CheckboxNode _aggregateUnstackableCheckboxNode = null!;
 
@@ -122,6 +123,51 @@ internal sealed class FunctionalConfigurationNode : TabbedVerticalListNode
         };
         AddNode(_hideRetainerbagsCheckboxNode);
         SubtractTab(1);
+
+        var showArmouryWithGameCheckBox = new CheckboxNode
+        {
+            Size = Size with { Y = 18 },
+            IsVisible = true,
+            String = Localization.Get("Functional.AutoOpenArmoury"),
+            IsChecked = config.OpenArmouryWithGameInventory,
+            OnClick = isChecked =>
+            {
+                config.OpenArmouryWithGameInventory = isChecked;
+                _hideArmouryCheckboxNode?.IsEnabled = isChecked;
+            }
+        };
+        AddNode(showArmouryWithGameCheckBox);
+
+        AddTab(1);
+        _hideArmouryCheckboxNode = new CheckboxNode
+        {
+            Size = Size with { Y = 18 },
+            IsVisible = true,
+            String = Localization.Get("Functional.HideGameArmoury"),
+            IsEnabled = config.OpenArmouryWithGameInventory,
+            IsChecked = config.HideGameArmoury,
+            OnClick = isChecked =>
+            {
+                config.HideGameArmoury = isChecked;
+            }
+        };
+        AddNode(_hideArmouryCheckboxNode);
+        SubtractTab(1);
+
+        var armouryGroupingDropDown = new LabeledEnumDropdownNode<ArmouryGrouping>
+        {
+            Size = new Vector2(500, 20),
+            LabelText = Localization.Get("Functional.ArmouryGrouping"),
+            LabelTextFlags = TextFlags.AutoAdjustNodeSize,
+            Options = Enum.GetValues<ArmouryGrouping>().ToList(),
+            SelectedOption = config.ArmouryGrouping,
+            OnOptionSelected = selected =>
+            {
+                config.ArmouryGrouping = selected;
+                InventoryOrchestrator.RefreshAll(updateMaps: true);
+            }
+        };
+        AddNode(armouryGroupingDropDown);
 
         var linkItemCheckBox = new CheckboxNode
         {

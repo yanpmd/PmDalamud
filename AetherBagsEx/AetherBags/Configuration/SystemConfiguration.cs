@@ -60,9 +60,12 @@ public class SystemConfiguration
         _general.InventoryWindowSizing ??= InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Inventory);
         _general.SaddleBagWindowSizing ??= InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.SaddleBag);
         _general.RetainerWindowSizing ??= InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Retainer);
+        _general.ArmouryWindowSizing ??= InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Armoury);
+        _general.Style ??= new();
         InventoryWindowSizingDefaults.Normalize(_general.InventoryWindowSizing, InventoryWindowSizingLimits.Inventory);
         InventoryWindowSizingDefaults.Normalize(_general.SaddleBagWindowSizing, InventoryWindowSizingLimits.SaddleBag);
         InventoryWindowSizingDefaults.Normalize(_general.RetainerWindowSizing, InventoryWindowSizingLimits.Retainer);
+        InventoryWindowSizingDefaults.Normalize(_general.ArmouryWindowSizing, InventoryWindowSizingLimits.Armoury);
     }
 
     /// <summary>

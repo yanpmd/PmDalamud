@@ -1,4 +1,5 @@
 using System;
+using AetherBags.Configuration;
 using AetherBags.Inventory.Items;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -24,12 +25,13 @@ public sealed unsafe class LootedItemDisplayNode : SimpleComponentNode
 
     public LootedItemDisplayNode()
     {
-        Size = new Vector2(44, 48);
+        var style = StylePresets.Current;
+        Size = new Vector2(style.ItemWidth, style.ItemHeight);
 
         _iconNode = new IconNode
         {
             Position = new Vector2(0, 0),
-            Size = new Vector2(44, 48),
+            Size = new Vector2(style.ItemWidth, style.ItemHeight),
         };
         _iconNode.CollisionNode.NodeFlags = 0;
         _iconNode.AttachNode(this);
@@ -48,6 +50,28 @@ public sealed unsafe class LootedItemDisplayNode : SimpleComponentNode
             AlignmentType = AlignmentType.Right,
         };
         _quantityTextNode.AttachNode(this);
+
+        ApplySlotMetrics();
+    }
+
+    /// <summary>
+    /// Resizes the node to the active style's slot metrics and repositions the
+    /// quantity label. Called again on reuse so a style switch is picked up even
+    /// by nodes that outlive the window.
+    /// </summary>
+    public void ApplySlotMetrics()
+    {
+        var style = StylePresets.Current;
+        var slotSize = new Vector2(style.ItemWidth, style.ItemHeight);
+
+        // Vector2 has implicit conversions on both sides here, compare components.
+        if (MathF.Abs(Size.X - slotSize.X) > 0.01f || MathF.Abs(Size.Y - slotSize.Y) > 0.01f)
+            Size = slotSize;
+
+        _iconNode.Size = slotSize;
+
+        _quantityTextNode.Size = new Vector2(MathF.Max(0.0f, slotSize.X - 4.0f), 12.0f);
+        _quantityTextNode.Position = new Vector2(2.0f, MathF.Max(0.0f, slotSize.Y - 14.0f));
     }
 
     public LootedItemInfo? LootedItem
@@ -63,6 +87,7 @@ public sealed unsafe class LootedItemDisplayNode : SimpleComponentNode
                 InventoryItem item = value.Item;
                 _iconNode.IconId = item.IconId;
                 _iconNode.ItemTooltip = item.ItemId;
+                _iconNode.IsGlamoured = item.Flags.HasFlag(InventoryItem.ItemFlags.Collectable);
                 _quantityTextNode.String = value.Quantity > 1 ? value.Quantity.ToString() : string.Empty;
                 _iconNode.IsVisible = true;
                 _quantityTextNode.IsVisible = true;
@@ -102,6 +127,7 @@ public sealed unsafe class LootedItemDisplayNode : SimpleComponentNode
     {
         LootedItem = null;
         _iconNode.IsVisible = false;
+        _iconNode.IsGlamoured = false;
         _quantityTextNode.String = string.Empty;
     }
 }

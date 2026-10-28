@@ -89,5 +89,7 @@ public static unsafe class InventoryOrchestrator
             yield return System.AddonSaddleBagWindow;
         if (System.AddonRetainerWindow != null)
             yield return System.AddonRetainerWindow;
+        if (System.AddonArmouryWindow != null)
+            yield return System.AddonArmouryWindow;
     }
 }

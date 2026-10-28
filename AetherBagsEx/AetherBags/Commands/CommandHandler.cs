@@ -145,6 +145,11 @@ public class CommandHandler : IDisposable
                 System.AddonRetainerWindow.Toggle();
                 break;
 
+            case "armoury":
+            case "armory":
+                System.AddonArmouryWindow.Toggle();
+                break;
+
             case "changelog":
                 System.AddonChangelogWindow.Toggle();
                 break;
@@ -183,6 +188,8 @@ public class CommandHandler : IDisposable
             openWindows.Add((Localization.Get("Command.StatsSaddle"), System.AddonSaddleBagWindow));
         if (System.AddonRetainerWindow.IsOpen)
             openWindows.Add((Localization.Get("Command.StatsRetainer"), System.AddonRetainerWindow));
+        if (System.AddonArmouryWindow.IsOpen)
+            openWindows.Add((Localization.Get("Command.StatsArmoury"), System.AddonArmouryWindow));
 
         if (openWindows.Count == 0)
         {
@@ -506,7 +513,7 @@ public class CommandHandler : IDisposable
             lines.Add($"  {cmd}  - {Localization.Get(desc)}");
 
         lines.Add(System.Config?.General?.DebugEnabled == true
-            ? $"  /abex debug [saddle|retainer|test|refresh]  - {Localization.Get("Command.Help.Debug")}"
+            ? $"  /abex debug [saddle|retainer|armoury|test|refresh]  - {Localization.Get("Command.Help.Debug")}"
             : $"  /abex debug  - {Localization.Get("Command.Help.DebugDisabled")}");
 
         PrintChat(string.Join("\n", lines));

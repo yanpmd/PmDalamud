@@ -62,10 +62,11 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     protected virtual float MaxWindowHeight => WindowSizingLimits.DefaultMaxHeight;
     protected virtual InventoryWindowSizingSettings WindowSizingSettings => System.Config.General.InventoryWindowSizing;
 
-    protected const float CategorySpacing = 12;
-    protected const float ItemSize = 44;
-    protected const float ItemPadding = 2;
-    protected const float FooterHeight = 28f;
+    // Layout metrics now come from the active style preset, see StylePresets.
+    protected static float CategorySpacing => StylePresets.Current.CategorySpacing;
+    protected static float ItemSize => StylePresets.Current.ItemWidth;
+    protected static float ItemPadding => StylePresets.Current.ItemPadding;
+    protected static float FooterHeight => StylePresets.Current.FooterHeight;
     protected const float FooterTopSpacing = 4f;
     protected const float SettingsButtonOffset = 62f;
     protected const float ScrollBarWidth = 16f;
@@ -396,6 +397,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         public float HeaderY { get; init; }
     }
 
+    /// <summary>
+    /// Width reserved on the left of the window header for window specific
+    /// controls. The search bar stays centered in whatever space is left.
+    /// </summary>
+    protected virtual float HeaderLeftReserve => 0f;
+
     protected HeaderLayout CalculateHeaderLayout(AtkUnitBase* addon)
     {
         var header = addon->WindowHeaderCollisionNode;
@@ -404,8 +411,9 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         const float searchHeight = 28f;
         float itemY = header->Y + (header->Height - searchHeight) * 0.5f;
 
-        // Space for title (e.g. "AetherRetainerbag" is ~150px)
-        const float titleReserve = 160f;
+        // The bag windows no longer render a window title, so nothing has to be
+        // reserved on the left unless the window puts its own control there.
+        float titleReserve = HeaderLeftReserve;
         const float gap = 8f;
         float leftReserve = titleReserve + gap;
         float rightReserve = SettingsButtonOffset + gap;
@@ -472,6 +480,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         node.OnDragEnd = () => InventoryOrchestrator.RefreshAll(updateMaps: true);
         node.OnHeaderRightClick = categoryNode => InventoryAddonContextMenu.OpenCategoryActions(this, categoryNode.CategorizedInventory);
         node.SharedItemPool = SharedItemNodePool;
+        node.ApplyStyle(StylePresets.Current);
         return node;
     }
 
@@ -512,7 +521,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
             }
         }
 
-        InventoryLocation emptyLocation = InventoryScanner.GetFirstEmptySlot(InventoryState.SourceType);
+        InventoryLocation emptyLocation = InventoryState.GetFirstEmptySlot();
 
         if (!emptyLocation.IsValid)
         {
@@ -609,10 +618,18 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         };
     }
 
+    /// <summary>
+    /// Area inside the window that holds the category grid. Windows that put a
+    /// sidebar next to the grid narrow this instead of moving the grid themselves.
+    /// </summary>
+    protected virtual Vector2 ContentAreaPosition => ContentStartPosition;
+
+    protected virtual Vector2 ContentAreaSize => ContentSize;
+
     protected virtual void LayoutContent()
     {
-        Vector2 contentPos = ContentStartPosition;
-        Vector2 contentSize = ContentSize;
+        Vector2 contentPos = ContentAreaPosition;
+        Vector2 contentSize = ContentAreaSize;
 
         float footerH = HasFooter || HasSlotCounter ?  FooterHeight : 0;
 
@@ -640,9 +657,22 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
 
     private void UpdateCategoryMaxWidths(float maxWidth)
     {
+        // In single column mode every category is stretched to the full content
+        // width so the wrapping grid can only fit one of them per row.
+        bool stretchCategories = StylePresets.Current.LayoutMode == CategoryLayoutMode.SingleColumn;
+
         foreach (var node in CategoriesNode.Nodes)
         {
-            if (node is InventoryCategoryNodeBase categoryNode && categoryNode.MaxWidth != maxWidth)
+            if (node is not InventoryCategoryNodeBase categoryNode) continue;
+
+            if (node is InventoryCategoryNode inventoryCategoryNode)
+            {
+                float? desiredFixedWidth = stretchCategories ? maxWidth : null;
+                if (inventoryCategoryNode.FixedWidth != desiredFixedWidth)
+                    inventoryCategoryNode.FixedWidth = desiredFixedWidth;
+            }
+
+            if (categoryNode.MaxWidth != maxWidth)
             {
                 categoryNode.MaxWidth = maxWidth;
                 categoryNode.RecalculateSize();
@@ -685,7 +715,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
 
         float footerSpace = HasFooter || HasSlotCounter ? FooterHeight + FooterTopSpacing : 0;
 
-        float requiredWidth = maxChildWidth + ScrollBarWidth + (ContentStartPosition.X * 2);
+        float requiredWidth = maxChildWidth + ScrollBarWidth + ContentAreaPosition.X + ContentStartPosition.X;
         float finalWidth = Math.Clamp(requiredWidth, sizing.MinWidth, sizing.MaxWidth);
 
         if (SettingsButtonNode != null)
@@ -693,7 +723,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
             SettingsButtonNode.X = finalWidth - SettingsButtonOffset;
         }
 
-        float contentWidth = finalWidth - (ContentStartPosition.X * 2);
+        float contentWidth = finalWidth - ContentAreaPosition.X - ContentStartPosition.X;
         float categoriesWidth = contentWidth - ScrollBarWidth;
 
         CategoriesNode.Width = categoriesWidth;
@@ -703,7 +733,10 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         float requiredGridHeight = CategoriesNode.GetRequiredHeight();
 
         float requiredContentHeight = requiredGridHeight + footerSpace;
-        float requiredWindowHeight = requiredContentHeight + ContentStartPosition.Y + ContentStartPosition.X + ContentHeightOffset;
+
+        // Use the actual content area top so window specific bands (the armoury
+        // part bar) are accounted for and the grid is not clipped into a scrollbar.
+        float requiredWindowHeight = requiredContentHeight + ContentAreaPosition.Y + ContentStartPosition.X + ContentHeightOffset;
         float finalHeight = Math.Clamp(requiredWindowHeight, sizing.MinHeight, sizing.MaxHeight);
 
         ResizeWindow(finalWidth, finalHeight, recalcLayout: false);
@@ -898,7 +931,16 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
 
     protected override void OnFinalize(AtkUnitBase* addon)
     {
-        System.AetherBagsAPI?.API.RaiseInventoryClosed();
+        // Reverse P/Invoke boundary: an exception here takes the process down, and
+        // during a plugin reload the IPC provider may already be torn down.
+        try
+        {
+            System.AetherBagsAPI?.API.RaiseInventoryClosed();
+        }
+        catch (Exception ex)
+        {
+            Services.Logger.Error(ex, "[Inventory] Failed to raise the inventory closed event");
+        }
 
         HoverSubscribed.Clear();
         SearchDebouncer.Dispose();

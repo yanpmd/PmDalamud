@@ -9,6 +9,7 @@ public enum InventorySourceType
     PremiumSaddleBag,
     AllSaddleBags,
     Retainer,
+    Armoury,
 }
 
 public static class InventorySourceDefinitions
@@ -52,6 +53,27 @@ public static class InventorySourceDefinitions
         InventoryType.RetainerPage7,
     ];
 
+    /// <summary>
+    /// The armoury chest containers, in the order the game's armoury board lists
+    /// them. <see cref="InventoryType.ArmoryWaist"/> is intentionally missing: the
+    /// waist slot no longer exists in game and has no UI page.
+    /// </summary>
+    public static readonly InventoryType[] Armoury =
+    [
+        InventoryType.ArmoryMainHand,
+        InventoryType.ArmoryOffHand,
+        InventoryType.ArmoryHead,
+        InventoryType.ArmoryBody,
+        InventoryType.ArmoryHands,
+        InventoryType.ArmoryLegs,
+        InventoryType.ArmoryFeets,
+        InventoryType.ArmoryEar,
+        InventoryType.ArmoryNeck,
+        InventoryType.ArmoryWrist,
+        InventoryType.ArmoryRings,
+        InventoryType.ArmorySoulCrystal,
+    ];
+
     public static InventoryType[] GetInventories(InventorySourceType source) => source switch
     {
         InventorySourceType.MainBags => MainBags,
@@ -59,6 +81,7 @@ public static class InventorySourceDefinitions
         InventorySourceType.PremiumSaddleBag => PremiumSaddleBag,
         InventorySourceType.AllSaddleBags => AllSaddleBags,
         InventorySourceType.Retainer => Retainer,
+        InventorySourceType.Armoury => Armoury,
         _ => MainBags,
     };
 
@@ -69,6 +92,7 @@ public static class InventorySourceDefinitions
         InventorySourceType.PremiumSaddleBag => PremiumSaddleBag,
         InventorySourceType.AllSaddleBags => AllSaddleBags,
         InventorySourceType.Retainer => Retainer,
+        InventorySourceType.Armoury => Armoury,
         _ => MainBags,
     };
 
@@ -79,6 +103,7 @@ public static class InventorySourceDefinitions
         InventorySourceType.PremiumSaddleBag => 70,             // 2 * 35
         InventorySourceType.AllSaddleBags => 140,               // 2 * 35
         InventorySourceType.Retainer => Retainer.Length * 25,   // 7 * 25
+        InventorySourceType.Armoury => Armoury.Length * 50,     // 12 * 50
         _ => 140,
     };
 }

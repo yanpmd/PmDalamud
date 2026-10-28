@@ -107,16 +107,38 @@ public unsafe class AddonSaddleBagWindow :  InventoryAddonBase
     {
         IsSetupComplete = false;
 
-        if (System.Config.General.HideGameSaddleBags)
+        // Runs inside a reverse P/Invoke from the game's addon vtable: an exception
+        // here kills the process, and during a reload the config may already be gone.
+        try
         {
-            var saddleAddon = RaptureAtkUnitManager.Instance()->GetAddonByName("InventoryBuddy");
-            if (saddleAddon != null)
+            if (System.Config?.General?.HideGameSaddleBags == true && Services.Framework is not null)
             {
-                saddleAddon->IsVisible = true;
-                saddleAddon->Close(true);
+                // Closing the vanilla addon from inside our own finalize re-enters the
+                // shared addon vtable hook and crashes the game, so defer it a few ticks.
+                Services.Framework.RunOnTick(CloseVanillaSaddleBag, delayTicks: 5);
             }
+        }
+        catch (Exception ex)
+        {
+            Services.Logger.Error(ex, "[SaddleBag] Failed to schedule the vanilla addon close");
         }
 
         base.OnFinalize(addon);
+    }
+
+    /// <summary>
+    /// Restores and closes the hidden vanilla saddlebag. Runs on the next tick so
+    /// it never re-enters the addon finalize hook while ours is still running.
+    /// </summary>
+    private static unsafe void CloseVanillaSaddleBag()
+    {
+        var unitManager = RaptureAtkUnitManager.Instance();
+        if (unitManager == null) return;
+
+        var saddleAddon = unitManager->GetAddonByName("InventoryBuddy");
+        if (saddleAddon == null) return;
+
+        saddleAddon->IsVisible = true;
+        saddleAddon->Close(true);
     }
 }

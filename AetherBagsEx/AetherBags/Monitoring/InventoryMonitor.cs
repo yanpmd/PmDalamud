@@ -34,12 +34,15 @@ public class InventoryMonitor : IDisposable
         var bags = new[] { "Inventory", "InventoryLarge", "InventoryExpansion" };
         var saddle = new[] { "InventoryBuddy" };
         var retainer = new[] { "InventoryRetainer", "InventoryRetainerLarge" };
+        var armoury = new[] { "ArmouryBoard" };
 
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, saddle, OnPostSetup);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, retainer, OnPostSetup);
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, armoury, OnPostSetup);
 
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, saddle, OnPreFinalize);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, retainer, OnPreFinalize);
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, armoury, OnPreFinalize);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, bags, OnInventoryPreFinalize);
 
         // PreRefresh Handlers
@@ -49,6 +52,11 @@ public class InventoryMonitor : IDisposable
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "Inventory", OnInventoryUpdate);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "InventoryBuddy", OnSaddleBagUpdate);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, retainer, OnRetainerInventoryUpdate);
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "ArmouryBoard", OnArmouryUpdate);
+
+        // The board is only set up once; later "open part X" requests arrive as a
+        // plain Show, so hiding and part syncing have to happen there too.
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PostShow, armoury, OnArmouryShow);
 
         // Dalamud raw event for raw inventory changes (scans once per frame)
         Services.GameInventory.InventoryChangedRaw += OnInventoryChangedRaw;
@@ -118,12 +126,26 @@ public class InventoryMonitor : IDisposable
                 }
             }
         }
+
+        if (name.Contains("ArmouryBoard") && config.OpenArmouryWithGameInventory && !vanillaBypassActive)
+        {
+            System.AddonArmouryWindow.Open();
+            if (config.HideGameArmoury)
+            {
+                var addon = RaptureAtkUnitManager.Instance()->GetAddonByName("ArmouryBoard");
+                if (addon != null)
+                {
+                    addon->IsVisible = false;
+                }
+            }
+        }
     }
 
     private void CloseInventories(string name)
     {
         if (name.Contains("Retainer")) System.AddonRetainerWindow.Close();
         if (name.Contains("InventoryBuddy")) System.AddonSaddleBagWindow.Close();
+        if (name.Contains("ArmouryBoard")) System.AddonArmouryWindow.Close();
     }
 
     private static bool IsInUnsafeState()
@@ -190,6 +212,7 @@ public class InventoryMonitor : IDisposable
                 System.AddonInventoryWindow?.RefreshFromLifecycle();
                 System.AddonSaddleBagWindow?.RefreshFromLifecycle();
                 System.AddonRetainerWindow?.RefreshFromLifecycle();
+                System.AddonArmouryWindow?.RefreshFromLifecycle();
             });
         }
     }
@@ -279,9 +302,64 @@ public class InventoryMonitor : IDisposable
         System.AddonRetainerWindow?.RefreshFromLifecycle();
     }
 
+    private unsafe void OnArmouryShow(AddonEvent type, AddonArgs args)
+    {
+        var unitManager = RaptureAtkUnitManager.Instance();
+        if (unitManager == null) return;
+
+        var armouryWindow = System.AddonArmouryWindow;
+        if (armouryWindow is null) return;
+
+        GeneralSettings config = System.Config.General;
+        bool vanillaBypassActive = System.AetherBagsAPI?.API.IsVanillaInventoryBypassActive ?? false;
+        if (vanillaBypassActive) return;
+
+        if (config.OpenArmouryWithGameInventory)
+        {
+            // Read the requested part before hiding: once the vanilla board is
+            // hidden the game may tear it down, and a deferred read comes back empty.
+            armouryWindow.SyncPartFromGame();
+
+            armouryWindow.Open();
+
+            Services.Framework.RunOnTick(armouryWindow.SyncPartFromGame);
+        }
+
+        if (config.HideGameArmoury)
+        {
+            var addon = unitManager->GetAddonByName("ArmouryBoard");
+            if (addon != null)
+            {
+                addon->IsVisible = false;
+            }
+        }
+    }
+
+    private unsafe void OnArmouryUpdate(AddonEvent type, AddonArgs args)
+    {
+        if (IsInUnsafeState())
+            return;
+
+        if (System.Config.General.HideGameArmoury)
+        {
+            var unitManager = RaptureAtkUnitManager.Instance();
+            var armouryAddon = unitManager != null ? unitManager->GetAddonByName("ArmouryBoard") : null;
+            if (armouryAddon != null)
+            {
+                armouryAddon->IsVisible = false;
+            }
+        }
+
+        if (DragDropState.IsDragging)
+            return;
+
+        System.LootedItemsTracker.FlushPendingChanges();
+        System.AddonArmouryWindow?.RefreshFromLifecycle();
+    }
+
     public void Dispose()
     {
         Services.GameInventory.InventoryChangedRaw -= OnInventoryChangedRaw;
-        Services.AddonLifecycle.UnregisterListener(OnPostSetup, OnPreFinalize, OnInventoryUpdate, OnSaddleBagUpdate, OnRetainerInventoryUpdate, OnInventoryPreFinalize, InventoryPreRefreshHandler);
+        Services.AddonLifecycle.UnregisterListener(OnPostSetup, OnPreFinalize, OnInventoryUpdate, OnSaddleBagUpdate, OnRetainerInventoryUpdate, OnArmouryUpdate, OnArmouryShow, OnInventoryPreFinalize, InventoryPreRefreshHandler);
     }
 }

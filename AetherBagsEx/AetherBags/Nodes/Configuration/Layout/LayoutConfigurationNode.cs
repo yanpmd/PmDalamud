@@ -23,6 +23,13 @@ internal class LayoutConfigurationNode : TabbedVerticalListNode
 
         GeneralSettings config = System.Config.General;
 
+        AddNode(new StyleConfigurationNode());
+
+        AddNode(new ResNode
+        {
+            Height = 8
+        });
+
         var titleNode = new CategoryTextNode
         {
             Height = 18,

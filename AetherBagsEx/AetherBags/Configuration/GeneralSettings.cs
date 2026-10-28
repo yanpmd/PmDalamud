@@ -20,6 +20,10 @@ public class GeneralSettings
     public bool HideGameSaddleBags { get; set; } = false;
     public bool OpenRetainerWithGameInventory { get; set; } = true;
     public bool HideGameRetainer { get; set; } = false;
+    public bool OpenArmouryWithGameInventory { get; set; } = true;
+    public bool HideGameArmoury { get; set; } = false;
+    public ArmouryPart ArmouryPart { get; set; } = ArmouryPart.MainHand;
+    public ArmouryGrouping ArmouryGrouping { get; set; } = ArmouryGrouping.ByRole;
     public bool ShowCategoryItemCount { get; set; } = false;
     public bool LinkItemEnabled { get; set; } = true;
     public bool AnimationEnabled { get; set; } = false;
@@ -30,9 +34,11 @@ public class GeneralSettings
     public Vector4 RecentlyLootedHighlightColor { get; set; } = new(0.9f, 0.7f, 0.2f, 0.4f);
     public bool UseUnifiedExternalCategories { get; set; } = true;
     public string Language { get; set; } = "Auto";
+    public StyleSettings Style { get; set; } = new();
     public InventoryWindowSizingSettings InventoryWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Inventory);
     public InventoryWindowSizingSettings SaddleBagWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.SaddleBag);
     public InventoryWindowSizingSettings RetainerWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Retainer);
+    public InventoryWindowSizingSettings ArmouryWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Armoury);
 }
 
 public enum InventoryStackMode : byte

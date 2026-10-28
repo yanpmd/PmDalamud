@@ -48,11 +48,14 @@ public static unsafe class InventoryScanner
         InventoryStackMode stackMode,
         bool aggregateUnstackable,
         Dictionary<ulong, AggregatedItem> aggByKey,
-        InventorySourceType source)
+        InventorySourceType source,
+        InventoryType[]? containers = null)
     {
         aggByKey.Clear();
 
-        InventoryType[] inventories = InventorySourceDefinitions.GetInventories(source);
+        // States may narrow the scanned containers (the armoury chest shows a single
+        // part at a time), so an explicit list wins over the source defaults.
+        InventoryType[] inventories = containers ?? InventorySourceDefinitions.GetInventories(source);
 
         var extras = ExternalCategoryManager.GetActiveInventoryTypes(source);
         if (extras.Count > 0)
@@ -175,9 +178,11 @@ public static unsafe class InventoryScanner
         => InventoryManager.Instance()->GetInventoryContainer(inventoryType);
 
     public static InventoryLocation GetFirstEmptySlot(InventorySourceType source)
+        => GetFirstEmptySlotFromContainers(InventorySourceDefinitions.GetContainersForSource(source));
+
+    public static InventoryLocation GetFirstEmptySlotFromContainers(InventoryType[] containers)
     {
         var manager = InventoryManager.Instance();
-        var containers = InventorySourceDefinitions.GetContainersForSource(source);
 
         foreach (var type in containers)
         {
@@ -201,16 +206,12 @@ public static unsafe class InventoryScanner
         InventorySourceType.PremiumSaddleBag => GetEmptySlotsInContainer(InventorySourceDefinitions.PremiumSaddleBag),
         InventorySourceType.AllSaddleBags => GetEmptySlotsInContainer(InventorySourceDefinitions.AllSaddleBags),
         InventorySourceType.Retainer => GetEmptySlotsInContainer(InventorySourceDefinitions.Retainer),
+        InventorySourceType.Armoury => GetEmptySlotsInContainer(InventorySourceDefinitions.Armoury),
         _ => 0u,
     });
 
-    public static string GetEmptySlotsString(InventorySourceType source)
-    {
-        int total = InventorySourceDefinitions.GetTotalSlots(source);
-        int empty = GetEmptySlots(source);
-        int used = total - empty;
-        return $"{used}/{total}";
-    }
+    public static int GetEmptySlotsInContainers(InventoryType[] inventories)
+        => (int)GetEmptySlotsInContainer(inventories);
 
     private static uint GetEmptySlotsInContainer(InventoryType[] inventories)
     {

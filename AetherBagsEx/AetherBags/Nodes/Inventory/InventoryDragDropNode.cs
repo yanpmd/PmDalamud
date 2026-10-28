@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using AetherBags.Addons;
 using AetherBags.Configuration;
@@ -32,6 +33,8 @@ public class InventoryDragDropNode : DragDropNode
     private ImageNode? _borderNode;
     private BorderStyle _currentBorderStyle;
     private bool _isBorderHovered;
+    private bool _isCollected;
+    private bool _isCollectable;
     private ItemDecoration? _currentDecoration;
 
     public unsafe InventoryDragDropNode()
@@ -50,6 +53,16 @@ public class InventoryDragDropNode : DragDropNode
         CollisionNode.AddEvent(AtkEventType.MouseClick, OnItemClicked);
         CollisionNode.AddEvent(AtkEventType.MouseOver, OnItemHover);
         CollisionNode.AddEvent(AtkEventType.MouseOut, OnItemUnhover);
+    }
+
+    /// <summary>
+    /// Positions the quantity label for the current slot size. Defaults to the
+    /// stock 44x48 slot, styles with other metrics call this after resizing.
+    /// </summary>
+    public void ApplySlotMetrics()
+    {
+        _quantityTextNode.Size = new Vector2(MathF.Max(0.0f, Width - 4.0f), 12.0f);
+        _quantityTextNode.Position = new Vector2(2.0f, MathF.Max(0.0f, Height - 14.0f));
     }
 
     public required ItemInfo ItemInfo
@@ -109,19 +122,35 @@ public class InventoryDragDropNode : DragDropNode
     }
 
     /// <summary>
-    /// Shows the game's native "collected" checkmark on the icon, used for orchestrion
+    /// Shows the game's native "collected" marker on the icon, used for orchestrion
     /// rolls, triad cards, mounts and minions the player has already unlocked.
     /// </summary>
     public bool IsCollected
     {
         set
         {
-            if (IconNode.IsGlamoured == value)
-                return;
-
-            IconNode.IsGlamoured = value;
+            if (_isCollected == value) return;
+            _isCollected = value;
+            ApplyIconMarker();
         }
     }
+
+    /// <summary>
+    /// Collectable (gathered/crafted) items use the same bottom right marker in the
+    /// vanilla inventory. They are not unlockable, so the collected check above
+    /// never covers them.
+    /// </summary>
+    public bool IsCollectable
+    {
+        set
+        {
+            if (_isCollectable == value) return;
+            _isCollectable = value;
+            ApplyIconMarker();
+        }
+    }
+
+    private void ApplyIconMarker() => IconNode.IsGlamoured = _isCollected || _isCollectable;
 
     private void ApplyBadge(BadgeInfo badge)
     {
@@ -388,6 +417,8 @@ private void ApplyBorder(BorderStyle style)
         Alpha = 1.0f;
         IconNode.AddColor = Vector3.Zero;
         IconNode.IsIconDisabled = false;
+        _isCollected = false;
+        _isCollectable = false;
         IconNode.IsGlamoured = false;
         IsDraggable = true;
         IconNode.IconExtras.AntsNode.IsVisible = false;

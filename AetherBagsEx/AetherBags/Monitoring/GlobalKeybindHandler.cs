@@ -68,7 +68,8 @@ public sealed unsafe class GlobalKeybindHandler : IDisposable
     {
         if (System.AddonInventoryWindow.TryFocusSearch()
             || System.AddonSaddleBagWindow.TryFocusSearch()
-            || System.AddonRetainerWindow.TryFocusSearch())
+            || System.AddonRetainerWindow.TryFocusSearch()
+            || System.AddonArmouryWindow.TryFocusSearch())
         {
             isHandled = true;
         }

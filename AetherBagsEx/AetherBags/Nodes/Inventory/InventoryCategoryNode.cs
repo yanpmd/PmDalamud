@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using AetherBags.Configuration;
 using AetherBags.Helpers;
 using AetherBags.Hooks;
 using AetherBags.Inventory;
@@ -21,9 +22,9 @@ namespace AetherBags.Nodes.Inventory;
 public class InventoryCategoryNode : InventoryCategoryNodeBase
 {
     private const uint CategoryNodeKeyBase = 0x10000000;
-    private const float ExpectedItemWidth = 44;
-    private const float ExpectedItemHeight = 48;
-    private const float HeaderHeight = 16;
+    private static float ExpectedItemWidth => StylePresets.Current.ItemWidth;
+    private static float ExpectedItemHeight => StylePresets.Current.ItemHeight;
+    private static float HeaderHeight => StylePresets.Current.CategoryHeaderHeight;
     private const float MinWidth = 40;
 
     public override uint Key => CategoryNodeKeyBase | CategorizedInventory.Key;
@@ -34,6 +35,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
 
     private float? _fixedWidth;
     private float? _maxWidth;
+    private float _headerMinWidth;
     private int _hoverRefs;
     private bool _headerSuppressed;
     private bool _headerExpanded;
@@ -104,8 +106,9 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
 
         _categoryNameTextNode = new TextNode
         {
-            Size = new Vector2(96, 16),
+            Size = new Vector2(96, HeaderHeight),
             AlignmentType = AlignmentType.Left,
+            FontSize = StylePresets.Current.CategoryHeaderFontSize,
         };
         _categoryNameTextNode.TextFlags |= TextFlags.OverflowHidden | TextFlags.Ellipsis;
         _categoryNameTextNode.TextFlags &= ~(TextFlags.WordWrap | TextFlags.MultiLine);
@@ -119,11 +122,38 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
             Size = new Vector2(240, 92),
             FillRowsFirst = true,
             ItemsPerLine = 10,
-            HorizontalPadding = 2,
-            VerticalPadding = 2,
+            HorizontalPadding = StylePresets.Current.ItemPadding,
+            VerticalPadding = StylePresets.Current.ItemPadding,
         };
         _itemGridNode.NodeFlags |= NodeFlags.EmitsEvents;
         _itemGridNode.AttachNode(this);
+    }
+
+    /// <summary>
+    /// Re-applies the style dependent metrics. Pooled nodes outlive a window
+    /// close, so this also runs when a node is rented back from the pool.
+    /// </summary>
+    public void ApplyStyle(InventoryStyle style)
+    {
+        _itemGridNode.HorizontalPadding = style.ItemPadding;
+        _itemGridNode.VerticalPadding = style.ItemPadding;
+        _categoryNameTextNode.FontSize = style.CategoryHeaderFontSize;
+
+        RefreshHeaderMinWidth();
+
+        if (CategorizedInventory.Items is not null)
+            RecalculateSize();
+    }
+
+    /// <summary>
+    /// Measures the header once per data/style change. RecalculateSize runs on every
+    /// refresh and must not measure text for every category each time.
+    /// </summary>
+    private void RefreshHeaderMinWidth()
+    {
+        _headerMinWidth = string.IsNullOrEmpty(_fullHeaderText)
+            ? 0f
+            : _categoryNameTextNode.GetTextDrawSize(_fullHeaderText).X + 4f;
     }
 
     #region Data
@@ -150,6 +180,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
         _categoryNameTextNode.String = _fullHeaderText;
         _categoryNameTextNode.TextColor = data.Category.Color;
         _categoryNameTextNode.TextTooltip = data.Category.Description;
+        RefreshHeaderMinWidth();
 
         if (itemsChanged || categoryChanged)
         {
@@ -289,7 +320,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
 
     public override void RecalculateSize()
     {
-        int itemCount = CategorizedInventory.Items.Count;
+        int itemCount = CategorizedInventory.Items?.Count ?? 0;
         float cellW = ExpectedItemWidth, cellH = ExpectedItemHeight;
         float hPad = _itemGridNode.HorizontalPadding, vPad = _itemGridNode.VerticalPadding;
 
@@ -317,6 +348,12 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
         int rows = (itemCount + itemsPerLine - 1) / itemsPerLine;
         int actualColumns = Math.Min(itemCount, itemsPerLine);
         float calculatedWidth = _fixedWidth ?? Math.Max(MinWidth, actualColumns * cellW + (actualColumns - 1) * hPad);
+
+        // Categories holding one or two items would otherwise be narrower than
+        // their own name and show up as "Beastm...".
+        if (_fixedWidth is null && _headerMinWidth > calculatedWidth)
+            calculatedWidth = _headerMinWidth;
+
         if (_maxWidth.HasValue && _fixedWidth is null && _maxWidth.Value >= cellW)
             calculatedWidth = Math.Min(calculatedWidth, _maxWidth.Value);
 
@@ -350,7 +387,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
     {
         var node = new InventoryDragDropNode
         {
-            Size = new Vector2(44, 48),
+            Size = new Vector2(ExpectedItemWidth, ExpectedItemHeight),
             IsVisible = true,
             IsClickable = true,
             OnDiscard = n => { if (n is InventoryDragDropNode dn) OnDiscard(n, dn.ItemInfo); },
@@ -360,6 +397,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
             OnRollOut = OnNodeRollOut,
             ItemInfo = data
         };
+        node.ApplySlotMetrics();
         ApplyItemDataToNode(node, data);
         return node;
     }
@@ -368,6 +406,15 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
     {
         var config = System.Config.General;
         InventoryItem item = data.Item;
+
+        // Reused (pooled) slots may still carry the metrics of a previous style.
+        var slotSize = new Vector2(ExpectedItemWidth, ExpectedItemHeight);
+        if (node.Size != slotSize)
+        {
+            node.Size = slotSize;
+            node.ApplySlotMetrics();
+        }
+
         InventoryMappedLocation vis = data.VisualLocation;
         var visInvType = InventoryType.GetInventoryTypeFromContainerId(vis.Container);
         var dragDropType = ExternalCategoryManager.GetDragDropTypeForContainer(item.Container);
@@ -378,6 +425,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
         // Must match emitted type or AtkComponentDragDrop rejects matching payloads from other windows.
         node.AcceptedType = dragDropType;
         node.IconNode.IconExtras.AntsNode.IsVisible = data.IsRelationshipHighlighted;
+        node.IsCollectable = item.Flags.HasFlag(InventoryItem.ItemFlags.Collectable);
         node.IsCollected = CollectionStatus.IsCollected(item.ItemId);
 
         if (data.IsRelationshipHighlighted && config.AnimationEnabled)
@@ -429,6 +477,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
             bool draggable = !info.IsSlotBlocked && !ExternalCategoryManager.IsContainerDragOutLocked(info.Item.Container);
             if (itemNode.IsDraggable != draggable) itemNode.IsDraggable = draggable;
 
+            itemNode.IsCollectable = info.Item.Flags.HasFlag(InventoryItem.ItemFlags.Collectable);
             itemNode.IsCollected = CollectionStatus.IsCollected(info.Item.ItemId);
 
             bool ants = info.IsRelationshipHighlighted;
@@ -543,6 +592,7 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
         _headerExpanded = false;
         _collapsePending = false;
         _fullHeaderText = string.Empty;
+        _headerMinWidth = 0f;
         _fixedWidth = null;
         _maxWidth = null;
 

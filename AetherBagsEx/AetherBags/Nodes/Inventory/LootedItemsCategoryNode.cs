@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using AetherBags.Configuration;
 using AetherBags.Inventory.Items;
 using AetherBags.Nodes.Layout;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -74,6 +75,7 @@ public class LootedItemsCategoryNode : InventoryCategoryNodeBase
             AlignmentType = AlignmentType.Left,
             String = Localization.Get("Looted.Title"),
             TextFlags = TextFlags.OverflowHidden | TextFlags.Ellipsis,
+            FontSize = StylePresets.Current.CategoryHeaderFontSize,
             TextColor = ColorHelper.GetColor(26), // Gold-ish color
         };
 
@@ -100,8 +102,8 @@ public class LootedItemsCategoryNode : InventoryCategoryNodeBase
             Size = new Vector2(240, 92),
             FillRowsFirst = true,
             ItemsPerLine = 10,
-            HorizontalPadding = 2,
-            VerticalPadding = 2,
+            HorizontalPadding = StylePresets.Current.ItemPadding,
+            VerticalPadding = StylePresets.Current.ItemPadding,
         };
         _itemGridNode.NodeFlags |= NodeFlags.EmitsEvents;
         _itemGridNode.AttachNode(this);
@@ -253,6 +255,7 @@ public class LootedItemsCategoryNode : InventoryCategoryNodeBase
 
     private static void UpdateLootedItemNode(LootedItemDisplayNode node, LootedItemInfo data)
     {
+        node.ApplySlotMetrics();
         node.LootedItem = data;
     }
 
@@ -285,8 +288,8 @@ public class LootedItemsCategoryNode : InventoryCategoryNodeBase
 
         int itemCount = _lootedItems.Count;
 
-        const float cellW = 44f;
-        const float cellH = 48f;
+        float cellW = StylePresets.Current.ItemWidth;
+        float cellH = StylePresets.Current.ItemHeight;
 
         float hPad = _itemGridNode.HorizontalPadding;
         float vPad = _itemGridNode.VerticalPadding;

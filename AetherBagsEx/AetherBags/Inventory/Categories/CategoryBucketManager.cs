@@ -211,6 +211,66 @@ public static class CategoryBucketManager
         }
     }
 
+    private static readonly Dictionary<uint, CategoryInfo> ArmouryGroupInfoCache = new(capacity: 16);
+
+    /// <summary>
+    /// Buckets items by the combat role that can equip them. Used by the armoury
+    /// window, where grouping by slot would pile every job's gear together.
+    /// </summary>
+    public static void BucketByJobRole(
+        Dictionary<ulong, ItemInfo> itemInfoByKey,
+        Dictionary<uint, CategoryBucket> bucketsByKey,
+        HashSet<ulong> claimedKeys,
+        bool userCategoriesEnabled)
+    {
+        foreach (var itemKvp in itemInfoByKey)
+        {
+            ulong itemKey = itemKvp.Key;
+            ItemInfo info = itemKvp.Value;
+
+            if (userCategoriesEnabled && claimedKeys.Contains(itemKey))
+                continue;
+
+            uint categoryKey = ArmouryJobGroups.ResolveBucketKey(info);
+
+            ref var bucketRef = ref CollectionsMarshal.GetValueRefOrAddDefault(bucketsByKey, categoryKey, out bool exists);
+
+            if (!exists)
+            {
+                bucketRef = new CategoryBucket
+                {
+                    Key = categoryKey,
+                    Category = GetArmouryGroupInfo(categoryKey),
+                    Items = new List<ItemInfo>(capacity: 16),
+                    FilteredItems = new List<ItemInfo>(capacity: 16),
+                    Used = true,
+                };
+            }
+            else
+            {
+                bucketRef!.Used = true;
+            }
+
+            bucketRef!.Items.Add(info);
+        }
+    }
+
+    private static CategoryInfo GetArmouryGroupInfo(uint key)
+    {
+        if (ArmouryGroupInfoCache.TryGetValue(key, out CategoryInfo? cached))
+            return cached;
+
+        var info = new CategoryInfo
+        {
+            Name = ArmouryJobGroups.GetBucketName(key),
+            // The bucket key already encodes the role-then-job order.
+            Order = 0,
+        };
+
+        ArmouryGroupInfoCache[key] = info;
+        return info;
+    }
+
     public static void BucketByAllaganFilters(
         Dictionary<ulong, ItemInfo> itemInfoByKey,
         Dictionary<uint, CategoryBucket> bucketsByKey,

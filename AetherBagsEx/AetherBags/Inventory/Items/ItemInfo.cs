@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using AetherBags.Extensions;
 using AetherBags.Helpers;
 using AetherBags.Inventory.Context;
 using AetherBags.IPC.ExternalCategorySystem;
@@ -104,6 +105,49 @@ public sealed class ItemInfo : IEquatable<ItemInfo>
 
     public RowRef<ItemUICategory> UiCategory => HasRow ? _row.ItemUICategory : default;
 
+    /// <summary>Which class/job category may equip this item.</summary>
+    public RowRef<ClassJobCategory> ClassJobCategory => HasRow ? _row.ClassJobCategory : default;
+
+    public uint ClassJobCategoryId => ClassJobCategory.RowId;
+
+    /// <summary>
+    /// True when the class/job category of this item includes the job the player
+    /// is currently on. Used to dim armoury items the current job cannot equip,
+    /// the same way the vanilla armoury board does.
+    /// </summary>
+    public bool IsUsableByCurrentJob
+    {
+        get
+        {
+            try
+            {
+                var rowRef = ClassJobCategory;
+                if (rowRef.RowId == 0) return true;
+                if (rowRef.ValueNullable is not { } row) return true;
+
+                uint jobId = Services.PlayerState.ClassJob.RowId;
+                return jobId == 0 || JobMatches(row, jobId);
+            }
+            catch
+            {
+                // Never let a data lookup failure take the window down.
+                return true;
+            }
+        }
+    }
+
+    private static bool JobMatches(ClassJobCategory row, uint jobId) => jobId switch
+    {
+        1 => row.GLA, 2 => row.PGL, 3 => row.MRD, 4 => row.LNC, 5 => row.ARC, 6 => row.CNJ, 7 => row.THM,
+        8 => row.CRP, 9 => row.BSM, 10 => row.ARM, 11 => row.GSM, 12 => row.LTW, 13 => row.WVR,
+        14 => row.ALC, 15 => row.CUL, 16 => row.MIN, 17 => row.BTN, 18 => row.FSH,
+        19 => row.PLD, 20 => row.MNK, 21 => row.WAR, 22 => row.DRG, 23 => row.BRD, 24 => row.WHM,
+        25 => row.BLM, 26 => row.ACN, 27 => row.SMN, 28 => row.SCH, 29 => row.ROG, 30 => row.NIN,
+        31 => row.MCH, 32 => row.DRK, 33 => row.AST, 34 => row.SAM, 35 => row.RDM, 36 => row.BLU,
+        37 => row.GNB, 38 => row.DNC, 39 => row.RPR, 40 => row.SGE, 41 => row.VPR, 42 => row.PCT,
+        _ => true,
+    };
+
     public bool IsUntradable => HasRow && _row.IsUntradable;
     public bool IsUnique => HasRow && _row.IsUnique;
     public bool IsMarketable => HasRow && _row.ItemSearchCategory.RowId != 0;
@@ -189,6 +233,11 @@ public sealed class ItemInfo : IEquatable<ItemInfo>
 
     private bool CheckNativeContextEligibility()
     {
+        // The armoury board has no AgentInventory context, so it is handled before
+        // the context checks below: only gear the current job can equip is lit.
+        if (Item.Container.IsArmory)
+            return IsUsableByCurrentJob;
+
         uint contextId = InventoryContextState.ActiveContextId;
         if (contextId == 0) return true;
 

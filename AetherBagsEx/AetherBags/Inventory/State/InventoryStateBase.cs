@@ -26,6 +26,12 @@ public abstract class InventoryStateBase
     public abstract InventorySourceType SourceType { get; }
     public abstract InventoryType[] Inventories { get; }
 
+    /// <summary>Slot capacity of what this state currently scans.</summary>
+    public virtual int TotalSlots => InventorySourceDefinitions.GetTotalSlots(SourceType);
+
+    /// <summary>Free slots of what this state currently scans.</summary>
+    public virtual int EmptySlots => InventoryScanner.GetEmptySlots(SourceType);
+
     public virtual unsafe void RefreshFromGame()
     {
         InventoryManager* inventoryManager = InventoryManager.Instance();
@@ -46,7 +52,7 @@ public abstract class InventoryStateBase
         FilteredCategories.Clear();
         ClaimedKeys.Clear();
 
-        InventoryScanner.ScanInventories(inventoryManager, stackMode, aggregateUnstackable, AggByKey, SourceType);
+        InventoryScanner.ScanInventories(inventoryManager, stackMode, aggregateUnstackable, AggByKey, SourceType, Inventories);
         CategoryBucketManager.ResetBuckets(BucketsByKey);
         InventoryScanner.BuildItemInfos(AggByKey, ItemInfoByKey);
 
@@ -101,7 +107,17 @@ public abstract class InventoryStateBase
         else
             HighlightState.ClearFilter(HighlightSource.BiSBuddy);
 
-        if (gameCategoriesEnabled)
+        BucketUnclaimedItems(userCategoriesEnabled);
+    }
+
+    /// <summary>
+    /// Buckets everything the user categories and external sources did not claim.
+    /// States may override this to group by something other than the game's own
+    /// item UI category.
+    /// </summary>
+    protected virtual void BucketUnclaimedItems(bool userCategoriesEnabled)
+    {
+        if (System.Config.Categories.GameCategoriesEnabled)
         {
             CategoryBucketManager.BucketByGameCategories(
                 ItemInfoByKey, BucketsByKey, ClaimedKeys, userCategoriesEnabled);
@@ -154,7 +170,16 @@ public abstract class InventoryStateBase
     public IReadOnlyList<CategorizedInventory> GetCategories(string filter = "", bool invert = false)
         => InventoryFilter.FilterCategories(AllCategories, BucketsByKey, FilteredCategories, filter, invert);
 
-    public string GetEmptySlotsString() => InventoryScanner.GetEmptySlotsString(SourceType);
+    /// <summary>First free slot among the containers this state scans.</summary>
+    public virtual InventoryLocation GetFirstEmptySlot()
+        => InventoryScanner.GetFirstEmptySlot(SourceType);
+
+    public string GetEmptySlotsString()
+    {
+        int total = TotalSlots;
+        int used = total - EmptySlots;
+        return $"{used}/{total}";
+    }
 
     public InventoryStats GetStats()
     {
@@ -166,8 +191,8 @@ public abstract class InventoryStateBase
             totalQuantity += kvp.Value.ItemCount;
         }
 
-        int totalSlots = InventorySourceDefinitions.GetTotalSlots(SourceType);
-        int emptySlots = InventoryScanner.GetEmptySlots(SourceType);
+        int totalSlots = TotalSlots;
+        int emptySlots = EmptySlots;
 
         var categories = GetCategories(string.Empty);
         int categoryCount = categories.Count;

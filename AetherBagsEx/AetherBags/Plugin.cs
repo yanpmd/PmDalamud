@@ -1,12 +1,14 @@
 using System.Numerics;
 using AetherBags.Addons;
 using AetherBags.Commands;
+using AetherBags.Configuration;
 using AetherBags.Helpers;
 using AetherBags.Hooks;
 using AetherBags.Inventory.Context;
 using AetherBags.IPC;
 using AetherBags.IPC.AetherBagsAPI;
 using AetherBags.Monitoring;
+using AetherBags.Nodes.Style;
 using Dalamud.Plugin;
 using KamiToolKit;
 
@@ -41,6 +43,7 @@ public class Plugin : IDalamudPlugin
             InternalName = "AetherBagsEx_MainBags",
             Title = Localization.Get("Window.Inventory"),
             Size = new Vector2(750, 750),
+            CreateWindowNode = CreateBagWindowNode,
         };
 
         System.AddonSaddleBagWindow = new AddonSaddleBagWindow
@@ -48,6 +51,7 @@ public class Plugin : IDalamudPlugin
             InternalName = "AetherBagsEx_SaddleBag",
             Title = Localization.Get("Window.SaddleBag"),
             Size = new Vector2(750, 750),
+            CreateWindowNode = CreateBagWindowNode,
         };
 
         System.AddonRetainerWindow = new AddonRetainerWindow
@@ -55,6 +59,15 @@ public class Plugin : IDalamudPlugin
             InternalName = "AetherBagsEx_Retainer",
             Title = Localization.Get("Window.Retainer"),
             Size = new Vector2(750, 750),
+            CreateWindowNode = CreateBagWindowNode,
+        };
+
+        System.AddonArmouryWindow = new AddonArmouryWindow
+        {
+            InternalName = "AetherBagsEx_Armoury",
+            Title = Localization.Get("Window.Armoury"),
+            Size = new Vector2(760, 750),
+            CreateWindowNode = CreateBagWindowNode,
         };
 
         System.AddonConfigurationWindow = new AddonConfigurationWindow
@@ -62,6 +75,7 @@ public class Plugin : IDalamudPlugin
             InternalName = "AetherBagsEx_Config",
             Title = Localization.Get("Window.Config"),
             Size = new Vector2(640, 512),
+            CreateWindowNode = CreateStyledWindowNode,
         };
 
         System.AddonChangelogWindow = new AddonChangelogWindow
@@ -91,6 +105,18 @@ public class Plugin : IDalamudPlugin
         inventoryMonitor = new InventoryMonitor();
     }
 
+    /// <summary>
+    /// The window chrome is built while the addon is being allocated, so the
+    /// current style is read lazily on every open instead of once at startup.
+    /// </summary>
+    private static StyledWindowNode CreateStyledWindowNode() => new(StylePresets.Current);
+
+    /// <summary>
+    /// Same as <see cref="CreateStyledWindowNode"/> but without the window title,
+    /// which only ever repeated the plugin name in the bag windows.
+    /// </summary>
+    private static StyledWindowNode CreateBagWindowNode() => new(StylePresets.Current) { HideTitle = true };
+
     public void Dispose()
     {
         // Unsubscribe first: while the plugin is being reloaded, these handlers
@@ -117,6 +143,7 @@ public class Plugin : IDalamudPlugin
         System.AddonInventoryWindow.Dispose();
         System.AddonSaddleBagWindow.Dispose();
         System.AddonRetainerWindow.Dispose();
+        System.AddonArmouryWindow.Dispose();
         System.AddonConfigurationWindow.Dispose();
         System.AddonChangelogWindow.Dispose();
 
@@ -142,6 +169,7 @@ public class Plugin : IDalamudPlugin
         System.AddonInventoryWindow.Close();
         System.AddonSaddleBagWindow.Close();
         System.AddonRetainerWindow.Close();
+        System.AddonArmouryWindow.Close();
         System.AddonConfigurationWindow.Close();
         System.AddonChangelogWindow.Close();
     }
