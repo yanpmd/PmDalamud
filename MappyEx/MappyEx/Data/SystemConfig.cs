@@ -1,0 +1,149 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Globalization;
+using System.Linq;
+using System.Numerics;
+using System.Text.Json.Serialization;
+using Dalamud.Interface;
+using KamiLib.Configuration;
+
+namespace Mappy.Data;
+
+public enum CenterTarget
+{
+    [Description("Disabled")]
+    Disabled = 0,
+
+    [Description("Player")]
+    Player = 1,
+
+    [Description("Map")]
+    Map = 2,
+}
+
+[Flags]
+public enum FadeMode
+{
+    [Description("Always")]
+    Always = 1 << 0,
+
+    [Description("When Moving")]
+    WhenMoving = 1 << 2,
+
+    [Description("When Focused")]
+    WhenFocused = 1 << 3,
+
+    [Description("When Unfocused")]
+    WhenUnFocused = 1 << 4,
+}
+
+public class SystemConfig : CharacterConfiguration
+{
+    public string Language = "Auto";
+    public float ZoomSpeed = 0.25f;
+    public float IconScale = 0.50f;
+    public bool ShowMiscTooltips = true;
+
+    /// <summary>
+    /// Visibility per marker group, missing entries fall back to the group default.
+    /// </summary>
+    public Dictionary<string, bool> MarkerGroupVisibility = [];
+    public bool HideWithGameGui = true;
+    public bool HideBetweenAreas = false;
+    public bool HideInCombat = false;
+    public bool KeepOpen = false;
+    public bool FollowOnOpen = false;
+    public bool FollowPlayer = true;
+    public CenterTarget CenterOnOpen = CenterTarget.Disabled;
+    public bool ScalePlayerCone = false;
+    public float ConeSize = 150.0f;
+    public bool ShowRadar = true;
+    public bool ShowRadarInDuties = false;
+    public Vector4 RadarColor = KnownColor.Gray.Vector() with { W = 0.10f };
+    public Vector4 RadarOutlineColor = KnownColor.Gray.Vector() with { W = 0.30f };
+    public bool HideWindowFrame = false;
+    public bool HideWindowBackground = false;
+    public bool EnableShiftDragMove = false;
+    public bool LockWindow = false;
+    public float FadePercent = 0.60f;
+    public FadeMode FadeMode = FadeMode.WhenUnFocused | FadeMode.WhenMoving;
+    public Vector2 WindowPosition = new(1024.0f, 700.0f);
+    public Vector2 WindowSize = new(500.0f, 500.0f);
+    public bool AlwaysShowToolbar = false;
+    public bool ShowToolbarOnHover = true;
+    public bool ScaleWithZoom = true;
+    public bool AcceptedSpoilerWarning = false;
+    public Vector4 AreaColor = KnownColor.CornflowerBlue.Vector() with { W = 0.33f };
+    public Vector4 AreaOutlineColor = KnownColor.CornflowerBlue.Vector() with { W = 0.30f };
+    public Vector4 PlayerConeColor = KnownColor.CornflowerBlue.Vector() with { W = 0.33f };
+    public Vector4 PlayerConeOutlineColor = KnownColor.CornflowerBlue.Vector() with { W = 1.0f };
+    public bool CenterOnFlag = true;
+    public bool CenterOnGathering = true;
+    public bool CenterOnQuest = true;
+    public bool LockCenterOnMap = false;
+    public bool ShowCoordinateBar = true;
+    public float ToolbarFade = 0.33f;
+    public float CoordinateBarFade = 0.66f;
+    public Vector4 CoordinateTextColor = KnownColor.White.Vector();
+    public bool ZoomLocked = false;
+    public bool ShowPlayers = true;
+    public bool SetFlagOnFateClick = false;
+    public bool ShowPlayerIcon = true;
+    public float PlayerIconScale = 1.0f;
+    public float MapScale = 1.0f;
+    public bool AutoZoom = false;
+    public bool ShowRegionLabel = true;
+    public bool ShowMapLabel = true;
+    public bool ShowAreaLabel = true;
+    public bool ShowSubAreaLabel = true;
+    public bool NoFocusOnAppear = false;
+    public float LargeAreaTextScale = 1.5f;
+    public float SmallAreaTextScale = 1.0f;
+    public bool ShowTextLabels = true;
+    public bool ShowFogOfWar = true;
+    public bool ScaleTextWithZoom = true;
+    public float AutoZoomScaleFactor = 0.33f;
+
+    public bool SuppressNativeMapOpenSound = true;
+
+    // Do not persist this setting
+    [JsonIgnore]
+    public bool DebugMode = false;
+
+    /// <summary>
+    /// Resolve the language code that should be used for localization.
+    /// "Auto" follows the dalamud UI language, which is the only place a Chinese language can appear, the game client itself never reports one.
+    /// </summary>
+    public string GetLanguageCode()
+    {
+        if (Language is not (null or "" or "Auto") && Localization.SupportedLanguages.Any(entry => entry.Code == Language)) {
+            return Language;
+        }
+
+        var uiLanguage = Service.PluginInterface.UiLanguage;
+        if (!string.IsNullOrEmpty(uiLanguage)) {
+            if (uiLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase)) return "zh-CN";
+            if (Localization.SupportedLanguages.Any(entry => entry.Code == uiLanguage)) return uiLanguage;
+        }
+
+        if (CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("zh", StringComparison.OrdinalIgnoreCase)) return "zh-CN";
+
+        return "en";
+    }
+
+    public bool GetGroupVisibility(string groupId, bool defaultVisible)
+        => MarkerGroupVisibility.TryGetValue(groupId, out var visible) ? visible : defaultVisible;
+
+    public void ToggleGroupVisibility(string groupId, bool defaultVisible)
+    {
+        MarkerGroupVisibility[groupId] = !GetGroupVisibility(groupId, defaultVisible);
+
+        Save();
+    }
+
+    public static SystemConfig Load() => Service.PluginInterface.LoadConfigFile<SystemConfig>("System.config.json");
+
+    public static void Save() => Service.PluginInterface.SaveConfigFile("System.config.json", System.SystemConfig);
+}

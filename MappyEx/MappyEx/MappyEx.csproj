@@ -1,0 +1,28 @@
+﻿<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+    <PropertyGroup>
+        <Name>MappyEx</Name>
+        <InternalName>MappyEx</InternalName>
+        <AssemblyName>MappyEx</AssemblyName>
+        <RootNamespace>Mappy</RootNamespace>
+        <Author>MidoriKami, harbingerftw, pmyan</Author>
+        <Version>3.2.0.0</Version>
+        <Punchline>A more versatile in-game map, with full Simplified Chinese support.</Punchline>
+        <Description>在原版 Mappy 基础上完成完整的中英双语适配，并加入永久地图标记、标记分组、vnavmesh 前往/飞向、地图右键导航等功能。分组可自建并统一图标与大小，工具栏单按钮切换显隐。不能与上游 Mappy 同时启用。</Description>
+        <RepoUrl>https://github.com/yanpmd/PmDalamud</RepoUrl>
+        <Tags>map;mapping;overlay;utility</Tags>
+        <CategoryTags>jobs</CategoryTags>
+        <AcceptsFeedback>true</AcceptsFeedback>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\KamiLib\KamiLib.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="loc\*.json"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="TerraFX.Interop.Windows" Private="false"/>
+    </ItemGroup>
+</Project>

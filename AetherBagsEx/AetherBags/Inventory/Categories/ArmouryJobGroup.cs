@@ -317,6 +317,26 @@ public static class ArmouryJobGroups
         return false;
     }
 
+    /// <summary>
+    /// True when the bucket key is the player's own job, or the role that job
+    /// belongs to. Used to highlight the matching category header.
+    /// </summary>
+    public static bool MatchesCurrentJob(uint key)
+    {
+        if ((key & GroupKeyFlag) == 0) return false;
+
+        uint currentJob = Services.PlayerState.ClassJob.RowId;
+        if (currentJob == 0) return false;
+
+        uint jobId = key & JobIdMask;
+        if (jobId != 0) return jobId == currentJob;
+
+        var group = (ArmouryJobGroup)((key >> GroupShift) & 0xF);
+        if (group is ArmouryJobGroup.Combat or ArmouryJobGroup.None) return false;
+
+        return group == GetJobGroup(GetJobLine(currentJob));
+    }
+
     public static string GetBucketName(uint key)
     {
         if ((key & UnknownCategoryKeyFlag) != 0)

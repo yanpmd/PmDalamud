@@ -1,0 +1,247 @@
+﻿using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Hooking;
+using Dalamud.Interface.Textures;
+using Dalamud.Interface.Textures.TextureWraps;
+using Dalamud.Utility;
+using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiLib.Classes;
+using TerraFX.Interop.DirectX;
+
+namespace Mappy.MapRenderer;
+
+public unsafe partial class MapRenderer
+{
+    private delegate void ImmediateContextProcessCommands(ImmediateContext* commands, RenderCommandBufferGroup* bufferGroup, uint a3);
+
+    [Signature("E8 ?? ?? ?? ?? 48 8B 4B 30 FF 15 ?? ?? ?? ??", DetourName = nameof(OnImmediateContextProcessCommands))]
+    private readonly Hook<ImmediateContextProcessCommands>? immediateContextProcessCommandsHook = null;
+
+    private bool requestUpdatedMaskingTexture;
+    private byte[]? maskingTextureBytes;
+
+    private byte[]? blockyFogBytes;
+    private IDalamudTextureWrap? fogTexture;
+    private int lastKnownDiscoveryFlags;
+    private readonly Stopwatch textureLoadStopwatch = new();
+
+    private static int CurrentDiscoveryFlags => AtkStage.Instance()->GetNumberArrayData(NumberArrayType.AreaMap2)->IntArray[2];
+
+    private void LoadFogHooks()
+    {
+        Service.Hooker.InitializeFromAttributes(this);
+        immediateContextProcessCommandsHook?.Enable();
+    }
+
+    private void UnloadFogHooks()
+    {
+        immediateContextProcessCommandsHook?.Dispose();
+    }
+
+    private void OnImmediateContextProcessCommands(ImmediateContext* commands, RenderCommandBufferGroup* bufferGroup, uint a3) =>
+        HookSafety.ExecuteSafe(() =>
+        {
+            // Delay by a certain number of frames because the game hasn't loaded the new texture yet.
+            if (requestUpdatedMaskingTexture && textureLoadStopwatch is { IsRunning: true, ElapsedMilliseconds: > 200 }) {
+                maskingTextureBytes = null;
+                maskingTextureBytes = GetPrebakedTextureBytes();
+                requestUpdatedMaskingTexture = false;
+                textureLoadStopwatch.Stop();
+
+                Task.Run(LoadFogTexture);
+            }
+
+            immediateContextProcessCommandsHook!.Original(commands, bufferGroup, a3);
+        }, Service.Log, "Exception during OnImmediateContextProcessCommands");
+
+    private void DrawFogOfWar()
+    {
+        if (!System.SystemConfig.ShowFogOfWar) return;
+        if (CurrentDiscoveryFlags == AgentMap.Instance()->SelectedMapDiscoveryFlag) return;
+        if (CurrentDiscoveryFlags == -1) return;
+
+        var flagsChanged = lastKnownDiscoveryFlags != CurrentDiscoveryFlags;
+        lastKnownDiscoveryFlags = CurrentDiscoveryFlags;
+
+        if (flagsChanged) {
+            Service.Log.Debug("[Fog of War] Discovery Bits Changed, updating fog texture.");
+            requestUpdatedMaskingTexture = true;
+            textureLoadStopwatch.Restart();
+            fogTexture = null;
+        }
+
+        if (fogTexture is not null) {
+            ImGui.SetCursorPos(DrawPosition);
+            ImGui.Image(fogTexture.Handle, fogTexture.Size * Scale);
+        }
+        else {
+            var defaultBackgroundTexture = Service.TextureProvider.GetFromGame($"{AgentMap.Instance()->SelectedMapBgPath.ToString()}.tex").GetWrapOrEmpty();
+
+            ImGui.SetCursorPos(DrawPosition);
+            ImGui.Image(defaultBackgroundTexture.Handle, defaultBackgroundTexture.Size * Scale);
+        }
+    }
+
+    private void LoadFogTexture()
+    {
+        var vanillaBgPath = $"{AgentMap.Instance()->SelectedMapBgPath.ToString()}.tex";
+        var bgFile = GetTexFile(vanillaBgPath);
+
+        if (bgFile is null) {
+            Service.Log.Warning("Failed to load map textures");
+            return;
+        }
+
+        // Load non-transparent background texture
+        var backgroundBytes = bgFile.GetRgbaImageData();
+
+        // Load alpha mapping
+        if (maskingTextureBytes is null) return;
+
+        var timer = Stopwatch.StartNew();
+
+        // Make background texture fully invisible
+        for (var index = 0; index < 2048 * 2048; index++) {
+            backgroundBytes[index * 4 + 3] = 0;
+        }
+
+        // Make non-transparent any section that the player has not-already explored
+        for (var x = 0; x < 128; x++)
+        for (var y = 0; y < 128; y++) {
+            var pixelIndex = (x + y * 128) * 4;
+            var targetPixel = (x + 2048 * y) * 4;
+
+            var redAmount = maskingTextureBytes[pixelIndex + 0] / 255.0f;
+            var greenAmount = maskingTextureBytes[pixelIndex + 1] / 255.0f;
+            var blueAmount = maskingTextureBytes[pixelIndex + 2] / 255.0f;
+
+            var maxAlpha = Math.Max(redAmount, Math.Max(greenAmount, blueAmount));
+            var alphaSum = (byte)(maxAlpha * 255);
+
+            if (alphaSum is not 0) {
+                const int scaleFactor = 16;
+                foreach (var xScalar in Enumerable.Range(0, scaleFactor))
+                foreach (var yScalar in Enumerable.Range(0, scaleFactor)) {
+                    var scalingPixelTarget = targetPixel * scaleFactor + xScalar * 4 + yScalar * 2048 * 4;
+                    backgroundBytes[scalingPixelTarget + 3] = alphaSum;
+                }
+            }
+        }
+
+        Service.Log.Debug($"Fog of War Calculated in {timer.ElapsedMilliseconds} ms");
+
+        blockyFogBytes = backgroundBytes;
+        fogTexture = Service.TextureProvider.CreateFromRaw(RawImageSpecification.Rgba32(2048, 2048), backgroundBytes);
+
+        Task.Run(CleanupFogTexture);
+    }
+
+    private static byte[]? GetPrebakedTextureBytes()
+    {
+        var addon = Service.GameGui.GetAddonByName<AddonAreaMap>("AreaMap");
+        if (addon is null) return null;
+
+        var componentMap = (void*)Marshal.ReadIntPtr((nint)addon, 0x430);
+        if (componentMap is null) return null;
+
+        var texturePointer = (Texture*)Marshal.ReadIntPtr((nint)componentMap, 0x270);
+        if (texturePointer is null) return null;
+
+        var device = (ID3D11Device*)Service.PluginInterface.UiBuilder.DeviceHandle;
+        var texture = (ID3D11Texture2D*)texturePointer->D3D11Texture2D;
+
+        D3D11_TEXTURE2D_DESC description;
+        texture->GetDesc(&description);
+        
+        description.ArraySize = 1;
+        description.BindFlags = 0;
+        description.MipLevels = 1;
+        description.MiscFlags = 0;
+        description.CPUAccessFlags = (uint)D3D11_CPU_ACCESS_FLAG.D3D11_CPU_ACCESS_READ;
+        description.Usage = D3D11_USAGE.D3D11_USAGE_STAGING;
+        
+
+        ID3D11Texture2D* stagingTexture;
+        if (device->CreateTexture2D(&description, null, &stagingTexture)< 0)
+            return null;
+
+        ID3D11DeviceContext* context;
+        device->GetImmediateContext(&context);
+
+        context->CopyResource((ID3D11Resource*)stagingTexture, (ID3D11Resource*)texture);
+        
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        if (context->Map((ID3D11Resource*)stagingTexture, 0, D3D11_MAP.D3D11_MAP_READ, 0, &mapped) < 0)
+        {
+            context->Release();
+            stagingTexture->Release();
+            return null;
+        }
+
+
+        int bufferSize = (int)(description.Height * mapped.RowPitch);
+        byte[] pixelData = new byte[bufferSize];
+            
+        Marshal.Copy((IntPtr)mapped.pData, pixelData, 0, bufferSize);
+
+        context->Unmap((ID3D11Resource*)stagingTexture, 0);
+        context->Release();
+        stagingTexture->Release();
+        
+        return pixelData;
+    }
+
+    private void CleanupFogTexture()
+    {
+        if (blockyFogBytes is null) return;
+
+        var timer = Stopwatch.StartNew();
+
+        // Because we had to scale a 128x128 texture mapping onto a 2048x2048, it'll look very blurry, lets blend the alpha channel
+        const int blurRadius = 8;
+
+        for (var x = 0; x < 2048; x++)
+        for (var y = 0; y < 2048; y++) {
+            var pixelIndex = (x + y * 2048) * 4;
+
+            var alphaAverage = 0.0f;
+            var numAveraged = 0;
+
+            if (blockyFogBytes[pixelIndex + 3] == 255) continue;
+
+            for (var xBlur = -blurRadius; xBlur < -blurRadius + blurRadius * 2; ++xBlur) {
+                var currentX = x + xBlur;
+                if (currentX is < 0 or >= 2048) continue;
+                var currentPixelIndex = (currentX + y * 2048) * 4;
+
+                alphaAverage += blockyFogBytes[currentPixelIndex + 3];
+                numAveraged++;
+            }
+
+            for (var yBlur = -blurRadius; yBlur < -blurRadius + blurRadius * 2; ++yBlur) {
+                var currentY = y + yBlur;
+
+                if (currentY is < 0 or >= 2048) continue;
+                var currentPixelIndex = (x + currentY * 2048) * 4;
+
+                alphaAverage += blockyFogBytes[currentPixelIndex + 3];
+                numAveraged++;
+            }
+
+            var newAlpha = (byte)(alphaAverage / numAveraged);
+            blockyFogBytes[pixelIndex + 3] = newAlpha;
+        }
+
+        fogTexture = Service.TextureProvider.CreateFromRaw(RawImageSpecification.Rgba32(2048, 2048), blockyFogBytes);
+
+        Service.Log.Debug($"Texture Cleanup completed in {timer.ElapsedMilliseconds} ms");
+    }
+}

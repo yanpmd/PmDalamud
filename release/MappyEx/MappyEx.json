@@ -1,0 +1,25 @@
+{
+  "Author": "MidoriKami, harbingerftw, pmyan",
+  "Name": "MappyEx",
+  "InternalName": "MappyEx",
+  "AssemblyVersion": "3.2.0.0",
+  "Description": "在原版 Mappy 基础上完成完整的中英双语适配，并加入永久地图标记、标记分组、vnavmesh 前往/飞向、地图右键导航等功能。分组可自建并统一图标与大小，工具栏单按钮切换显隐。不能与上游 Mappy 同时启用。",
+  "ApplicableVersion": "any",
+  "RepoUrl": "https://github.com/yanpmd/PmDalamud",
+  "Tags": [
+    "map",
+    "mapping",
+    "overlay",
+    "utility"
+  ],
+  "CategoryTags": [
+    "jobs"
+  ],
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "LoadPriority": 0,
+  "Punchline": "A more versatile in-game map, with full Simplified Chinese support.",
+  "AcceptsFeedback": true
+}

@@ -7,10 +7,10 @@
         "InternalName": "AetherBagsEx",
         "RepoUrl": "https://github.com/yanpmd/PmDalamud",
         "DownloadCount": 1,
-        "LastUpdate": 1793190788,
+        "LastUpdate": 1793373186,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/AetherBagsEx/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/AetherBagsEx/latest.zip",
-        "AssemblyVersion": "2.0.0.8",
+        "AssemblyVersion": "2.0.0.9",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/AetherBagsEx/images/icon.png"
@@ -62,5 +62,20 @@
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/UmbraEx/Umbra/images/logo.png"
+    },
+    {
+        "Author": "pmyan",
+        "Name": "MappyEx",
+        "Description": "在原版 Mappy 基础上完成完整的中英双语适配，并加入永久地图标记、标记分组、vnavmesh 前往/飞向、地图右键导航等功能。分组可自建并统一图标与大小，工具栏单按钮切换显隐。不能与上游 Mappy 同时启用。",
+        "Punchline": "A more versatile in-game map, with full Simplified Chinese support.",
+        "InternalName": "MappyEx",
+        "RepoUrl": "https://github.com/yanpmd/PmDalamud",
+        "DownloadCount": 1,
+        "LastUpdate": 1793373771,
+        "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/MappyEx/latest.zip",
+        "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/MappyEx/latest.zip",
+        "AssemblyVersion": "3.2.0.0",
+        "ApplicableVersion": "any",
+        "DalamudApiLevel": 15
     }
 ]

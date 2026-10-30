@@ -1,5 +1,61 @@
-I have made some optimizations that I believe are worthwhile. Please take a look at the original repository.
+# PmDalamud
 
-- [AetherBags](https://github.com/Zeffuro/AetherBags).
-- [QoLBar](https://github.com/UnknownX7/QoLBar).
-- [umbra](https://github.com/una-xiv/umbra).
+若干 Dalamud 插件的个人维护分支。上游的界面文本大多只有英文，而我平时是中文环境使用，
+所以这些分支的出发点很直接：**把中文可用性做扎实**，再按实际使用习惯补上一些上游没有的功能。
+
+## 为什么是「多语言适配」
+
+不是简单地把提示文本翻一遍，而是把本地化做成可维护的一层：
+
+- 英文资源作为唯一真源，中文只写需要翻译的键，**缺键自动回退英文**，不会出现空白按钮或空 tooltip
+- 默认跟随 Dalamud 的界面语言，`zh*` 统一归到简体中文，也可以手动指定
+- 设置窗口里切换语言**即时生效**，不需要重载插件或重启游戏
+- 资源以 JSON 内嵌在程序集里，零第三方依赖，新增一种语言只需要放一个 `loc/<code>.json`
+- 依赖的公共控件库（KamiLib）通过可注入的 `Resolver` 回调接入，未注入时保持原样，
+  不会影响其他同样使用该库的插件
+
+## 为什么有「功能拓展」
+
+有些功能在中文社区的实际玩法里是刚需，但上游没有做，于是在分支里补上——
+比如地图上的宝箱点位、导航指令、按分组批量显隐。这些都是「用起来顺手」的改动，
+不影响上游已有的行为，不需要的话完全可以不碰。
+
+## 插件列表
+
+| 插件 | 说明 | 上游 |
+|---|---|---|
+| **MappyEx** | 替代原生地图的可交互地图 | [Mappy](https://github.com/harbingerftw/Mappy) |
+| AetherBagsEx | 分类化的背包界面 | [AetherBags](https://github.com/Zeffuro/AetherBags) |
+| QoLBarEx | 可自定义的快捷栏 | [QoLBar](https://github.com/UnknownX7/QoLBar) |
+| UmbraEx | 高度可定制的工具栏集合 | [umbra](https://github.com/una-xiv/umbra) |
+| Pilgrim's Traverse | 挖宝 | 上游见插件信息 |
+
+## MappyEx
+
+在上游基础上完成完整的中英双语界面，并额外提供：
+
+- **永久地图标记** — 地图右键任意位置创建，支持名称、备注、图标、缩放、左键自动标点、
+  附加文本指令；数据保存在 `CustomMarkers.data.json`
+- **标记分组** — 内置新月岛宝箱 / 魔法罐 / 胡萝卜 / 调查点等分组，分组内图标与尺寸统一锁定；
+  设置窗口新增「标记分组」页，可自建分组并统一设置图标与大小
+- **vnavmesh 导航** — 标记右键「前往 / 飞向」，导航前用 `vnavmesh.Query.Mesh.NearestPoint`
+  把目标吸附到导航网格，避免高度偏差导致走错位置
+- **地图右键导航** — 空白处右键即可「前往此处 / 飞向此处」
+- **缩放手感** — 改为对数步进，任何缩放级别下滚轮一格的变化量都一致
+- **工具栏分组菜单** — 单个按钮下拉切换各组显隐，分组再多也不会挤压、遮挡其他按钮
+
+> MappyEx 与上游 Mappy 不能同时启用，两者都会接管原生地图。
+> 从 Mappy 升级时会自动把旧配置迁移到新目录。
+
+## 安装
+
+在 Dalamud 的「设置 → 插件仓库」中新增：
+
+```
+https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Dalamud.json
+```
+
+## 说明
+
+这些都是个人使用的分支，改动以自己的使用习惯为准，不保证与上游行为完全一致。
+上游的版权与许可归各自作者所有。

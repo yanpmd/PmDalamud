@@ -25,6 +25,10 @@ public unsafe class AddonArmouryWindow : InventoryAddonBase
     private const float PartButtonGap = 2f;
     private const uint PartButtonFontSize = 11;
 
+    /// <summary>Warm gold so the active part stands out against the dark frame.</summary>
+    private static readonly Vector3 PartSelectedTint = new(0.95f, 0.62f, 0.10f);
+    private static readonly Vector4 PartSelectedTextColor = new(0.10f, 0.07f, 0.02f, 1.0f);
+
     private readonly ArmouryState _armouryState = new();
     private readonly List<TextButtonNode> _partButtons = new();
 
@@ -247,10 +251,12 @@ public unsafe class AddonArmouryWindow : InventoryAddonBase
             bool selected = parts[i].part == current;
 
             _partButtons[i].BackgroundNode.AddColor = selected
-                ? new Vector3(0.16f, 0.26f, 0.08f)
+                ? PartSelectedTint
                 : Vector3.Zero;
 
-            _partButtons[i].LabelNode.TextColor = ColorHelper.GetColor(selected ? 2u : 50u);
+            _partButtons[i].LabelNode.TextColor = selected
+                ? PartSelectedTextColor
+                : ColorHelper.GetColor(50u);
         }
     }
 

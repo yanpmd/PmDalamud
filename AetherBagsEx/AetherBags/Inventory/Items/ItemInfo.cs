@@ -110,6 +110,9 @@ public sealed class ItemInfo : IEquatable<ItemInfo>
 
     public uint ClassJobCategoryId => ClassJobCategory.RowId;
 
+    /// <summary>Character level this item requires to be equipped (0 = no requirement).</summary>
+    public uint LevelEquip => HasRow && _row.LevelEquip > 0 ? (uint)_row.LevelEquip : 0u;
+
     /// <summary>
     /// True when the class/job category of this item includes the job the player
     /// is currently on. Used to dim armoury items the current job cannot equip,
@@ -121,6 +124,13 @@ public sealed class ItemInfo : IEquatable<ItemInfo>
         {
             try
             {
+                short rawLevel = Services.PlayerState.Level;
+                uint playerLevel = rawLevel > 0 ? (uint)rawLevel : 0u;
+
+                // Gear above the current job's level cannot be equipped either, and the
+                // vanilla board dims it the same way.
+                if (playerLevel > 0 && LevelEquip > playerLevel) return false;
+
                 var rowRef = ClassJobCategory;
                 if (rowRef.RowId == 0) return true;
                 if (rowRef.ValueNullable is not { } row) return true;

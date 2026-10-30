@@ -33,6 +33,9 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
     private readonly TextNode _categoryNameTextNode;
     private readonly HybridDirectionalFlexNode<DragDropNode> _itemGridNode;
 
+    /// <summary>Gold header colour for the category matching the player's job.</summary>
+    private static readonly Vector4 CurrentJobHeaderColor = new(1.0f, 0.83f, 0.30f, 1.0f);
+
     private float? _fixedWidth;
     private float? _maxWidth;
     private float _headerMinWidth;
@@ -178,7 +181,9 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
             : data.Category.Name;
 
         _categoryNameTextNode.String = _fullHeaderText;
-        _categoryNameTextNode.TextColor = data.Category.Color;
+        _categoryNameTextNode.TextColor = ArmouryJobGroups.MatchesCurrentJob(data.Key)
+            ? CurrentJobHeaderColor
+            : data.Category.Color;
         _categoryNameTextNode.TextTooltip = data.Category.Description;
         RefreshHeaderMinWidth();
 
