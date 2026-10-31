@@ -18,11 +18,30 @@ public static class VnavController
 
     private static ICallGateSubscriber<bool>? isReady;
     private static ICallGateSubscriber<Vector3, float, float, Vector3?>? nearestPoint;
+    private static ICallGateSubscriber<object>? stop;
 
     private static void EnsureInitialized()
     {
         isReady ??= Service.PluginInterface.GetIpcSubscriber<bool>("vnavmesh.Nav.IsReady");
         nearestPoint ??= Service.PluginInterface.GetIpcSubscriber<Vector3, float, float, Vector3?>("vnavmesh.Query.Mesh.NearestPoint");
+        stop ??= Service.PluginInterface.GetIpcSubscriber<object>("vnavmesh.Path.Stop");
+    }
+
+    /// <summary>
+    /// Abort any running pathfinding, used when something else takes over the movement (a teleport for example),
+    /// otherwise the character keeps walking to the old destination afterwards.
+    /// </summary>
+    public static void Stop()
+    {
+        try
+        {
+            EnsureInitialized();
+            stop!.InvokeAction();
+        }
+        catch
+        {
+            // vnavmesh not installed, nothing is moving anyway.
+        }
     }
 
     public static bool IsReady()

@@ -35,10 +35,12 @@ public unsafe class MapContextMenu
         }
 
         if (ImGui.MenuItem(Localization.Get("Context.NavigateHere", "Go Here"))) {
+            AethernetNavigator.Cancel();
             VnavController.NavigateTo(MarkerContextMenu.FromFlatPosition(GetCursorWorldPosition(mapDrawOffset)), fly: false);
         }
 
         if (ImGui.MenuItem(Localization.Get("Context.FlyHere", "Fly Here"))) {
+            AethernetNavigator.Cancel();
             VnavController.NavigateTo(MarkerContextMenu.FromFlatPosition(GetCursorWorldPosition(mapDrawOffset)), fly: true);
         }
 

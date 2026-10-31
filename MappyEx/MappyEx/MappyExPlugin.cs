@@ -2,6 +2,7 @@
 using System.IO;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using KamiLib.Classes;
 using KamiLib.CommandManager;
@@ -58,6 +59,8 @@ public sealed class MappyExPlugin : IDalamudPlugin
         System.AreaMapController = new AddonAreaMapController();
         System.IntegrationsController = new IntegrationsController();
 
+        Service.Framework.Update += OnFrameworkUpdate;
+
         Service.PluginInterface.UiBuilder.OpenMainUi += OpenMapWindow;
 
         System.CommandManager.RegisterCommand(new ToggleCommandHandler
@@ -86,6 +89,8 @@ public sealed class MappyExPlugin : IDalamudPlugin
     }
 
     private unsafe void OpenMapWindow() => AgentMap.Instance()->Show();
+
+    private static void OnFrameworkUpdate(IFramework framework) => AethernetNavigator.Update();
 
     /// <summary>
     /// The plugin was renamed from Mappy to MappyEx, and the configuration directory follows the internal name.
@@ -126,6 +131,10 @@ public sealed class MappyExPlugin : IDalamudPlugin
 
     public void Dispose()
     {
+        Service.Framework.Update -= OnFrameworkUpdate;
+
+        AethernetNavigator.Cancel();
+
         System.MapWindow.OnClose();
         System.WindowManager.Dispose();
         System.IntegrationsController.Dispose();
