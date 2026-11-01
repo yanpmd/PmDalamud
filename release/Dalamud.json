@@ -71,10 +71,10 @@
         "InternalName": "MappyEx",
         "RepoUrl": "https://github.com/yanpmd/PmDalamud",
         "DownloadCount": 1,
-        "LastUpdate": 1793554972,
+        "LastUpdate": 1793556147,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/MappyEx/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/MappyEx/latest.zip",
-        "AssemblyVersion": "3.3.0.2",
+        "AssemblyVersion": "3.3.0.3",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15
     }
