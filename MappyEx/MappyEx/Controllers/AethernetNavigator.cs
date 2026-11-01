@@ -24,6 +24,16 @@ public static class AethernetNavigator
     private static readonly TimeSpan TeleportBusyTimeout = TimeSpan.FromSeconds(6.0);
 
     /// <summary>
+    /// How long the game may need to load the destination area and its navmesh after a teleport was issued.
+    /// </summary>
+    private static readonly TimeSpan AreaLoadTimeout = TimeSpan.FromSeconds(10.0);
+
+    /// <summary>
+    /// How long a movement waits for the navmesh of the area it was queued in.
+    /// </summary>
+    private static readonly TimeSpan NavmeshTimeout = TimeSpan.FromSeconds(10.0);
+
+    /// <summary>
     /// The game accepts the aetheryte interaction a few meters away from it, walking precisely onto it is not needed
     /// and vnavmesh often stops next to it. A big aetheryte is a much larger object, so vnavmesh keeps a wider
     /// distance from it and needs its own, larger threshold.
@@ -57,6 +67,12 @@ public static class AethernetNavigator
     /// </summary>
     private static bool lastReportedInRange;
 
+    /// <summary>
+    /// Whether the loading screen showed up after the teleport was issued. A hop inside the city does not load a new
+    /// area, so the screen is the only reliable sign that the teleport really started.
+    /// </summary>
+    private static bool sawAreaChange;
+
     private static readonly TimeSpan CrossMapTimeout = TimeSpan.FromSeconds(60);
     private static uint pendingCrossMapPlaceNameId;
     private static Vector3? pendingCrossMapTarget;
@@ -84,7 +100,16 @@ public static class AethernetNavigator
         // Aethernet shortcuts are optional, walking plus a mount is the plain vnavmesh route.
         if (!System.SystemConfig.EnableAethernetNavigation)
         {
-            VnavController.NavigateTo(target, fly);
+            VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
+
+            return;
+        }
+
+        // The aethernet can only be used through Lifestream, without it the whole trip is walked.
+        if (!LifestreamController.IsInstalled())
+        {
+            Service.Log.Information("[Aethernet] Lifestream is not installed, walking the whole way");
+            VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
 
             return;
         }
@@ -104,7 +129,7 @@ public static class AethernetNavigator
 
                 if (TryTeleportToTerritory(mapId, target, fly)) return;
 
-                VnavController.NavigateTo(target, fly);
+                VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
 
                 return;
             }
@@ -119,7 +144,7 @@ public static class AethernetNavigator
             crystalDistance > System.SystemConfig.AethernetSearchRadius)
         {
             Service.Log.Information($"[Aethernet] no usable crystal near {target}, walking the whole way");
-            VnavController.NavigateTo(target, fly);
+            VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
 
             return;
         }
@@ -145,7 +170,7 @@ public static class AethernetNavigator
             if (available)
             {
                 Service.Log.Information($"[Aethernet] teleport to {crystalRow.RowId} refused, walking to {target}");
-                VnavController.NavigateTo(target, fly);
+                VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
 
                 return;
             }
@@ -153,7 +178,7 @@ public static class AethernetNavigator
 
         if (!TryFindNearestSource(crystalRow.AethernetGroup, player.Position, out var walkSource, out var walkTarget))
         {
-            VnavController.NavigateTo(target, fly);
+            VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
 
             return;
         }
@@ -162,7 +187,7 @@ public static class AethernetNavigator
         if (walkSource?.RowId == crystalRow.RowId)
         {
             Service.Log.Information($"[Aethernet] crystal {crystalRow.RowId} is also the closest walkable point, walking to {target}");
-            VnavController.NavigateTo(target, fly);
+            VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
 
             return;
         }
@@ -249,6 +274,7 @@ public static class AethernetNavigator
 
         pendingFinalTarget = finalTarget;
         pendingFinalFly = finalFly;
+        sawAreaChange = false;
 
         Service.Log.Information($"[Aethernet] queued walk to {walkTarget}, teleport to {teleportTargetRowId}, stopDistance={pendingStopDistance:F1}, final={(finalTarget is { } final ? final.ToString() : "none")}");
     }
@@ -261,6 +287,7 @@ public static class AethernetNavigator
         pendingFinalTarget = target;
         pendingFinalFly = fly;
         teleportIssuedAt = DateTime.UtcNow;
+        sawAreaChange = false;
     }
 
     /// <summary>
@@ -495,22 +522,48 @@ public static class AethernetNavigator
 
         var waited = DateTime.UtcNow - teleportIssuedAt;
 
-        // Give Lifestream a moment to pick the request up before its busy flag is meaningful.
-        if (waited < TeleportStartupDelay) return;
-
-        var busy = LifestreamController.IsBusy();
+        // The loading screen shows up while the destination area is loaded. That is the same condition the map uses
+        // to hide itself, and it is the reliable sign that the teleport really started.
         var betweenAreas = Service.Condition[ConditionFlag.BetweenAreas];
 
-        if (busy || betweenAreas)
+        if (betweenAreas) sawAreaChange = true;
+
+        // Give Lifestream a moment to pick the request up before anything is issued.
+        if (waited < TeleportStartupDelay) return;
+
+        if (betweenAreas)
         {
-            // The busy flag can stay set long after the teleport finished, walking must not be blocked forever.
+            // The destination area is still loading.
+            if (waited < AreaLoadTimeout)
+            {
+                LogTeleportWait("the area is still loading", waited);
+
+                return;
+            }
+
+            Service.Log.Warning($"[Aethernet] the area is still loading after {waited.TotalSeconds:F1}s, walking anyway");
+        }
+        else if (sawAreaChange)
+        {
+            // The new area is there, the navmesh of that place needs a moment as well.
+            if (!VnavController.IsReady())
+            {
+                if (waited < AreaLoadTimeout)
+                {
+                    LogTeleportWait("the navmesh of the new area is not loaded", waited);
+
+                    return;
+                }
+
+                Service.Log.Warning($"[Aethernet] navmesh not ready after {waited.TotalSeconds:F1}s, walking anyway");
+            }
+        }
+        else if (LifestreamController.IsBusy())
+        {
+            // A hop inside the city does not load a new area, Lifestream knows while it is still moving.
             if (waited < TeleportBusyTimeout)
             {
-                if (DateTime.UtcNow - lastFinalWalkLog > TimeSpan.FromSeconds(2.0))
-                {
-                    lastFinalWalkLog = DateTime.UtcNow;
-                    Service.Log.Information($"[Aethernet] waiting for the teleport to settle: busy={busy} betweenAreas={betweenAreas} waited={waited.TotalSeconds:F1}s");
-                }
+                LogTeleportWait("the teleport is still running", waited);
 
                 return;
             }
@@ -521,7 +574,19 @@ public static class AethernetNavigator
         pendingFinalTarget = null;
 
         Service.Log.Information($"[Aethernet] teleport finished, walking to {final}");
-        VnavController.NavigateTo(final, pendingFinalFly);
+        VnavController.NavigateToWhenReady(final, pendingFinalFly, NavmeshTimeout);
+    }
+
+    /// <summary>
+    /// Log the wait for the teleport, throttled so the log does not flood.
+    /// </summary>
+    private static void LogTeleportWait(string reason, TimeSpan waited)
+    {
+        if (DateTime.UtcNow - lastFinalWalkLog <= TimeSpan.FromSeconds(2.0)) return;
+
+        lastFinalWalkLog = DateTime.UtcNow;
+
+        Service.Log.Information($"[Aethernet] waiting for the teleport to settle: {reason} waited={waited.TotalSeconds:F1}s");
     }
 
     /// <summary>
@@ -533,7 +598,7 @@ public static class AethernetNavigator
 
         if (DateTime.UtcNow - crossMapStartedAt > CrossMapTimeout)
         {
-            Service.Log.Information("[Aethernet] cross map continuation timed out");
+            Service.Log.Warning("[Aethernet] the cross map continuation timed out, the teleport probably never happened");
             pendingCrossMapPlaceNameId = 0;
             pendingCrossMapTarget = null;
 

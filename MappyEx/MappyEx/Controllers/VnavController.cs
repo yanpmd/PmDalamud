@@ -29,6 +29,11 @@ public static class VnavController
     /// </summary>
     private static readonly TimeSpan MountTimeout = TimeSpan.FromSeconds(5.0);
 
+    /// <summary>
+    /// How long a queued movement may wait for a path that could not be built yet.
+    /// </summary>
+    private static readonly TimeSpan PathRetryTimeout = TimeSpan.FromSeconds(3.0);
+
     private static ICallGateSubscriber<bool>? isReady;
     private static ICallGateSubscriber<Vector3, float, float, Vector3?>? nearestPoint;
     private static ICallGateSubscriber<object>? stop;
@@ -37,6 +42,11 @@ public static class VnavController
     private static Vector3? pendingTarget;
     private static bool pendingFly;
     private static DateTime mountRequestedAt;
+
+    private static Vector3? queuedTarget;
+    private static bool queuedFly;
+    private static DateTime queuedAt;
+    private static TimeSpan queuedTimeout;
 
     private static void EnsureInitialized()
     {
@@ -53,6 +63,7 @@ public static class VnavController
     public static void Stop()
     {
         pendingTarget = null;
+        queuedTarget = null;
 
         try
         {
@@ -135,10 +146,30 @@ public static class VnavController
     }
 
     /// <summary>
+    /// Queue a movement and issue it as soon as the navmesh of the area is available.
+    /// A teleport loads the destination area and the mesh of that area is not there yet, a request in that moment is
+    /// dropped by vnavmesh and the character stands still instead of walking to the target.
+    /// </summary>
+    /// <param name="position">world position to walk to</param>
+    /// <param name="fly">whether the path should fly</param>
+    /// <param name="timeout">how long the request may wait for the navmesh</param>
+    public static void NavigateToWhenReady(Vector3 position, bool fly, TimeSpan timeout)
+    {
+        queuedTarget = position;
+        queuedFly = fly;
+        queuedAt = DateTime.UtcNow;
+        queuedTimeout = timeout;
+
+        Service.Log.Information($"[Vnav] movement queued, waiting for the navmesh: {position} fly={fly} timeout={timeout.TotalSeconds:F0}s");
+    }
+
+    /// <summary>
     /// Called every frame, issues the deferred path once the player actually sits on a mount.
     /// </summary>
     public static void Update()
     {
+        UpdateQueuedMovement();
+
         if (pendingTarget is not { } target) return;
 
         if (DateTime.UtcNow - mountRequestedAt > MountTimeout)
@@ -158,6 +189,42 @@ public static class VnavController
 
         Service.Log.Information($"[Vnav] mounted, issuing {(pendingFly ? "flyto" : "moveto")} to {target}");
         IssueMove(target, pendingFly);
+    }
+
+    /// <summary>
+    /// Issue a queued movement as soon as the navmesh of the area is available.
+    /// </summary>
+    private static void UpdateQueuedMovement()
+    {
+        if (queuedTarget is not { } queued) return;
+
+        if (DateTime.UtcNow - queuedAt > queuedTimeout)
+        {
+            Service.Log.Warning("[Vnav] the navmesh stayed unavailable, the movement was dropped");
+            queuedTarget = null;
+
+            return;
+        }
+
+        // The area is still loading, the mesh of that place is not there yet.
+        if (!IsReady()) return;
+
+        var issued = NavigateTo(queued, queuedFly);
+
+        // A mount is summoned first, that path continues on its own.
+        if (issued || pendingTarget is not null)
+        {
+            queuedTarget = null;
+
+            return;
+        }
+
+        // The mesh is there but no path could be built, a few tries usually fix that.
+        if (DateTime.UtcNow - queuedAt > PathRetryTimeout)
+        {
+            Service.Log.Warning("[Vnav] no path to the target could be built, the movement was dropped");
+            queuedTarget = null;
+        }
     }
 
     /// <summary>

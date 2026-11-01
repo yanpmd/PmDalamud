@@ -56,6 +56,26 @@ public static class LifestreamController
     }
 
     /// <summary>
+    /// Whether Lifestream is installed at all, the aethernet can only be used through it.
+    /// </summary>
+    public static bool IsInstalled()
+    {
+        try
+        {
+            EnsureInitialized();
+
+            // The call throws when the plugin is not loaded, the result itself does not matter.
+            isBusy!.InvokeFunc();
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Move to an aethernet shard inside the current area.
     /// The id variant is preferred, it resolves the destination through Lifestream's name overrides instead of
     /// matching the raw PlaceName text, which does not always equal the entry shown in the aethernet menu.
