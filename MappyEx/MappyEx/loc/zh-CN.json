@@ -223,6 +223,7 @@
   "Marker.InstanceLink": "副本链接 {0}",
   "Marker.NotAttuned": "尚未与以太之光共鸣",
   "Marker.Teleport": "传送至 {0} {1}",
+  "Marker.Aethernet": "以太网络 {0}",
   "Marker.LevelPrefix": "Lv.",
   "Marker.UnknownLevel": "??",
   "Marker.TimeRemainingProgress": "剩余时间：{0}\n进度：{1}%",

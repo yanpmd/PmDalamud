@@ -223,6 +223,7 @@
   "Marker.InstanceLink": "Instance Link {0}",
   "Marker.NotAttuned": "Not attuned to aetheryte",
   "Marker.Teleport": "Teleport to {0} {1}",
+  "Marker.Aethernet": "Aethernet {0}",
   "Marker.LevelPrefix": "Lv. ",
   "Marker.UnknownLevel": "??",
   "Marker.TimeRemainingProgress": "Time Remaining: {0}\nProgress: {1}%",

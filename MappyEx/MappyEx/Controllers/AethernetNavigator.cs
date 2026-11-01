@@ -2,7 +2,6 @@ using System;
 using System.Numerics;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Utility;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using KamiLib.Extensions;
 using Lumina.Excel.Sheets;
 using Mappy.Data;
@@ -32,18 +31,6 @@ public static class AethernetNavigator
     private const float ImmediateTeleportDistance = 4.0f;
     private const float ShardStopDistance = 6.9f;
     private const float AetheryteStopDistance = 10.9f;
-
-    /// <summary>
-    /// Vertical distance beyond which a stepping stone is considered to be on another floor.
-    /// Two decks of a city are usually much further apart than this, while objects on one floor stay well within it.
-    /// </summary>
-    private const float VerticalTolerance = 10.0f;
-
-    /// <summary>
-    /// A shard is only worth hopping to when it is reasonably close to the destination, otherwise the map simply has
-    /// no aethernet network and walking is the answer.
-    /// </summary>
-    private const float ShardSearchRadius = 150.0f;
 
     /// <summary>
     /// Icons the game uses for aetherytes in the map marker sheet, the second one shows up on some maps.
@@ -105,10 +92,10 @@ public static class AethernetNavigator
         // The target lives in another territory. A city is split over several territories that share one aethernet
         // group, those are the same place and must not trigger a teleport.
         var targetTerritory = mapId is 0 ? 0 : Service.DataManager.GetExcelSheet<Map>().GetRow(mapId).TerritoryType.RowId;
+        var targetGroup = targetTerritory is 0 ? 0 : FindAethernetGroupForTerritory(targetTerritory);
 
         if (targetTerritory is not 0 && targetTerritory != Service.ClientState.TerritoryType)
         {
-            var targetGroup = FindAethernetGroupForTerritory(targetTerritory);
             var currentGroup = FindAethernetGroupForTerritory(Service.ClientState.TerritoryType);
 
             if (targetGroup is 0 || targetGroup != currentGroup)
@@ -125,7 +112,10 @@ public static class AethernetNavigator
             Service.Log.Information($"[Aethernet] territory {targetTerritory} shares group {targetGroup} with the player, treating it as the same city");
         }
 
-        if (!TryFindShardNearestTo(target, out var shard, out var shardPosition, out var shardDistance) ||
+        // The shard has to belong to the destination's own city and territory. Every territory has its own coordinate
+        // space and those overlap numerically, so a plain distance search happily picks the shard of a foreign city,
+        // which then teleports the player to that city's aetheryte.
+        if (!TryFindShardNearestTo(target, targetTerritory, targetGroup, out var shard, out var shardPosition, out var shardDistance) ||
             shardDistance > System.SystemConfig.AethernetSearchRadius)
         {
             Service.Log.Information($"[Aethernet] no usable shard near {target}, walking the whole way");
@@ -136,7 +126,7 @@ public static class AethernetNavigator
 
         if (shard is not { } shardRow) return;
 
-        Service.Log.Information($"[Aethernet] shard {shardRow.RowId} at {shardPosition} is the closest to {target}");
+        Service.Log.Information($"[Aethernet] shard {shardRow.RowId} ({GetAetheryteName(shardRow)}) at {shardPosition} is the closest to {target}");
 
         // Standing in range already, teleport and walk the rest.
         if (LifestreamController.GetActiveAetheryte() is not 0)
@@ -197,17 +187,23 @@ public static class AethernetNavigator
         if (Service.ObjectTable.LocalPlayer is not { } player) return false;
 
         var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
-        if (aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == placeNameRowId) is not { } destination) return false;
 
-        if (!TryFindNearestSource(destination.AethernetGroup, player.Position, out var walkSource, out var walkTarget)) return false;
+        // A shard carries the PlaceName row in its aethernet name, a big aetheryte can carry the same name, so the
+        // shard is preferred to make sure the teleport resolves to the aethernet and not to the city gate.
+        var destination = aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == placeNameRowId && !entry.IsAetheryte)
+                          ?? aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == placeNameRowId);
+
+        if (destination is not { } destinationRow) return false;
+
+        if (!TryFindNearestSource(destinationRow.AethernetGroup, player.Position, out var walkSource, out var walkTarget)) return false;
 
         var distance = Vector3.Distance(player.Position, walkTarget);
 
         // Standing on it already, teleport right away instead of requesting a zero length walk.
         if (distance <= ImmediateTeleportDistance)
         {
-            Service.Log.Information($"[Aethernet] already at {walkTarget} ({distance:F1}y), teleporting to {destination.RowId}");
-            LifestreamController.TryAethernetTeleportById(destination.RowId, out _);
+            Service.Log.Information($"[Aethernet] already at {walkTarget} ({distance:F1}y), teleporting to {destinationRow.RowId}");
+            LifestreamController.TryAethernetTeleportById(destinationRow.RowId, out _);
 
             navigated = true;
 
@@ -215,7 +211,7 @@ public static class AethernetNavigator
         }
 
         // Already closest to the destination, walking there completes the request on its own.
-        if (walkSource?.RowId == destination.RowId)
+        if (walkSource?.RowId == destinationRow.RowId)
         {
             Service.Log.Information($"[Aethernet] nearest point is the destination at {walkTarget}, walking there directly");
             VnavController.NavigateTo(walkTarget, fly: false);
@@ -225,9 +221,9 @@ public static class AethernetNavigator
             return false;
         }
 
-        Service.Log.Information($"[Aethernet] walking to source {walkSource?.RowId} at {walkTarget} ({distance:F0}y) before teleporting to {destination.RowId}");
+        Service.Log.Information($"[Aethernet] walking to source {walkSource?.RowId} at {walkTarget} ({distance:F0}y) before teleporting to {destinationRow.RowId}");
         VnavController.NavigateTo(walkTarget, fly: false);
-        QueueTeleportAfterArrival(walkTarget, destination.RowId, walkSource);
+        QueueTeleportAfterArrival(walkTarget, destinationRow.RowId, walkSource);
 
         navigated = true;
 
@@ -570,21 +566,57 @@ public static class AethernetNavigator
 
     /// <summary>
     /// Shard closest to an arbitrary point, used to decide which aethernet hop gets closest to a destination.
+    /// Only shards of the destination's own territory and aethernet group qualify. Every territory has its own
+    /// coordinate space and those overlap numerically, so a plain distance search happily picks the shard of a
+    /// completely different city, and that shard then teleports the player to the aetheryte of that city.
     /// </summary>
-    public static bool TryFindShardNearestTo(Vector3 target, out Aetheryte? shard, out Vector3 position, out float distance)
+    /// <param name="target">world position of the destination</param>
+    /// <param name="targetTerritory">territory the destination is in, 0 when unknown</param>
+    /// <param name="targetGroup">aethernet group of the destination, 0 when unknown</param>
+    public static bool TryFindShardNearestTo(Vector3 target, uint targetTerritory, uint targetGroup, out Aetheryte? shard, out Vector3 position, out float distance)
+    {
+        shard = null;
+        position = default;
+        distance = float.MaxValue;
+
+        // The group of the destination is preferred, but the crystals of a city are not always linked to the same
+        // group, so the second pass takes any shard of the territory when the first one finds nothing.
+        if (FindShard(target, targetTerritory, targetGroup, true, out shard, out position, out distance)) return true;
+
+        return FindShard(target, targetTerritory, targetGroup, false, out shard, out position, out distance);
+    }
+
+    /// <summary>
+    /// Closest shard of the destination's territory.
+    /// </summary>
+    /// <param name="requireGroup">only shards of the given aethernet group qualify</param>
+    private static bool FindShard(Vector3 target, uint targetTerritory, uint targetGroup, bool requireGroup, out Aetheryte? shard, out Vector3 position, out float distance)
     {
         shard = null;
         position = default;
         distance = float.MaxValue;
 
         var found = false;
+        var candidates = 0;
         var nearestDistance = float.MaxValue;
 
         foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
         {
             // Big aetherytes are destinations, not stepping stones, only shards are useful here.
             if (candidate.IsAetheryte) continue;
+
+            // The shard has to sit in the same territory as the destination. Every territory has its own coordinate
+            // space and those overlap numerically, so a plain distance search happily picks the shard of a
+            // completely different city, and the teleport would end the trip there.
+            if (!IsInTerritory(candidate, targetTerritory)) continue;
+
+            // A shard of another group ends the trip at another crystal of the same city.
+            if (requireGroup && targetGroup is not 0 && candidate.AethernetGroup != targetGroup) continue;
+
+            // Measured positions, the marker pixels are less precise and the level rows are unreliable.
             if (!AetheryteLocations.Positions.TryGetValue(candidate.RowId, out var candidatePosition)) continue;
+
+            candidates++;
 
             var candidateDistance = Vector3.Distance(target, candidatePosition);
             if (candidateDistance >= nearestDistance) continue;
@@ -597,7 +629,7 @@ public static class AethernetNavigator
 
         if (found) distance = nearestDistance;
 
-        Service.Log.Information($"[Aethernet] closest shard to {target}: picked={shard?.RowId} at {position} distance={nearestDistance:F0}y");
+        Service.Log.Information($"[Aethernet] closest shard to {target} in territory {targetTerritory} group {targetGroup} (groupOnly={requireGroup}): candidates={candidates} picked={shard?.RowId} ({GetAetheryteName(shard)}) at {position} distance={nearestDistance:F0}y");
 
         return found;
     }
@@ -605,49 +637,26 @@ public static class AethernetNavigator
     /// <summary>
     /// Nearest point of the city the player can walk to. Positions come from the measured coordinate table, the map
     /// markers and the level rows of the sheet are not reliable enough for path finding.
+    /// Only crystals of the player's own territory qualify, the player cannot walk to a crystal of another map.
     /// </summary>
-    public static unsafe bool TryFindNearestSource(uint aethernetGroup, Vector3 position, out Aetheryte? source, out Vector3 sourcePosition)
+    public static bool TryFindNearestSource(uint aethernetGroup, Vector3 position, out Aetheryte? source, out Vector3 sourcePosition)
     {
         source = null;
         sourcePosition = default;
 
-        var agent = AgentMap.Instance();
-        if (agent is null) return false;
-
-        var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
+        var playerTerritory = Service.ClientState.TerritoryType;
 
         var found = false;
         var candidates = 0;
         var nearestDistance = float.MaxValue;
 
-        // Only the aetherytes drawn on the currently displayed map can be walked to. A city spans several maps
-        // (New and Old Gridania for example) that share one aethernet group, and their coordinates overlap in
-        // places, so the sheet alone would happily pick a shard that is actually on the other map.
-        for (var index = 0; index < agent->MapMarkerCount; index++)
+        foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
         {
-            ref var marker = ref agent->MapMarkers[index];
-
-            var dataType = marker.DataType;
-            if (dataType is not (3 or 4)) continue;
-
-            var dataKey = marker.DataKey;
-
-            Aetheryte candidate;
-            if (dataType is 4)
-            {
-                // A shard stores its PlaceName row, the aetheryte row has to be looked up through it.
-                if (aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == dataKey) is not { } shardRow) continue;
-                candidate = shardRow;
-            }
-            else
-            {
-                // A big aetheryte stores its own row directly.
-                var row = aetheryteSheet.GetRow(dataKey);
-                if (row.RowId is 0) continue;
-                candidate = row;
-            }
-
             if (candidate.AethernetGroup != aethernetGroup) continue;
+
+            // The player walks to this crystal, so it has to be in the territory the player stands in. The aetherytes
+            // of the displayed map are no help, the map can show a completely different part of the city.
+            if (!IsInTerritory(candidate, playerTerritory)) continue;
 
             // Measured positions, the marker pixels are less precise and the level rows are unreliable.
             if (!AetheryteLocations.Positions.TryGetValue(candidate.RowId, out var candidatePosition)) continue;
@@ -663,9 +672,45 @@ public static class AethernetNavigator
             found = true;
         }
 
-        Service.Log.Information($"[Aethernet] nearest source on this map, group {aethernetGroup}: candidates={candidates} picked={source?.RowId} at {sourcePosition} distance={nearestDistance:F0}y (origin {position})");
+        Service.Log.Information($"[Aethernet] nearest source in territory {playerTerritory}, group {aethernetGroup}: candidates={candidates} picked={source?.RowId} ({GetAetheryteName(source)}) at {sourcePosition} distance={nearestDistance:F0}y (origin {position})");
 
         return found;
+    }
+
+    /// <summary>
+    /// Whether an aetheryte sits in a territory. The territory row is the authoritative one, the measured coordinates
+    /// of the crystal live in that coordinate space, so a crystal of another territory cannot be walked to.
+    /// </summary>
+    private static bool IsInTerritory(Aetheryte aetheryte, uint territory)
+    {
+        if (territory is 0) return false;
+        if (aetheryte.Territory.RowId == territory) return true;
+
+        // Some rows only list the level and leave the territory empty.
+        if (aetheryte.Territory.RowId is not 0) return false;
+
+        foreach (var levelReference in aetheryte.Level) {
+            if (levelReference.ValueNullable is not { } level) continue;
+            if (level.Territory.RowId == territory) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Display name of an aetheryte, a big one uses its place name and a shard its aethernet name.
+    /// </summary>
+    public static string GetAetheryteName(Aetheryte? aetheryte)
+    {
+        if (aetheryte is not { } row) return string.Empty;
+
+        var name = row.IsAetheryte
+            ? row.PlaceName.ValueNullable?.Name.ExtractText()
+            : row.AethernetName.ValueNullable?.Name.ExtractText();
+
+        if (string.IsNullOrEmpty(name)) name = row.PlaceName.ValueNullable?.Name.ExtractText() ?? row.AethernetName.ValueNullable?.Name.ExtractText();
+
+        return name ?? string.Empty;
     }
 
     /// <summary>

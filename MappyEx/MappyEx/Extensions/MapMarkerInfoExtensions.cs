@@ -166,8 +166,12 @@ public static class MapMarkerInfoExtensions {
         var masterAetheryte = GetAetheryteForAethernet(dataKey);
         if (masterAetheryte is not { } aetheryte) return;
 
-        var shard = Service.DataManager.GetExcelSheet<Aetheryte>()
-            .FirstOrNull(entry => entry.AethernetName.RowId == dataKey);
+        var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
+
+        // A shard carries the PlaceName row in its aethernet name, a big aetheryte can carry the same name, so the
+        // shard is preferred to make sure the aethernet of the clicked marker is used.
+        var shard = aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == dataKey && !entry.IsAetheryte)
+                    ?? aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == dataKey);
 
         // Already in that area, so the player wants to hop between the shards of this city instead of leaving the map.
         if (shard is { } shardRow && IsInSameArea(shardRow)) {
@@ -251,13 +255,12 @@ public static class MapMarkerInfoExtensions {
     private static string GetAethernetTooltip(ref MapMarkerInfo marker) {
         if (marker.DataKey is 0) return string.Empty;
 
-        var aetheryte = GetAetheryteForAethernet(marker.DataKey);
-        if (aetheryte is null) return string.Empty;
-        if (aetheryte.Value.RowId is 0) return string.Empty;
+        // The aethernet node is the destination of the teleport, the big aetheryte of its group is a different place
+        // entirely, so naming that one here is just confusing.
+        var shardName = Service.DataManager.GetExcelSheet<PlaceName>().GetRow(marker.DataKey).Name.ExtractText();
+        if (shardName.Length is 0) return string.Empty;
 
-        var aetherytePlaceName = aetheryte.Value.PlaceName.ValueNullable?.Name.ExtractText() ?? string.Empty;
-
-        return Localization.F("Marker.Teleport", aetherytePlaceName, GetAetheryteTeleportCost(aetheryte.Value.RowId));
+        return Localization.F("Marker.Aethernet", shardName);
     }
 
     /// <summary>
