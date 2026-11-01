@@ -157,11 +157,19 @@ public static unsafe class InventoryTypeExtensions
             InventoryType.RetainerPage6 or
             InventoryType.RetainerPage7;
 
+        public bool IsCompanyChest => inventoryType is
+            InventoryType.FreeCompanyPage1 or
+            InventoryType.FreeCompanyPage2 or
+            InventoryType.FreeCompanyPage3 or
+            InventoryType.FreeCompanyPage4 or
+            InventoryType.FreeCompanyPage5;
+
         public int UIPageSize => inventoryType switch
         {
             _ when (inventoryType.IsMainInventory || inventoryType.IsRetainer) => 35,
             _ when inventoryType.IsSaddleBag => 70,
             _ when inventoryType.IsArmory => 50,
+            _ when inventoryType.IsCompanyChest => 50,
             _ => 0,
         };
 
@@ -171,6 +179,7 @@ public static unsafe class InventoryTypeExtensions
             _ when inventoryType.IsSaddleBag => 2,
             _ when inventoryType.IsArmory => 3,
             _ when inventoryType.IsRetainer => 4,
+            _ when inventoryType.IsCompanyChest => 5,
             _ => 0,
         };
 

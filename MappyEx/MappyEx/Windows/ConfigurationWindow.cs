@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Numerics;
@@ -7,6 +8,8 @@ using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using KamiLib.Classes;
 using KamiLib.CommandManager;
 using KamiLib.Extensions;
@@ -18,12 +21,13 @@ namespace Mappy.Windows;
 
 public class ConfigurationWindow : Window
 {
+    // Ordered from the settings that are touched most often to the ones that are set once and forgotten.
     private readonly TabBar tabBar = new("mappy_tab_bar", [
-        new IconConfigurationTab(),
         new MapFunctionsTab(),
         new StyleOptionsTab(),
-        new PlayerOptionsTab(),
+        new NavigationTab(),
         new MarkerGroupsTab(),
+        new IconConfigurationTab(),
     ]);
 
     public ConfigurationWindow() : base(Localization.Get("Window.Configuration", "Mappy Configuration Window"), new Vector2(500.0f, 580.0f))
@@ -37,19 +41,64 @@ public class ConfigurationWindow : Window
     public void UpdateLocalizedName()
         => WindowName = $"{Localization.Get("Window.Configuration", "Mappy Configuration Window")}##{Service.PluginInterface.InternalName}";
 
-    protected override void DrawContents() => tabBar.Draw();
+    protected override void DrawContents()
+    {
+        tabBar.Draw();
+
+        // Language applies to the whole plugin, keeping it out of a page frees up the first screen of that page.
+        ImGui.Separator();
+        DrawLanguageSelector();
+    }
+
+    private static void DrawLanguageSelector()
+    {
+        var languages = Localization.SupportedLanguages;
+        var currentIndex = Array.FindIndex(languages, entry => entry.Code == System.SystemConfig.Language);
+        if (currentIndex < 0) currentIndex = 0;
+
+        var languageNames = languages.Select(entry => Localization.Get(entry.NameKey)).ToArray();
+
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(Localization.Get("Language.Header", "Language"));
+        ImGui.SameLine();
+
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.5f);
+        if (!ImGui.Combo("##mappy_language", ref currentIndex, languageNames, languageNames.Length)) return;
+
+        System.SystemConfig.Language = languages[currentIndex].Code;
+        Localization.Load(System.SystemConfig.GetLanguageCode());
+        System.RefreshLocalizedText();
+        SystemConfig.Save();
+    }
 }
 
-public class MapFunctionsTab : ITabItem
+/// <summary>
+/// Base for pages whose content can be taller than the window.
+/// Every page scrolls on its own so nothing is silently clipped at the bottom.
+/// </summary>
+public abstract class ScrollableTab : ITabItem
 {
-    public string Name => Localization.Get("Tab.MapFunctions", "Map Functions");
+    public abstract string Name { get; }
 
     public bool Disabled => false;
 
     public void Draw()
     {
-        DrawLanguageSelector();
+        using var content = ImRaii.Child($"{GetType().Name}_scroll", ImGui.GetContentRegionAvail(), false);
+        if (!content) return;
 
+        DrawContents();
+    }
+
+    protected abstract void DrawContents();
+}
+
+public class MapFunctionsTab : ScrollableTab
+{
+    public override string Name => Localization.Get("Tab.MapFunctions", "Map");
+
+    protected override void DrawContents()
+    {
         var configChanged = false;
 
         ImGuiTweaks.Header(Localization.Get("Header.ZoomOptions", "Zoom Options"));
@@ -120,39 +169,35 @@ public class MapFunctionsTab : ITabItem
             configChanged |= ImGui.DragFloat($"{Localization.Get("Config.Opacity", "Opacity")}##toolbar", ref System.SystemConfig.ToolbarFade, 0.01f, 0.0f, 1.0f);
         }
 
+        ImGuiTweaks.Header(Localization.Get("Header.MapBrowser", "Map Browser"));
+        using (ImRaii.PushIndent()) {
+            configChanged |= ImGui.Checkbox(Localization.Get("Config.ShowMapSidebar", "Show Map Browser Sidebar"), ref System.SystemConfig.ShowMapSidebar);
+
+            ImGuiHelpers.ScaledDummy(5.0f);
+            configChanged |= ImGui.DragFloat(Localization.Get("Config.MapSidebarWidth", "Sidebar Width"), ref System.SystemConfig.MapSidebarWidth, 1.0f, 160.0f, 500.0f);
+        }
+
         ImGuiTweaks.Header(Localization.Get("Header.Coordinates", "Coordinates"));
         using (ImRaii.PushIndent()) {
-            configChanged |= ImGui.Checkbox(Localization.Get("Config.ShowCoordinateBar", "Show Coordinate Bar"), ref System.SystemConfig.ShowCoordinateBar);
+            configChanged |= ImGui.Checkbox(Localization.Get("Config.ShowCoordinateBar", "Show Coordinates"), ref System.SystemConfig.ShowCoordinateBar);
 
             ImGuiHelpers.ScaledDummy(5.0f);
             configChanged |= ImGuiTweaks.ColorEditWithDefault(Localization.Get("Config.TextColor", "Text Color"), ref System.SystemConfig.CoordinateTextColor, KnownColor.White.Vector());
 
+
             ImGuiHelpers.ScaledDummy(5.0f);
             configChanged |= ImGui.DragFloat($"{Localization.Get("Config.Opacity", "Opacity")}##coordinatebar", ref System.SystemConfig.CoordinateBarFade, 0.01f, 0.0f, 1.0f);
+
+            ImGuiHelpers.ScaledDummy(10.0f);
+            configChanged |= ImGui.Checkbox(Localization.Get("Config.ShowCoordinateGrid", "Show Coordinate Grid"), ref System.SystemConfig.ShowCoordinateGrid);
+
+            ImGuiHelpers.ScaledDummy(5.0f);
+            configChanged |= ImGuiTweaks.ColorEditWithDefault(Localization.Get("Config.GridColor", "Grid Color"), ref System.SystemConfig.CoordinateGridColor,
+                KnownColor.White.Vector() with { W = 0.25f });
         }
 
         if (configChanged) {
             SystemConfig.Save();
-        }
-    }
-
-    private static void DrawLanguageSelector()
-    {
-        var languages = Localization.SupportedLanguages;
-        var currentIndex = Array.FindIndex(languages, entry => entry.Code == System.SystemConfig.Language);
-        if (currentIndex < 0) currentIndex = 0;
-
-        var languageNames = languages.Select(entry => Localization.Get(entry.NameKey)).ToArray();
-
-        ImGuiTweaks.Header(Localization.Get("Language.Header", "Language"));
-        using (ImRaii.PushIndent()) {
-            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.6f);
-            if (ImGui.Combo("##mappy_language", ref currentIndex, languageNames, languageNames.Length)) {
-                System.SystemConfig.Language = languages[currentIndex].Code;
-                Localization.Load(System.SystemConfig.GetLanguageCode());
-                System.RefreshLocalizedText();
-                SystemConfig.Save();
-            }
         }
     }
 
@@ -177,13 +222,11 @@ public class MapFunctionsTab : ITabItem
     }
 }
 
-public class StyleOptionsTab : ITabItem
+public class StyleOptionsTab : ScrollableTab
 {
-    public string Name => Localization.Get("Tab.Style", "Style");
+    public override string Name => Localization.Get("Tab.Style", "Style");
 
-    public bool Disabled => false;
-
-    public void Draw()
+    protected override void DrawContents()
     {
         var configChanged = false;
 
@@ -259,28 +302,6 @@ public class StyleOptionsTab : ITabItem
                 KnownColor.CornflowerBlue.Vector() with { W = 0.30f });
         }
 
-        if (configChanged) {
-            if (System.MapWindow.SizeConstraints is { } constraints) {
-                System.SystemConfig.WindowSize.X = MathF.Max(System.SystemConfig.WindowSize.X, constraints.MinimumSize.X);
-                System.SystemConfig.WindowSize.Y = MathF.Max(System.SystemConfig.WindowSize.Y, constraints.MinimumSize.Y);
-            }
-
-            System.MapWindow.RefreshTitle();
-            SystemConfig.Save();
-        }
-    }
-}
-
-public class PlayerOptionsTab : ITabItem
-{
-    public string Name => Localization.Get("Tab.Player", "Player");
-
-    public bool Disabled => false;
-
-    public void Draw()
-    {
-        var configChanged = false;
-
         ImGuiTweaks.Header(Localization.Get("Header.ConeOptions", "Cone Options"));
         using (ImRaii.PushIndent()) {
             configChanged |= ImGui.Checkbox(Localization.Get("Config.ScalePlayerCone", "Scale Player Cone"), ref System.SystemConfig.ScalePlayerCone);
@@ -317,18 +338,173 @@ public class PlayerOptionsTab : ITabItem
         }
 
         if (configChanged) {
+            if (System.MapWindow.SizeConstraints is { } constraints) {
+                System.SystemConfig.WindowSize.X = MathF.Max(System.SystemConfig.WindowSize.X, constraints.MinimumSize.X);
+                System.SystemConfig.WindowSize.Y = MathF.Max(System.SystemConfig.WindowSize.Y, constraints.MinimumSize.Y);
+            }
+
+            System.MapWindow.RefreshTitle();
             SystemConfig.Save();
         }
     }
 }
 
-public class MarkerGroupsTab : ITabItem
+public class NavigationTab : ScrollableTab
 {
-    public string Name => Localization.Get("Tab.MarkerGroups", "Marker Groups");
+    public override string Name => Localization.Get("Tab.Navigation", "Navigation");
 
-    public bool Disabled => false;
+    protected override void DrawContents()
+    {
+        var configChanged = false;
 
-    public void Draw()
+        ImGuiTweaks.Header(Localization.Get("Header.AethernetNavigation", "Aethernet Teleporting"));
+        using (ImRaii.PushIndent()) {
+            configChanged |= ImGuiTweaks.Checkbox(Localization.Get("Config.EnableAethernetNavigation", "Use aethernet teleports"),
+                ref System.SystemConfig.EnableAethernetNavigation,
+                Localization.Get("Config.EnableAethernetNavigationTooltip",
+                    "When navigating to a marker, teleport to the closest aethernet shard first and walk the rest instead of covering the whole distance on foot."));
+
+            using (ImRaii.Disabled(!System.SystemConfig.EnableAethernetNavigation)) {
+                ImGuiHelpers.ScaledDummy(5.0f);
+                configChanged |= DrawDistanceSlider(Localization.Get("Config.AethernetSearchRadius", "Shard search radius"),
+                    ref System.SystemConfig.AethernetSearchRadius, 50.0f, 500.0f,
+                    Localization.Get("Config.AethernetSearchRadiusTooltip",
+                        "A shard is only used when it is at least this close to the destination. Maps without an aethernet network simply have no shards nearby."));
+            }
+        }
+
+        ImGuiHelpers.ScaledDummy(5.0f);
+
+        ImGuiTweaks.Header(Localization.Get("Header.Mounting", "Mounting"));
+        using (ImRaii.PushIndent()) {
+            configChanged |= ImGuiTweaks.Checkbox(Localization.Get("Config.AutoMount", "Summon a mount for long trips"),
+                ref System.SystemConfig.AutoMount,
+                Localization.Get("Config.AutoMountTooltip",
+                    "Asks for a mount before navigating, flying paths always need one. Areas that forbid mounting are skipped automatically."));
+
+            using (ImRaii.Disabled(!System.SystemConfig.AutoMount)) {
+                ImGuiHelpers.ScaledDummy(5.0f);
+                configChanged |= DrawDistanceSlider(Localization.Get("Config.AutoMountDistance", "Mount from distance"),
+                    ref System.SystemConfig.AutoMountDistance, 10.0f, 300.0f,
+                    Localization.Get("Config.AutoMountDistanceTooltip",
+                        "Shorter trips are faster on foot, the mount is only summoned beyond this distance."));
+
+                ImGuiHelpers.ScaledDummy(5.0f);
+                configChanged |= DrawMountSelector();
+            }
+        }
+
+        ImGuiHelpers.ScaledDummy(5.0f);
+
+        using (ImRaii.PushIndent()) {
+            ImGui.TextDisabled(Localization.Get("Config.NavigationRequiresVnavmesh", "Both options require the vnavmesh plugin."));
+        }
+
+        if (configChanged) SystemConfig.Save();
+    }
+
+    private static bool DrawDistanceSlider(string label, ref float value, float min, float max, string tooltip)
+    {
+        ImGui.SetNextItemWidth(-1.0f);
+        var changed = ImGui.SliderFloat(label, ref value, min, max, "%.0f");
+
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(tooltip);
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Mount list is read from the sheet once, unlocking a mount while the window is open is rare enough to ignore.
+    /// </summary>
+    private static List<(uint Id, string Name)>? unlockedMounts;
+
+    private static bool DrawMountSelector()
+    {
+        var mounts = GetUnlockedMounts();
+        var current = System.SystemConfig.MountId;
+
+        var preview = Localization.Get("Config.MountAuto", "Automatic (roulette)");
+
+        if (current is not 0)
+        {
+            foreach (var (id, name) in mounts)
+            {
+                if (id != current) continue;
+
+                preview = name;
+
+                break;
+            }
+        }
+
+        var changed = false;
+
+        ImGui.TextUnformatted(Localization.Get("Config.PreferredMount", "Preferred mount"));
+        ImGui.SetNextItemWidth(-1.0f);
+
+        using var combo = ImRaii.Combo("##preferredMount", preview);
+
+        if (combo)
+        {
+            if (ImGui.Selectable(Localization.Get("Config.MountAuto", "Automatic (roulette)"), current is 0))
+            {
+                System.SystemConfig.MountId = 0;
+                changed = true;
+            }
+
+            foreach (var (id, name) in mounts)
+            {
+                if (!ImGui.Selectable($"{name}##mount{id}", current == id)) continue;
+
+                System.SystemConfig.MountId = id;
+                changed = true;
+            }
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(Localization.Get("Config.PreferredMountTooltip",
+                "Mount summoned before long trips. Automatic lets the game pick any unlocked mount, which avoids per mount restrictions."));
+        }
+
+        return changed;
+    }
+
+    private static unsafe List<(uint Id, string Name)> GetUnlockedMounts()
+    {
+        if (unlockedMounts is not null) return unlockedMounts;
+
+        var mounts = new List<(uint Id, string Name)>();
+
+        var playerState = PlayerState.Instance();
+
+        if (playerState is not null)
+        {
+            foreach (var mount in Service.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Mount>())
+            {
+                if (mount.RowId is 0) continue;
+                if (!playerState->IsMountUnlocked((ushort)mount.RowId)) continue;
+
+                var name = mount.Singular.ExtractText();
+                if (name.Length is 0) continue;
+
+                mounts.Add((mount.RowId, name));
+            }
+        }
+
+        mounts.Sort((left, right) => string.CompareOrdinal(left.Name, right.Name));
+
+        unlockedMounts = mounts;
+
+        return mounts;
+    }
+}
+
+public class MarkerGroupsTab : ScrollableTab
+{
+    public override string Name => Localization.Get("Tab.MarkerGroups", "Marker Groups");
+
+    protected override void DrawContents()
     {
         ImGuiTweaks.Header(Localization.Get("MarkerGroups.Header", "Custom Marker Groups"));
 
@@ -441,14 +617,36 @@ public class IconConfigurationTab : ITabItem
 
     private IconSetting? currentSetting;
 
+    /// <summary>
+    /// Icons used by user defined markers, they never show up in the global icon list.
+    /// </summary>
+    private static HashSet<uint> CollectCustomMarkerIconIds()
+    {
+        var iconIds = new HashSet<uint>();
+
+        if (System.CustomMarkerConfig is null) return iconIds;
+
+        foreach (var marker in System.CustomMarkerConfig.BuiltInMarkers) iconIds.Add(marker.DisplayIconId);
+        foreach (var marker in System.CustomMarkerConfig.Markers) iconIds.Add(marker.DisplayIconId);
+
+        iconIds.Remove(0);
+
+        return iconIds;
+    }
+
     public void Draw()
     {
         using (var leftChild = ImRaii.Child("left_child", new Vector2(48.0f * ImGuiHelpers.GlobalScale + ImGui.GetStyle().ItemSpacing.X, ImGui.GetContentRegionAvail().Y))) {
             if (leftChild) {
                 using var selectionList = ImRaii.ListBox("iconSelection", ImGui.GetContentRegionAvail());
 
+                // User defined markers and their groups carry their own icon, size and colour,
+                // they are managed in the marker group tab instead of here.
+                var customIconIds = CollectCustomMarkerIconIds();
+
                 foreach (var (iconId, settings) in System.IconConfig.IconSettingMap.OrderBy(pairData => pairData.Key)) {
                     if (iconId is 0) continue;
+                    if (customIconIds.Contains(iconId)) continue;
                     if (DrawHelpers.IsDisallowedIcon(iconId)) continue;
 
                     var texture = Service.TextureProvider.GetFromGameIcon(iconId).GetWrapOrEmpty();

@@ -6,13 +6,13 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using KamiLib.Configuration;
 using Lumina.Excel.Sheets;
-using Mappy.Classes.SelectionWindowComponents;
+using Mappy.Classes;
 
 namespace Mappy.Data;
 
 public unsafe record Flag(uint Territory, uint Map, float X, float Y, uint IconId)
 {
-    public IDalamudTextureWrap? GetMapTexture() => MapDrawableOption.GetMapTexture(Map);
+    public IDalamudTextureWrap? GetMapTexture() => DrawHelpers.GetMapThumbnail(Map);
 
     public Map GetMap() => Service.DataManager.GetExcelSheet<Map>().GetRow(Map);
 

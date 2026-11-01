@@ -10,6 +10,7 @@ public readonly record struct InventoryLocation(InventoryType Container, ushort 
                            Container.IsSaddleBag ||
                            Container.IsArmory ||
                            Container.IsRetainer ||
+                           Container.IsCompanyChest ||
                            Container == InventoryType.EquippedItems;
 
     public override string ToString() => $"{Container}@{Slot}";

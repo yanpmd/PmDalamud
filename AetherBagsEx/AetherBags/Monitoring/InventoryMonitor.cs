@@ -35,14 +35,17 @@ public class InventoryMonitor : IDisposable
         var saddle = new[] { "InventoryBuddy" };
         var retainer = new[] { "InventoryRetainer", "InventoryRetainerLarge" };
         var armoury = new[] { "ArmouryBoard" };
+        var companyChest = new[] { "FreeCompanyChest" };
 
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, saddle, OnPostSetup);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, retainer, OnPostSetup);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, armoury, OnPostSetup);
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, companyChest, OnPostSetup);
 
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, saddle, OnPreFinalize);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, retainer, OnPreFinalize);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, armoury, OnPreFinalize);
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, companyChest, OnPreFinalize);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, bags, OnInventoryPreFinalize);
 
         // PreRefresh Handlers
@@ -53,6 +56,7 @@ public class InventoryMonitor : IDisposable
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "InventoryBuddy", OnSaddleBagUpdate);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, retainer, OnRetainerInventoryUpdate);
         Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "ArmouryBoard", OnArmouryUpdate);
+        Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, "FreeCompanyChest", OnCompanyChestUpdate);
 
         // The board is only set up once; later "open part X" requests arrive as a
         // plain Show, so hiding and part syncing have to happen there too.
@@ -139,6 +143,19 @@ public class InventoryMonitor : IDisposable
                 }
             }
         }
+
+        if (name.Contains("FreeCompanyChest") && config.OpenCompanyChestWithGameInventory && !vanillaBypassActive)
+        {
+            System.AddonCompanyChestWindow.Open();
+            if (config.HideGameCompanyChest)
+            {
+                var addon = RaptureAtkUnitManager.Instance()->GetAddonByName("FreeCompanyChest");
+                if (addon != null)
+                {
+                    addon->IsVisible = false;
+                }
+            }
+        }
     }
 
     private void CloseInventories(string name)
@@ -146,6 +163,7 @@ public class InventoryMonitor : IDisposable
         if (name.Contains("Retainer")) System.AddonRetainerWindow.Close();
         if (name.Contains("InventoryBuddy")) System.AddonSaddleBagWindow.Close();
         if (name.Contains("ArmouryBoard")) System.AddonArmouryWindow.Close();
+        if (name.Contains("FreeCompanyChest")) System.AddonCompanyChestWindow.Close();
     }
 
     private static bool IsInUnsafeState()
@@ -186,6 +204,11 @@ public class InventoryMonitor : IDisposable
             InventoryType.RetainerPage7,
             InventoryType.RetainerCrystals,
             InventoryType.RetainerEquippedItems,
+            InventoryType.FreeCompanyPage1,
+            InventoryType.FreeCompanyPage2,
+            InventoryType.FreeCompanyPage3,
+            InventoryType.FreeCompanyPage4,
+            InventoryType.FreeCompanyPage5,
         };
         return set;
     }
@@ -213,6 +236,7 @@ public class InventoryMonitor : IDisposable
                 System.AddonSaddleBagWindow?.RefreshFromLifecycle();
                 System.AddonRetainerWindow?.RefreshFromLifecycle();
                 System.AddonArmouryWindow?.RefreshFromLifecycle();
+                System.AddonCompanyChestWindow?.RefreshFromLifecycle();
             });
         }
     }
@@ -357,9 +381,31 @@ public class InventoryMonitor : IDisposable
         System.AddonArmouryWindow?.RefreshFromLifecycle();
     }
 
+    private unsafe void OnCompanyChestUpdate(AddonEvent type, AddonArgs args)
+    {
+        if (IsInUnsafeState())
+            return;
+
+        if (System.Config.General.HideGameCompanyChest)
+        {
+            var unitManager = RaptureAtkUnitManager.Instance();
+            var chestAddon = unitManager != null ? unitManager->GetAddonByName("FreeCompanyChest") : null;
+            if (chestAddon != null)
+            {
+                chestAddon->IsVisible = false;
+            }
+        }
+
+        if (DragDropState.IsDragging)
+            return;
+
+        System.LootedItemsTracker.FlushPendingChanges();
+        System.AddonCompanyChestWindow?.RefreshFromLifecycle();
+    }
+
     public void Dispose()
     {
         Services.GameInventory.InventoryChangedRaw -= OnInventoryChangedRaw;
-        Services.AddonLifecycle.UnregisterListener(OnPostSetup, OnPreFinalize, OnInventoryUpdate, OnSaddleBagUpdate, OnRetainerInventoryUpdate, OnArmouryUpdate, OnArmouryShow, OnInventoryPreFinalize, InventoryPreRefreshHandler);
+        Services.AddonLifecycle.UnregisterListener(OnPostSetup, OnPreFinalize, OnInventoryUpdate, OnSaddleBagUpdate, OnRetainerInventoryUpdate, OnArmouryUpdate, OnArmouryShow, OnCompanyChestUpdate, OnInventoryPreFinalize, InventoryPreRefreshHandler);
     }
 }

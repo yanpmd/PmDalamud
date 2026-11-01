@@ -104,6 +104,9 @@ public static class InventoryAddonContextMenu
 
             if (RetainerState.AreContainersLoaded)
                 actions.Add(CreateCategoryAction("ContextMenu.DepositAllRetainer", () => CategoryTransferQueue.MoveAllToRetainer(items)));
+
+            if (CompanyChestState.AreContainersLoaded)
+                actions.Add(CreateCategoryAction("ContextMenu.DepositAllCompanyChest", () => CategoryTransferQueue.MoveAllToCompanyChest(items)));
         }
         else if (parent.IsRetainerWindow)
         {
@@ -114,6 +117,11 @@ public static class InventoryAddonContextMenu
         {
             if (InventoryScanner.GetFirstEmptySlot(InventorySourceType.MainBags).IsValid)
                 actions.Add(CreateCategoryAction("ContextMenu.WithdrawAllArmoury", () => CategoryTransferQueue.MoveAllFromArmoury(items)));
+        }
+        else if (parent.IsCompanyChestWindow)
+        {
+            if (InventoryScanner.GetFirstEmptySlot(InventorySourceType.MainBags).IsValid)
+                actions.Add(CreateCategoryAction("ContextMenu.WithdrawAllCompanyChest", () => CategoryTransferQueue.MoveAllFromCompanyChest(items)));
         }
 
         if (actions.Count == 0) return;

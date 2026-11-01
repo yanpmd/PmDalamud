@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Mappy.Controllers;
 using Mappy.Data;
 
@@ -41,7 +42,7 @@ public static class MarkerContextMenu
     /// <param name="knownWorldPosition">exact position when the caller owns it, user defined markers for example</param>
     /// <param name="iconChildRelativePosition">center of the drawn icon, used to derive the world position when no exact one is known</param>
     /// <param name="customMarker">the user defined marker being edited, null for markers that do not belong to Mappy</param>
-    public static void Draw(int seed, Vector3? knownWorldPosition, Vector2? iconChildRelativePosition, CustomMarker? customMarker)
+    public static unsafe void Draw(int seed, Vector3? knownWorldPosition, Vector2? iconChildRelativePosition, CustomMarker? customMarker)
     {
         ImGui.PushID(seed);
 
@@ -54,11 +55,11 @@ public static class MarkerContextMenu
                 var worldPosition = knownWorldPosition ?? FromFlatPosition(iconChildRelativePosition is { } iconPosition ? GetWorldPosition(iconPosition) : Vector2.Zero);
 
                 if (ImGui.MenuItem(Localization.Get("CustomMarker.MoveTo", "Go To Marker"))) {
-                    VnavController.NavigateTo(worldPosition, fly: false);
+                    AethernetNavigator.NavigateToMarker(worldPosition, customMarker?.MapId ?? AgentMap.Instance()->SelectedMapId, fly: false);
                 }
 
                 if (ImGui.MenuItem(Localization.Get("CustomMarker.FlyTo", "Fly To Marker"))) {
-                    VnavController.NavigateTo(worldPosition, fly: true);
+                    AethernetNavigator.NavigateToMarker(worldPosition, customMarker?.MapId ?? AgentMap.Instance()->SelectedMapId, fly: true);
                 }
 
                 // Built in group markers are read only, they can only be navigated to.

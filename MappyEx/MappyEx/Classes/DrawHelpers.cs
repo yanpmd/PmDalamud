@@ -1,14 +1,18 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using KamiLib.Classes;
+using Lumina.Excel.Sheets;
 using Mappy.Data;
+using Action = System.Action;
 using SeString = Dalamud.Game.Text.SeStringHandling.SeString;
 
 namespace Mappy.Classes;
@@ -40,6 +44,12 @@ public class MarkerInfo
     /// Bypass the global per icon "allow click" setting, used by markers that are only usable through clicking.
     /// </summary>
     public bool AlwaysAllowInteraction { get; init; }
+
+    /// <summary>
+    /// The marker brings its own icon, scale and colour (user defined markers and their groups), so it must not be
+    /// registered in the global icon settings where the user would have two places to change the same thing.
+    /// </summary>
+    public bool IgnoreIconSettings { get; init; }
 
     /// <summary>
     /// Popup id for the right click menu, handing over an id avoids allocating a closure per marker per frame.
@@ -104,13 +114,8 @@ public static class DrawHelpers
             markerInfo.PrimaryText = () => Localization.F("Marker.DebugIconId", markerInfo.IconId);
         }
 
-        // If this is the first time we have seen this iconId, save it
-        if (System.IconConfig.IconSettingMap.TryAdd(markerInfo.IconId, new IconSetting { IconId = markerInfo.IconId, })) {
-            System.IconConfig.Save();
-        }
-
         // If this icon is disabled, don't even process it
-        if (System.IconConfig.IconSettingMap[markerInfo.IconId] is { Hide: true }) {
+        if (GetIconSetting(markerInfo) is { Hide: true }) {
             return;
         }
 
@@ -127,6 +132,26 @@ public static class DrawHelpers
         DrawIcon(markerInfo);
         ProcessInteractions(markerInfo);
         DrawTooltip(markerInfo);
+    }
+
+    /// <summary>
+    /// Settings for markers that do not participate in the icon list, always the neutral defaults.
+    /// </summary>
+    private static readonly IconSetting DefaultIconSetting = new() { IconId = 0 };
+
+    /// <summary>
+    /// Per icon settings, registering unknown icons on first sight so they show up in the settings window.
+    /// Markers that carry their own appearance skip the registry entirely.
+    /// </summary>
+    private static IconSetting GetIconSetting(MarkerInfo markerInfo)
+    {
+        if (markerInfo.IgnoreIconSettings) return DefaultIconSetting;
+
+        if (System.IconConfig.IconSettingMap.TryAdd(markerInfo.IconId, new IconSetting { IconId = markerInfo.IconId })) {
+            System.IconConfig.Save();
+        }
+
+        return System.IconConfig.IconSettingMap[markerInfo.IconId];
     }
 
     private static unsafe void DrawRadiusUnderlay(MarkerInfo markerInfo)
@@ -159,7 +184,7 @@ public static class DrawHelpers
             iconScale = 0.42f;
         }
 
-        var iconSetting = System.IconConfig.IconSettingMap[markerInfo.IconId];
+        var iconSetting = GetIconSetting(markerInfo);
         var settingScale = iconSetting.Scale * markerInfo.IconScaleMultiplier;
 
         ImGui.SetCursorPos(markerInfo.Position + markerInfo.Offset - texture.Size * iconScale / 2.0f * scale * settingScale);
@@ -223,7 +248,7 @@ public static class DrawHelpers
             }
         }
 
-        if (!markerInfo.AlwaysAllowInteraction && System.IconConfig.IconSettingMap[markerInfo.IconId] is not { AllowClick: true }) return;
+        if (!markerInfo.AlwaysAllowInteraction && GetIconSetting(markerInfo) is not { AllowClick: true }) return;
 
         if (markerInfo is { OnLeftClicked: { } leftClickAction } && ImGui.IsItemClicked(ImGuiMouseButton.Left)) {
             leftClickAction.Invoke();
@@ -232,7 +257,7 @@ public static class DrawHelpers
 
     private static unsafe void DrawTooltip(MarkerInfo markerInfo)
     {
-        if (System.IconConfig.IconSettingMap[markerInfo.IconId] is { AllowTooltip: false } && !DebugMode) {
+        if (GetIconSetting(markerInfo) is { AllowTooltip: false } && !DebugMode) {
             return;
         }
 
@@ -282,4 +307,104 @@ public static class DrawHelpers
             >= 62620 and < 62800 => true,
             _ => false,
         };
+
+    /// <summary>
+    /// Content centers are expensive to compute, the excel sheets do not change while the game is running.
+    /// </summary>
+    private static readonly Dictionary<uint, Vector2?> ContentCenterCache = [];
+
+    /// <summary>
+    /// Loading screen picture of a map, used wherever a map is previewed.
+    /// </summary>
+    public static IDalamudTextureWrap? GetMapThumbnail(uint mapId)
+    {
+        if (mapId is 0) return null;
+
+        var map = Service.DataManager.GetExcelSheet<Map>().GetRow(mapId);
+        if (map.RowId is 0) return null;
+
+        var territory = map.TerritoryType;
+        if (!territory.IsValid) return null;
+
+        var loadingImage = territory.Value.LoadingImage;
+        if (!loadingImage.IsValid) return null;
+
+        return Service.TextureProvider.GetFromGame($"ui/loadingimage/{loadingImage.Value.FileName}_hr1.tex").GetWrapOrDefault();
+    }
+
+    /// <summary>
+    /// Center of the part of the map that actually holds content, in texture pixels.
+    /// Many maps only fill a corner of their texture, centering the texture itself would leave the user on empty background.
+    /// </summary>
+    public static bool TryGetMapContentCenter(uint mapId, out Vector2 center)
+    {
+        center = default;
+
+        if (mapId is 0) return false;
+
+        if (ContentCenterCache.TryGetValue(mapId, out var cached)) {
+            if (cached is not { } cachedCenter) return false;
+
+            center = cachedCenter;
+
+            return true;
+        }
+
+        var map = Service.DataManager.GetExcelSheet<Map>().GetRow(mapId);
+        var computed = TryGetMapContentCenter(map, out var computedCenter) ? computedCenter : (Vector2?)null;
+
+        ContentCenterCache[mapId] = computed;
+
+        if (computed is not { } result) return false;
+
+        center = result;
+
+        return true;
+    }
+
+    private static bool TryGetMapContentCenter(Map map, out Vector2 center)
+    {
+        center = default;
+
+        var markerRange = (uint)map.MapMarkerRange;
+        if (map.RowId is 0 || markerRange is 0) return false;
+
+        var textureSize = GetMapCenterOffsetVector() * 2.0f;
+
+        List<Vector2> namedPlaces = [];
+        List<Vector2> allMarkers = [];
+
+        foreach (var marker in Service.DataManager.GetSubrowExcelSheet<MapMarker>().SelectMany(collection => collection)) {
+            if (marker.RowId != markerRange) continue;
+
+            // Excel marker positions are already map texture pixels, the agent scales them by 16 instead.
+            var position = new Vector2(marker.X, marker.Y);
+            if (position.X < 0.0f || position.Y < 0.0f || position.X > textureSize.X || position.Y > textureSize.Y) continue;
+
+            allMarkers.Add(position);
+
+            // Named places describe where the map is actually used, plain markers can sit far outside the playable part.
+            if (marker.PlaceNameSubtext.RowId is not 0) namedPlaces.Add(position);
+        }
+
+        var candidates = namedPlaces.Count > 0 ? namedPlaces : allMarkers;
+        if (candidates.Count is 0) return false;
+
+        // Median instead of a mean, a single stray marker must not drag the view away from the content.
+        var centerPosition = new Vector2(Median(candidates.Select(position => position.X)), Median(candidates.Select(position => position.Y)));
+
+        center = Vector2.Clamp(centerPosition, Vector2.Zero, textureSize);
+
+        return true;
+    }
+
+    private static float Median(IEnumerable<float> values)
+    {
+        var sorted = values.OrderBy(value => value).ToList();
+        if (sorted.Count is 0) return 0.0f;
+
+        var middle = sorted.Count / 2;
+
+        return sorted.Count % 2 is 0 ? (sorted[middle - 1] + sorted[middle]) / 2.0f : sorted[middle];
+    }
 }

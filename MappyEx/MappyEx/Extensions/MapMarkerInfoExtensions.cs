@@ -134,7 +134,7 @@ public static class MapMarkerInfoExtensions {
 
                 Service.Log.Information($"[Aethernet] out of range, walking to source {source?.RowId} at {sourcePosition} for aetheryte {dataKey}");
                 VnavController.NavigateTo(sourcePosition, fly: false);
-                AethernetNavigator.QueueTeleportAfterArrival(sourcePosition, dataKey);
+                AethernetNavigator.QueueTeleportAfterArrival(sourcePosition, dataKey, source);
 
                 return;
             }
@@ -195,9 +195,12 @@ public static class MapMarkerInfoExtensions {
 
         if (aetheryte.RowId is 0) return;
 
-        if (LifestreamController.TryTeleport(aetheryte.RowId, out _)) return;
+        if (!LifestreamController.TryTeleport(aetheryte.RowId, out _)) {
+            System.Teleporter.Teleport(aetheryte.RowId);
+        }
 
-        System.Teleporter.Teleport(aetheryte.RowId);
+        // The teleport only lands at the big aetheryte of that city, the aethernet part has to follow once loaded.
+        AethernetNavigator.QueueAfterTerritoryChange(dataKey);
     }
 
     private static string GetTooltip(ref MapMarkerInfo marker) {
@@ -312,9 +315,19 @@ public static class MapMarkerInfoExtensions {
             }
         }
 
+        // A city is spread over several territories (Limsa Lower and Upper Decks are 128 and 129) that all share one
+        // aethernet group, so the group resolves the layers that the territory rows cannot.
+        var currentGroup = AethernetNavigator.FindAethernetGroupForTerritory(currentTerritory);
+        if (currentGroup is not 0 && currentGroup == target.AethernetGroup)
+        {
+            Service.Log.Information($"[Aethernet] area=group-territory group={currentGroup} target={target.AethernetGroup} current={currentTerritory}");
+
+            return true;
+        }
+
         // Distance is deliberately not used here, every territory has its own coordinate space and two different
         // cities can be numerically close, which made a cross city click walk instead of teleport.
-        Service.Log.Information($"[Aethernet] area=none currentMap={currentMapId} place={currentPlaceName} territory={target.Territory.RowId} current={currentTerritory}");
+        Service.Log.Information($"[Aethernet] area=none currentMap={currentMapId} place={currentPlaceName} territory={target.Territory.RowId} current={currentTerritory} group={currentGroup}/{target.AethernetGroup}");
 
         return false;
     }

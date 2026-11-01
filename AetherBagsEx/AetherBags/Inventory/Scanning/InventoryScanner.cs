@@ -207,6 +207,7 @@ public static unsafe class InventoryScanner
         InventorySourceType.AllSaddleBags => GetEmptySlotsInContainer(InventorySourceDefinitions.AllSaddleBags),
         InventorySourceType.Retainer => GetEmptySlotsInContainer(InventorySourceDefinitions.Retainer),
         InventorySourceType.Armoury => GetEmptySlotsInContainer(InventorySourceDefinitions.Armoury),
+        InventorySourceType.CompanyChest => GetEmptySlotsInContainer(InventorySourceDefinitions.CompanyChest),
         _ => 0u,
     });
 

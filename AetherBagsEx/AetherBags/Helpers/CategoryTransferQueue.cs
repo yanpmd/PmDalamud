@@ -1,8 +1,11 @@
+using System;
 using System.Collections.Generic;
+using AetherBags.Configuration;
 using AetherBags.Hooks;
 using AetherBags.Inventory;
 using AetherBags.Inventory.Items;
 using AetherBags.Inventory.Scanning;
+using AetherBags.Inventory.State;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AetherBags.Helpers;
@@ -14,6 +17,8 @@ public enum CategoryTransferKind
     ToRetainer,
     FromRetainer,
     FromArmoury,
+    ToCompanyChest,
+    FromCompanyChest,
 }
 
 /// <summary>
@@ -26,10 +31,25 @@ public static class CategoryTransferQueue
 {
     private readonly record struct PendingMove(InventoryType Container, ushort Slot, uint ItemId);
 
+    /// <summary>
+    /// Interval between company chest moves. The server throttles chest operations,
+    /// so a whole category has to be walked slowly instead of one move per tick.
+    /// </summary>
+    private static readonly TimeSpan CompanyChestMoveDelay = TimeSpan.FromSeconds(1);
+
     private static readonly Queue<PendingMove> Pending = new();
     private static CategoryTransferKind _kind;
     private static InventorySourceType _destinationSource;
+    private static InventoryType[]? _destinationContainers;
     private static bool _running;
+    private static int _processed;
+    private static int _total;
+
+    /// <summary>Stacks already dispatched in the current batch.</summary>
+    public static int Processed => _processed;
+
+    /// <summary>Stacks the current batch is trying to move.</summary>
+    public static int Total => _total;
 
     /// <summary>Moves the given items from the player inventory into the saddlebag.</summary>
     public static bool MoveAllToSaddleBag(IEnumerable<ItemInfo> items)
@@ -51,6 +71,14 @@ public static class CategoryTransferQueue
     public static bool MoveAllFromArmoury(IEnumerable<ItemInfo> items)
         => Start(items, CategoryTransferKind.FromArmoury);
 
+    /// <summary>Moves the given items from the player inventory into the company chest.</summary>
+    public static bool MoveAllToCompanyChest(IEnumerable<ItemInfo> items)
+        => Start(items, CategoryTransferKind.ToCompanyChest);
+
+    /// <summary>Takes the given items out of the company chest into the player inventory.</summary>
+    public static bool MoveAllFromCompanyChest(IEnumerable<ItemInfo> items)
+        => Start(items, CategoryTransferKind.FromCompanyChest);
+
     public static bool IsRunning => _running;
 
     private static bool Start(IEnumerable<ItemInfo> items, CategoryTransferKind kind)
@@ -61,10 +89,12 @@ public static class CategoryTransferQueue
         // external sources, ...); only move stacks that sit on the expected side.
         bool IsOnExpectedSide(InventoryType container) => kind switch
         {
-            CategoryTransferKind.ToSaddleBag or CategoryTransferKind.ToRetainer => container.IsMainInventory,
+            CategoryTransferKind.ToSaddleBag or CategoryTransferKind.ToRetainer
+                or CategoryTransferKind.ToCompanyChest => container.IsMainInventory,
             CategoryTransferKind.FromSaddleBag => container.IsSaddleBag,
             CategoryTransferKind.FromRetainer => container.IsRetainer,
             CategoryTransferKind.FromArmoury => container.IsArmory,
+            CategoryTransferKind.FromCompanyChest => container.IsCompanyChest,
             _ => false,
         };
 
@@ -85,8 +115,15 @@ public static class CategoryTransferQueue
         _destinationSource = kind switch
         {
             CategoryTransferKind.ToSaddleBag => InventorySourceType.AllSaddleBags,
+            CategoryTransferKind.ToCompanyChest => InventorySourceType.CompanyChest,
             _ => InventorySourceType.MainBags,
         };
+
+        // The company chest has several independent tabs; deposit into the one the
+        // player is currently looking at instead of the first page with room.
+        _destinationContainers = kind == CategoryTransferKind.ToCompanyChest
+            ? CompanyChestPages.GetContainers(CompanyChestState.CurrentPage)
+            : null;
 
         if (!HasDestinationSlot())
         {
@@ -96,6 +133,9 @@ public static class CategoryTransferQueue
         }
 
         _running = true;
+        _processed = 0;
+        _total = Pending.Count;
+
         Services.Framework.RunOnTick(Step);
         return true;
     }
@@ -104,8 +144,10 @@ public static class CategoryTransferQueue
     {
         CategoryTransferKind.ToSaddleBag => InventoryScanner.GetFirstEmptySlot(InventorySourceType.AllSaddleBags).IsValid,
         CategoryTransferKind.ToRetainer => InventoryScanner.GetFirstEmptySlot(InventorySourceType.Retainer).IsValid,
+        CategoryTransferKind.ToCompanyChest => _destinationContainers is not null
+            && InventoryScanner.GetFirstEmptySlotFromContainers(_destinationContainers).IsValid,
         CategoryTransferKind.FromSaddleBag or CategoryTransferKind.FromRetainer
-            or CategoryTransferKind.FromArmoury
+            or CategoryTransferKind.FromArmoury or CategoryTransferKind.FromCompanyChest
             => InventoryScanner.GetFirstEmptySlot(InventorySourceType.MainBags).IsValid,
         _ => false,
     };
@@ -141,7 +183,8 @@ public static class CategoryTransferQueue
         bool moved = _kind switch
         {
             CategoryTransferKind.ToSaddleBag or CategoryTransferKind.FromSaddleBag
-                or CategoryTransferKind.FromArmoury => MoveViaSlotSwap(next),
+                or CategoryTransferKind.FromArmoury or CategoryTransferKind.ToCompanyChest
+                or CategoryTransferKind.FromCompanyChest => MoveViaSlotSwap(next),
             CategoryTransferKind.ToRetainer => RetainerCommands.TryEntrust(next.Container, next.Slot),
             CategoryTransferKind.FromRetainer => RetainerCommands.TryRetrieve(next.Container, next.Slot),
             _ => false,
@@ -153,12 +196,22 @@ public static class CategoryTransferQueue
             return;
         }
 
-        Services.Framework.RunOnTick(Step);
+        _processed++;
+
+        // The company chest is rate limited server side, one move per second keeps
+        // the batch from being rejected. Other destinations accept one per tick.
+        if (_kind is CategoryTransferKind.ToCompanyChest or CategoryTransferKind.FromCompanyChest)
+            Services.Framework.RunOnTick(Step, CompanyChestMoveDelay);
+        else
+            Services.Framework.RunOnTick(Step);
     }
 
     private static bool MoveViaSlotSwap(PendingMove move)
     {
-        var destination = InventoryScanner.GetFirstEmptySlot(_destinationSource);
+        var destination = _destinationContainers is not null
+            ? InventoryScanner.GetFirstEmptySlotFromContainers(_destinationContainers)
+            : InventoryScanner.GetFirstEmptySlot(_destinationSource);
+
         if (!destination.IsValid)
         {
             Services.Logger.Warning($"[CategoryTransfer] No empty slot available in {_destinationSource}, stopping.");
@@ -172,6 +225,9 @@ public static class CategoryTransferQueue
     private static void Finish()
     {
         _running = false;
+        _destinationContainers = null;
+        _processed = 0;
+        _total = 0;
         Pending.Clear();
         InventoryOrchestrator.RefreshAll(updateMaps: true);
     }

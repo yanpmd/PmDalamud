@@ -12,12 +12,30 @@ public static class LifestreamController
     private static ICallGateSubscriber<uint, bool>? aethernetTeleportById;
     private static ICallGateSubscriber<uint, byte, bool>? teleport;
     private static ICallGateSubscriber<uint>? getActiveAetheryte;
+    private static ICallGateSubscriber<bool>? isBusy;
 
     private static void EnsureInitialized()
     {
         aethernetTeleportById ??= Service.PluginInterface.GetIpcSubscriber<uint, bool>("Lifestream.AethernetTeleportById");
         teleport ??= Service.PluginInterface.GetIpcSubscriber<uint, byte, bool>("Lifestream.Teleport");
         getActiveAetheryte ??= Service.PluginInterface.GetIpcSubscriber<uint>("Lifestream.GetActiveAetheryte");
+        isBusy ??= Service.PluginInterface.GetIpcSubscriber<bool>("Lifestream.IsBusy");
+    }
+
+    /// <summary>
+    /// True while Lifestream is still moving the player, used to wait before starting to walk again.
+    /// </summary>
+    public static bool IsBusy()
+    {
+        try
+        {
+            EnsureInitialized();
+            return isBusy!.InvokeFunc();
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

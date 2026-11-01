@@ -55,7 +55,6 @@ public static class System {
         WindowManager?.GetWindow<FateListWindow>()?.UpdateLocalizedName();
         WindowManager?.GetWindow<QuestListWindow>()?.UpdateLocalizedName();
         WindowManager?.GetWindow<FlagHistoryWindow>()?.UpdateLocalizedName();
-        WindowManager?.GetWindow<MapSelectionWindow>()?.UpdateLocalizedName();
 
         CustomMarkerWindow?.UpdateLocalizedName();
 

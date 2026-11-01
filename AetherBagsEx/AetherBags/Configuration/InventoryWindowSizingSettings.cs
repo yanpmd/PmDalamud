@@ -32,6 +32,7 @@ public readonly record struct InventoryWindowSizingLimits(int SafeMinWidth, int 
     public static InventoryWindowSizingLimits SaddleBag => new(500, 600, 200, 1000);
     public static InventoryWindowSizingLimits Retainer => new(500, 700, 200, 1000);
     public static InventoryWindowSizingLimits Armoury => new(560, 760, 200, 1000);
+    public static InventoryWindowSizingLimits CompanyChest => new(560, 760, 200, 1000);
 }
 
 public static class InventoryWindowSizingDefaults

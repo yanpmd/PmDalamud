@@ -40,8 +40,16 @@ public class MapWindow : Window
     private uint lastSubAreaPlaceNameId;
 
     private readonly MapToolbar mapToolbar = new();
-    private readonly MapCoordinateBar mapCoordinateBar = new();
+    private readonly MapBottomBar mapBottomBar = new();
     private readonly MapContextMenu mapContextMenu = new();
+    private readonly MapSidebar mapSidebar = new();
+    private readonly MapSearchOverlay mapSearch = new();
+
+    /// <summary>
+    /// Sidebar width that is currently added to the window, used to grow and shrink it when the browser opens.
+    /// </summary>
+    private float appliedSidebarWidth;
+    private bool sidebarResizeInitialized;
 
     public MapWindow() : base("###MappyMapWindow", new Vector2(400.0f, 250.0f))
     {
@@ -69,7 +77,7 @@ public class MapWindow : Window
         if (Service.ClientState is { IsLoggedIn: false } or { IsPvP: true }) IsOpen = false;
     }
 
-    public override void OnOpen()
+    public override unsafe void OnOpen()
     {
         if (ProcessingCommand) {
             ProcessingCommand = false;
@@ -89,7 +97,7 @@ public class MapWindow : Window
 
             case CenterTarget.Map:
                 System.SystemConfig.FollowPlayer = false;
-                System.MapRenderer.DrawOffset = Vector2.Zero;
+                System.MapRenderer.CenterOnMapContent(AgentMap.Instance()->SelectedMapId);
                 break;
 
             case CenterTarget.Disabled:
@@ -104,6 +112,8 @@ public class MapWindow : Window
         UpdateStyle();
         UpdateSizePosition();
 
+        System.MapRenderer.UpdateMapCentering();
+
         // Reset every frame, set by any marker that was right clicked during drawing.
         MarkerMenuOpened = false;
 
@@ -113,29 +123,117 @@ public class MapWindow : Window
             HoveredFlags |= HoverFlags.Window;
         }
 
+        UpdateSidebarResize();
+
+        var contentRegion = ImGui.GetContentRegionAvail();
+        var sidebarWidth = System.SystemConfig.ShowMapSidebar ? System.SystemConfig.MapSidebarWidth * ImGuiHelpers.GlobalScale : 0.0f;
+        var mapWidth = contentRegion.X - (sidebarWidth is 0.0f ? 0.0f : sidebarWidth + ImGui.GetStyle().ItemSpacing.X);
+        var mapSize = new Vector2(MathF.Max(mapWidth, 120.0f), contentRegion.Y);
+
         MapDrawOffset = ImGui.GetCursorScreenPos();
         using var fade = ImRaii.PushStyle(ImGuiStyleVar.Alpha, System.SystemConfig.FadePercent, ShouldFade());
-        using (var renderChild = ImRaii.Child("render_child", ImGui.GetContentRegionAvail(), false, ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoScrollbar)) {
+        using (var renderChild = ImRaii.Child("render_child", mapSize, false, ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoScrollbar)) {
             if (!renderChild) return;
+
             if (!System.SystemConfig.AcceptedSpoilerWarning) {
                 DrawSpoilerWarning();
-                return;
             }
+            else {
+                DrawMapElements();
 
-            DrawMapElements();
-
-            // Reset Draw Position for Overlay Extras
-            ImGui.SetCursorPos(Vector2.Zero);
-            DrawToolbar();
-            DrawCoordinateBar();
+                // Reset Draw Position for Overlay Extras
+                ImGui.SetCursorPos(Vector2.Zero);
+                DrawToolbar();
+                DrawBottomBar();
+                DrawMapSearch();
+            }
         }
 
         if (ImGui.IsItemHovered()) {
             HoveredFlags |= HoverFlags.WindowInnerFrame;
         }
 
+        // Read the map clicks before the sidebar becomes the last item of this window.
+        var mapLeftClicked = ImGui.IsItemClicked(ImGuiMouseButton.Left);
+        var mapRightClicked = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+
+        if (sidebarWidth is not 0.0f) {
+            ImGui.SameLine();
+            DrawSidebar(sidebarWidth, contentRegion.Y);
+        }
+
         // Process Inputs
-        ProcessInputs();
+        ProcessInputs(mapLeftClicked, mapRightClicked);
+    }
+
+    /// <summary>
+    /// Opening the browser grows the window by the width of the sidebar, so the visible part of the map keeps
+    /// its size instead of being squeezed. Closing it shrinks the window again.
+    /// </summary>
+    private void UpdateSidebarResize()
+    {
+        var spacing = ImGui.GetStyle().ItemSpacing.X;
+        var targetWidth = System.SystemConfig.ShowMapSidebar ? System.SystemConfig.MapSidebarWidth * ImGuiHelpers.GlobalScale + spacing : 0.0f;
+
+        if (!sidebarResizeInitialized) {
+            sidebarResizeInitialized = true;
+            appliedSidebarWidth = targetWidth;
+
+            return;
+        }
+
+        var change = targetWidth - appliedSidebarWidth;
+        appliedSidebarWidth = targetWidth;
+
+        if (MathF.Abs(change) < 0.5f) return;
+
+        var size = ImGui.GetWindowSize();
+        var minimumWidth = SizeConstraints?.MinimumSize.X ?? 200.0f * ImGuiHelpers.GlobalScale;
+        var width = MathF.Max(size.X + change, minimumWidth);
+
+        // Keep the window on screen when it is dragged all the way to the right edge.
+        var position = ImGui.GetWindowPos();
+        var displaySize = ImGui.GetIO().DisplaySize;
+        if (position.X + width > displaySize.X) position.X = MathF.Max(0.0f, displaySize.X - width);
+
+        ImGui.SetWindowSize(new Vector2(width, size.Y));
+        ImGui.SetWindowPos(position);
+
+        System.SystemConfig.WindowSize = new Vector2(width, size.Y);
+        System.SystemConfig.WindowPosition = position;
+    }
+
+    private void DrawMapSearch()
+    {
+        if (!mapSearch.IsOpen) return;
+
+        mapSearch.Draw();
+
+        if (ImGui.IsItemHovered()) {
+            HoveredFlags |= HoverFlags.Overlay;
+        }
+    }
+
+    private void DrawSidebar(float width, float height)
+    {
+        using var sidebar = ImRaii.Child("map_sidebar", new Vector2(width, height), true);
+        if (!sidebar) return;
+
+        mapSidebar.Draw();
+
+        if (ImGui.IsItemHovered()) {
+            HoveredFlags |= HoverFlags.Sidebar;
+        }
+    }
+
+    public void ToggleMapSearch() => mapSearch.Toggle();
+
+    public bool IsMapSearchOpen => mapSearch.IsOpen;
+
+    public void ToggleSidebar()
+    {
+        System.SystemConfig.ShowMapSidebar = !System.SystemConfig.ShowMapSidebar;
+        SystemConfig.Save();
     }
 
     private void DrawMapElements()
@@ -161,15 +259,18 @@ public class MapWindow : Window
         }
     }
 
-    private void DrawCoordinateBar()
+    private void DrawBottomBar()
     {
-        if (!System.SystemConfig.ShowCoordinateBar) return;
+        // Shares the visibility with the top toolbar.
+        if (!ShouldShowToolbar()) return;
+
+        var isHovered = false;
 
         using (ImRaii.Group()) {
-            mapCoordinateBar.Draw(HoveredFlags.HasFlag(HoverFlags.MapTexture), MapDrawOffset);
+            isHovered = mapBottomBar.Draw(HoveredFlags.HasFlag(HoverFlags.MapTexture), MapDrawOffset);
         }
 
-        if (ImGui.IsItemHovered()) {
+        if (isHovered) {
             HoveredFlags |= HoverFlags.CoordinateBar;
         }
     }
@@ -231,7 +332,7 @@ public class MapWindow : Window
         lastSubAreaPlaceNameId = 0;
     }
 
-    private void ProcessInputs()
+    private void ProcessInputs(bool mapLeftClicked, bool mapRightClicked)
     {
         // A marker opened its own context menu this frame, the map menu has to stay closed.
         if (MarkerMenuOpened) {
@@ -240,7 +341,11 @@ public class MapWindow : Window
             return;
         }
 
-        if (ImGui.IsItemClicked(ImGuiMouseButton.Right)) {
+        // Clicks inside the search box, the browser or the bottom bar belong to them, not to the map.
+        var isOverUi = HoveredFlags.HasFlag(HoverFlags.Overlay) || HoveredFlags.HasFlag(HoverFlags.Sidebar) ||
+                       HoveredFlags.HasFlag(HoverFlags.CoordinateBar);
+
+        if (mapRightClicked && !isOverUi) {
             ImGui.OpenPopup("Mappy_Context_Menu");
         }
         else {
@@ -249,8 +354,11 @@ public class MapWindow : Window
                     Flags &= ~ImGuiWindowFlags.NoMove;
                 }
                 else {
-                    ProcessMouseScroll();
-                    ProcessMapDragStart();
+                    if (!isOverUi) {
+                        ProcessMouseScroll();
+                        ProcessMapDragStart(mapLeftClicked);
+                    }
+
                     Flags |= ImGuiWindowFlags.NoMove;
                 }
             }
@@ -293,7 +401,8 @@ public class MapWindow : Window
             Flags &= ~ImGuiWindowFlags.NoBackground;
         }
 
-        if (Service.KeyState[VirtualKey.ESCAPE] && IsFocused && !IsMapLocked()) {
+        // While the search box is open, escape closes it instead of the map.
+        if (Service.KeyState[VirtualKey.ESCAPE] && IsFocused && !IsMapLocked() && !mapSearch.IsOpen) {
             AgentMap.Instance()->Hide();
         }
 
@@ -365,6 +474,8 @@ public class MapWindow : Window
 
     public override unsafe void OnClose()
     {
+        mapSearch.Close();
+
         AgentMap.Instance()->Hide();
 
         SystemConfig.Save();
@@ -404,11 +515,11 @@ public class MapWindow : Window
         }
     }
 
-    private void ProcessMapDragStart()
+    private void ProcessMapDragStart(bool mapClicked)
     {
         // Don't allow a drag to start if the window size is changing
         if (ImGui.GetWindowSize() == lastWindowSize) {
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left) && !isDragStarted) {
+            if (mapClicked && !isDragStarted) {
                 isDragStarted = true;
                 System.SystemConfig.FollowPlayer = false;
             }
@@ -425,7 +536,7 @@ public class MapWindow : Window
         System.SystemConfig.FadeMode.HasFlag(FadeMode.WhenMoving) && AgentMap.Instance()->IsPlayerMoving ||
         System.SystemConfig.FadeMode.HasFlag(FadeMode.WhenUnFocused) && !IsFocused;
 
-    private void RegisterCommands()
+    private unsafe void RegisterCommands()
     {
         System.CommandManager.RegisterCommand(new ToggleCommandHandler
         {
@@ -513,7 +624,7 @@ public class MapWindow : Window
             Delegate = _ =>
             {
                 System.SystemConfig.FollowPlayer = false;
-                System.MapRenderer.DrawOffset = Vector2.Zero;
+                System.MapRenderer.CenterOnMapContent(AgentMap.Instance()->SelectedMapId);
             },
         });
     }

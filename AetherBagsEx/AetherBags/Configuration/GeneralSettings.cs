@@ -22,6 +22,9 @@ public class GeneralSettings
     public bool HideGameRetainer { get; set; } = false;
     public bool OpenArmouryWithGameInventory { get; set; } = true;
     public bool HideGameArmoury { get; set; } = false;
+    public bool OpenCompanyChestWithGameInventory { get; set; } = true;
+    public bool HideGameCompanyChest { get; set; } = false;
+    public CompanyChestPage CompanyChestPage { get; set; } = CompanyChestPage.Page1;
     public ArmouryPart ArmouryPart { get; set; } = ArmouryPart.MainHand;
     public ArmouryGrouping ArmouryGrouping { get; set; } = ArmouryGrouping.ByRole;
     public bool ShowCategoryItemCount { get; set; } = false;
@@ -39,6 +42,7 @@ public class GeneralSettings
     public InventoryWindowSizingSettings SaddleBagWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.SaddleBag);
     public InventoryWindowSizingSettings RetainerWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Retainer);
     public InventoryWindowSizingSettings ArmouryWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.Armoury);
+    public InventoryWindowSizingSettings CompanyChestWindowSizing { get; set; } = InventoryWindowSizingDefaults.Create(InventoryWindowSizingLimits.CompanyChest);
 }
 
 public enum InventoryStackMode : byte

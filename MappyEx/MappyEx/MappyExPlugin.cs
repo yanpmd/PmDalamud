@@ -90,7 +90,11 @@ public sealed class MappyExPlugin : IDalamudPlugin
 
     private unsafe void OpenMapWindow() => AgentMap.Instance()->Show();
 
-    private static void OnFrameworkUpdate(IFramework framework) => AethernetNavigator.Update();
+    private static void OnFrameworkUpdate(IFramework framework)
+    {
+        VnavController.Update();
+        AethernetNavigator.Update();
+    }
 
     /// <summary>
     /// The plugin was renamed from Mappy to MappyEx, and the configuration directory follows the internal name.

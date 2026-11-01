@@ -28,6 +28,7 @@ public partial class MapRenderer {
                 IconId = iconId,
                 IconScaleMultiplier = marker.DisplayScale,
                 AlwaysAllowInteraction = true,
+                IgnoreIconSettings = true,
                 PrimaryText = marker.PrimaryText,
                 SecondaryText = marker.SecondaryText,
                 OnLeftClicked = marker.ClickAction,

@@ -95,6 +95,7 @@ public class FateListWindow : Window {
         System.IntegrationsController.OpenOccupiedMap();
         System.SystemConfig.FollowPlayer = false;
         System.MapRenderer.DrawOffset = -new Vector2(fate->Location.X, fate->Location.Z);
+        System.MapRenderer.MarkCurrentMapCentered();
 
         if (System.SystemConfig.SetFlagOnFateClick) {
             AgentMap.Instance()->FlagMarkerCount = 0;

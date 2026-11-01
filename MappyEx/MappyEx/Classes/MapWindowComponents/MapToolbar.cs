@@ -11,7 +11,7 @@ using FFXIVClientStructs.Interop;
 using KamiLib.Extensions;
 using KamiLib.Window;
 using Lumina.Excel.Sheets;
-using Mappy.Windows;
+using Mappy.Data;
 using Action = System.Action;
 
 namespace Mappy.Classes.MapWindowComponents;
@@ -36,8 +36,10 @@ public unsafe class MapToolbar {
         new(FontAwesomeIcon.ArrowUp, "up",
             () => Localization.Get("Toolbar.OpenParentMap", "Open Parent Map"), OpenParentMap),
 
+        // Only shown when the selected map actually has other layers to switch to.
         new(FontAwesomeIcon.LayerGroup, "layers",
-            () => Localization.Get("Toolbar.ShowMapLayers", "Show Map Layers"), ShowLayers),
+            () => Localization.Get("Toolbar.ShowMapLayers", "Show Map Layers"), ShowLayers,
+            IsVisible: HasLayers),
 
         new(FontAwesomeIcon.LocationArrow, "follow",
             () => Localization.Get("Toolbar.ToggleFollowPlayer", "Toggle Follow Player"), ToggleFollowPlayer,
@@ -49,14 +51,22 @@ public unsafe class MapToolbar {
         new(FontAwesomeIcon.MapMarked, "centerMap",
             () => Localization.Get("Toolbar.CenterOnMap", "Center on Map"), CenterOnMap),
 
+        new(FontAwesomeIcon.BorderAll, "coordinateGrid",
+            () => Localization.Get("Toolbar.ToggleCoordinateGrid", "Coordinate Grid"), ToggleCoordinateGrid,
+            () => System.SystemConfig.ShowCoordinateGrid),
+
         new(FontAwesomeIcon.Search, "search",
-            () => Localization.Get("Toolbar.SearchForMap", "Search for Map"), OpenSearchWindow),
+            () => Localization.Get("Toolbar.SearchForMap", "Search for Map"), System.MapWindow.ToggleMapSearch,
+            () => System.MapWindow.IsMapSearchOpen),
 
         // Only shown when the selected map actually has marker groups.
         new(FontAwesomeIcon.ListUl, "markerGroups",
             () => Localization.Get("Toolbar.MarkerGroups", "Marker Groups"), MarkerGroupMenu.Open,
             IsVisible: MarkerGroupMenu.HasGroups),
     ];
+
+    private static uint cachedLayerMapId = uint.MaxValue;
+    private static bool cachedHasLayers;
 
     public void Draw() {
         var borderPadding = 2.5f;
@@ -130,6 +140,37 @@ public unsafe class MapToolbar {
 
     private static void ShowLayers() => ImGui.OpenPopup("Mappy_Show_Layers");
 
+    /// <summary>
+    /// Decides if the layer button has anything to offer, using the same rules as the popup below.
+    /// </summary>
+    private static bool HasLayers() {
+        var mapId = AgentMap.Instance()->SelectedMapId;
+        if (mapId is 0) return false;
+
+        var currentMap = Service.DataManager.GetExcelSheet<Map>().GetRow(mapId);
+        if (currentMap.RowId is 0) return false;
+
+        // Region maps list the maps inside them from the marker list, which fills in while the map is open, so this is not cached.
+        if (currentMap.MapType.RowId == 3) {
+            foreach (var marker in AgentMap.Instance()->MapMarkers) {
+                if (DrawHelpers.IsRegionIcon(marker.MapMarker.IconId)) return true;
+            }
+
+            return false;
+        }
+
+        if (cachedLayerMapId == mapId) return cachedHasLayers;
+
+        cachedHasLayers = Service.DataManager.GetExcelSheet<Map>()
+            .Any(eachMap => eachMap.PlaceName.RowId == currentMap.PlaceName.RowId
+                            && eachMap.MapIndex != 0
+                            && eachMap.RowId != currentMap.RowId);
+
+        cachedLayerMapId = mapId;
+
+        return cachedHasLayers;
+    }
+
     private static void ToggleFollowPlayer() {
         System.SystemConfig.FollowPlayer = !System.SystemConfig.FollowPlayer;
 
@@ -150,24 +191,12 @@ public unsafe class MapToolbar {
 
     private static void CenterOnMap() {
         System.SystemConfig.FollowPlayer = false;
-        System.MapRenderer.DrawOffset = Vector2.Zero;
+        System.MapRenderer.CenterOnMapContent(AgentMap.Instance()->SelectedMapId);
     }
 
-    private static void OpenSearchWindow() {
-        System.WindowManager.AddWindow(new MapSelectionWindow {
-            SingleSelectionCallback = selection => {
-                if (selection?.Map != null) {
-                    if (AgentMap.Instance()->SelectedMapId != selection.Map.RowId) {
-                        System.IntegrationsController.OpenMap(selection.Map.RowId);
-                    }
-
-                    if (selection.MarkerLocation is { } location) {
-                        System.SystemConfig.FollowPlayer = false;
-                        System.MapRenderer.DrawOffset = -location + DrawHelpers.GetMapCenterOffsetVector();
-                    }
-                }
-            },
-        }, WindowFlags.OpenImmediately | WindowFlags.RequireLoggedIn);
+    private static void ToggleCoordinateGrid() {
+        System.SystemConfig.ShowCoordinateGrid = !System.SystemConfig.ShowCoordinateGrid;
+        SystemConfig.Save();
     }
 
     private void DrawLayersContextMenu() {
@@ -187,7 +216,7 @@ public unsafe class MapToolbar {
                 if (ImGui.MenuItem(label.ToString())) {
                     System.IntegrationsController.OpenMap(marker.DataKey);
                     System.SystemConfig.FollowPlayer = false;
-                    System.MapRenderer.DrawOffset = Vector2.Zero;
+                    System.MapRenderer.CenterOnMapContent(marker.DataKey);
                 }
             }
         }
@@ -209,7 +238,7 @@ public unsafe class MapToolbar {
                         AgentMap.Instance()->SelectedMapId == layer.RowId)) {
                     System.IntegrationsController.OpenMap(layer.RowId);
                     System.SystemConfig.FollowPlayer = false;
-                    System.MapRenderer.DrawOffset = Vector2.Zero;
+                    System.MapRenderer.CenterOnMapContent(layer.RowId);
                 }
             }
         }

@@ -39,6 +39,9 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     protected TextNode? SlotCounterNode { get; set; }
     protected CircleButtonNode SettingsButtonNode = null!;
 
+    /// <summary>Shows the batch transfer progress while a category move is running.</summary>
+    protected TextNode? TransferProgressNode { get; private set; }
+
     internal ContextMenu ContextMenu = null!;
 
     protected readonly SharedNodePool<InventoryDragDropNode> SharedItemNodePool = new(
@@ -119,6 +122,9 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
 
     /// <summary>True when this window displays the armoury chest.</summary>
     public bool IsArmouryWindow => InventoryState.SourceType == InventorySourceType.Armoury;
+
+    /// <summary>True when this window displays the free company chest.</summary>
+    public bool IsCompanyChestWindow => InventoryState.SourceType == InventorySourceType.CompanyChest;
 
     public string GetSearchText() => SearchInputNode?.SearchString.ExtractText() ?? string.Empty;
 
@@ -646,6 +652,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
             SlotCounterNode.Position = new Vector2(contentSize.X -80f, contentPos.Y + contentSize.Y - footerH + 4f);
         }
 
+        if (TransferProgressNode != null)
+        {
+            TransferProgressNode.Position = new Vector2(contentPos.X + 4f, contentPos.Y + contentSize.Y - footerH + 4f);
+            TransferProgressNode.Size = new Vector2(MathF.Max(0f, contentSize.X - 110f), 18f);
+        }
+
         float gridH = contentSize.Y - ((HasFooter || HasSlotCounter) ? FooterHeight + FooterTopSpacing : 0);
         if (gridH < 0) gridH = 0;
 
@@ -890,6 +902,18 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     {
         ContextMenu = new ContextMenu();
 
+        TransferProgressNode = new TextNode
+        {
+            Size = new Vector2(240f, 18f),
+            AlignmentType = AlignmentType.Left,
+            FontType = FontType.MiedingerMed,
+            TextFlags = TextFlags.Glare,
+            TextColor = ColorHelper.GetColor(50),
+            TextOutlineColor = ColorHelper.GetColor(32),
+            IsVisible = false,
+        };
+        TransferProgressNode.AttachNode(this);
+
         // Re-arm "compact once per open" so a fresh window compacts again.
         CategoriesNode?.ResetCompactPackingGate();
 
@@ -909,6 +933,8 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
 
     protected override void OnUpdate(AtkUnitBase* addon)
     {
+        UpdateTransferProgress();
+
         if (RefreshQueued)
         {
             bool doAutosize = RefreshAutosizeQueued;
@@ -919,6 +945,27 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         }
 
         base.OnUpdate(addon);
+    }
+
+    /// <summary>
+    /// Mirrors the batch transfer queue state into the footer label. The chest is
+    /// rate limited, so a long running move needs visible progress.
+    /// </summary>
+    private void UpdateTransferProgress()
+    {
+        if (TransferProgressNode is null) return;
+
+        bool running = AetherBags.Helpers.CategoryTransferQueue.IsRunning;
+
+        if (TransferProgressNode.IsVisible != running)
+            TransferProgressNode.IsVisible = running;
+
+        if (!running) return;
+
+        TransferProgressNode.String = Localization.F(
+            "Transfer.Progress",
+            AetherBags.Helpers.CategoryTransferQueue.Processed,
+            AetherBags.Helpers.CategoryTransferQueue.Total);
     }
 
     private static bool IsFocusedAddon(AtkUnitBase* addon)
@@ -944,6 +991,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         {
             Services.Logger.Error(ex, "[Inventory] Failed to raise the inventory closed event");
         }
+
+        // The addon is torn down but this object is reused on the next open, so drop
+        // the node reference: a stale one crashes LayoutContent before the new node
+        // is created (its native text node is already gone).
+        TransferProgressNode = null;
+        SlotCounterNode = null;
 
         HoverSubscribed.Clear();
         SearchDebouncer.Dispose();

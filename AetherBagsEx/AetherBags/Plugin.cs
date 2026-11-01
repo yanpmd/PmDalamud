@@ -70,6 +70,14 @@ public class Plugin : IDalamudPlugin
             CreateWindowNode = CreateBagWindowNode,
         };
 
+        System.AddonCompanyChestWindow = new AddonCompanyChestWindow
+        {
+            InternalName = "AetherBagsEx_CompanyChest",
+            Title = Localization.Get("Window.CompanyChest"),
+            Size = new Vector2(750, 750),
+            CreateWindowNode = CreateBagWindowNode,
+        };
+
         System.AddonConfigurationWindow = new AddonConfigurationWindow
         {
             InternalName = "AetherBagsEx_Config",
@@ -144,6 +152,7 @@ public class Plugin : IDalamudPlugin
         System.AddonSaddleBagWindow.Dispose();
         System.AddonRetainerWindow.Dispose();
         System.AddonArmouryWindow.Dispose();
+        System.AddonCompanyChestWindow.Dispose();
         System.AddonConfigurationWindow.Dispose();
         System.AddonChangelogWindow.Dispose();
 
@@ -170,6 +179,7 @@ public class Plugin : IDalamudPlugin
         System.AddonSaddleBagWindow.Close();
         System.AddonRetainerWindow.Close();
         System.AddonArmouryWindow.Close();
+        System.AddonCompanyChestWindow.Close();
         System.AddonConfigurationWindow.Close();
         System.AddonChangelogWindow.Close();
     }

@@ -192,9 +192,10 @@ public unsafe class AddonArmouryWindow : InventoryAddonBase
 
     private void CreatePartBar()
     {
-        // Buttons are owned by the addon and released with it, so a redundant
-        // setup pass must not dispose (and then rebuild) live nodes.
-        if (_partButtons.Count > 0) return;
+        // The addon object is reused across opens and its nodes are destroyed with
+        // the old addon, so drop stale references and rebuild rather than reusing
+        // dead nodes (touching them throws inside the native text node).
+        _partButtons.Clear();
 
         var parts = ArmouryParts.Items;
 
@@ -202,15 +203,18 @@ public unsafe class AddonArmouryWindow : InventoryAddonBase
         {
             var part = parts[i].part;
 
+            // Attach before touching the label: sizing a button forwards to its
+            // label node, which needs a live native node.
             var button = new TextButtonNode
             {
-                Size = new Vector2(20f, PartBarHeight - 2f),
                 String = ArmouryParts.GetShortName(part),
                 OnClick = () => SwitchPart(part),
             };
-            button.LabelNode.FontSize = PartButtonFontSize;
-
             button.AttachNode(this);
+
+            button.LabelNode.FontSize = PartButtonFontSize;
+            button.Size = new Vector2(20f, PartBarHeight - 2f);
+
             _partButtons.Add(button);
         }
 

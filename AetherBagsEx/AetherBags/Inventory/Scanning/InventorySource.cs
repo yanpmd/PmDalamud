@@ -10,6 +10,7 @@ public enum InventorySourceType
     AllSaddleBags,
     Retainer,
     Armoury,
+    CompanyChest,
 }
 
 public static class InventorySourceDefinitions
@@ -74,6 +75,22 @@ public static class InventorySourceDefinitions
         InventoryType.ArmorySoulCrystal,
     ];
 
+    /// <summary>
+    /// The free company chest item containers: up to five chest pages plus the
+    /// crystal tab. Pages the company has not unlocked report a zero sized
+    /// container, so scanning the full set is harmless. Gil is a value, not a
+    /// container.
+    /// </summary>
+    public static readonly InventoryType[] CompanyChest =
+    [
+        InventoryType.FreeCompanyPage1,
+        InventoryType.FreeCompanyPage2,
+        InventoryType.FreeCompanyPage3,
+        InventoryType.FreeCompanyPage4,
+        InventoryType.FreeCompanyPage5,
+        InventoryType.FreeCompanyCrystals,
+    ];
+
     public static InventoryType[] GetInventories(InventorySourceType source) => source switch
     {
         InventorySourceType.MainBags => MainBags,
@@ -82,6 +99,7 @@ public static class InventorySourceDefinitions
         InventorySourceType.AllSaddleBags => AllSaddleBags,
         InventorySourceType.Retainer => Retainer,
         InventorySourceType.Armoury => Armoury,
+        InventorySourceType.CompanyChest => CompanyChest,
         _ => MainBags,
     };
 
@@ -93,6 +111,7 @@ public static class InventorySourceDefinitions
         InventorySourceType.AllSaddleBags => AllSaddleBags,
         InventorySourceType.Retainer => Retainer,
         InventorySourceType.Armoury => Armoury,
+        InventorySourceType.CompanyChest => CompanyChest,
         _ => MainBags,
     };
 
@@ -104,6 +123,7 @@ public static class InventorySourceDefinitions
         InventorySourceType.AllSaddleBags => 140,               // 2 * 35
         InventorySourceType.Retainer => Retainer.Length * 25,   // 7 * 25
         InventorySourceType.Armoury => Armoury.Length * 50,     // 12 * 50
+        InventorySourceType.CompanyChest => CompanyChest.Length * 50, // 5 pages + crystals
         _ => 140,
     };
 }

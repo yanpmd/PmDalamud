@@ -16,6 +16,7 @@ internal sealed class FunctionalConfigurationNode : TabbedVerticalListNode
     private readonly CheckboxNode _hideSaddlebagsCheckboxNode;
     private readonly CheckboxNode _hideRetainerbagsCheckboxNode;
     private readonly CheckboxNode _hideArmouryCheckboxNode;
+    private readonly CheckboxNode _hideCompanyChestCheckboxNode;
     private readonly LabeledEnumDropdownNode<InventoryStackMode> _stackDropDown;
     private readonly CheckboxNode _aggregateUnstackableCheckboxNode = null!;
 
@@ -168,6 +169,36 @@ internal sealed class FunctionalConfigurationNode : TabbedVerticalListNode
             }
         };
         AddNode(armouryGroupingDropDown);
+
+        var showCompanyChestWithGameCheckBox = new CheckboxNode
+        {
+            Size = Size with { Y = 18 },
+            IsVisible = true,
+            String = Localization.Get("Functional.AutoOpenCompanyChest"),
+            IsChecked = config.OpenCompanyChestWithGameInventory,
+            OnClick = isChecked =>
+            {
+                config.OpenCompanyChestWithGameInventory = isChecked;
+                _hideCompanyChestCheckboxNode?.IsEnabled = isChecked;
+            }
+        };
+        AddNode(showCompanyChestWithGameCheckBox);
+
+        AddTab(1);
+        _hideCompanyChestCheckboxNode = new CheckboxNode
+        {
+            Size = Size with { Y = 18 },
+            IsVisible = true,
+            String = Localization.Get("Functional.HideGameCompanyChest"),
+            IsEnabled = config.OpenCompanyChestWithGameInventory,
+            IsChecked = config.HideGameCompanyChest,
+            OnClick = isChecked =>
+            {
+                config.HideGameCompanyChest = isChecked;
+            }
+        };
+        AddNode(_hideCompanyChestCheckboxNode);
+        SubtractTab(1);
 
         var linkItemCheckBox = new CheckboxNode
         {

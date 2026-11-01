@@ -1,42 +1,193 @@
 using System;
 using System.Numerics;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using KamiLib.Extensions;
-using Lumina.Excel;
 using Lumina.Excel.Sheets;
-using Mappy.Classes;
+using Mappy.Data;
 
 namespace Mappy.Controllers;
 
 /// <summary>
 /// Lifestream only accepts an aethernet teleport while the player stands near an aetheryte or one of its shards.
-/// When a destination is clicked from out of range, this walks the player to the nearest usable point of the same
-/// city and asks Lifestream again once the player is in range, instead of silently failing.
+/// This drives the "walk to a shard, teleport, walk on" chain, and keeps the bookkeeping for a cross map teleport
+/// that still needs an aethernet hop once the new map is loaded.
 /// </summary>
 public static class AethernetNavigator
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan TeleportStartupDelay = TimeSpan.FromSeconds(1.0);
+
+    /// <summary>
+    /// Lifestream can keep its busy flag set after a teleport, never wait longer than this before walking anyway.
+    /// </summary>
+    private static readonly TimeSpan TeleportBusyTimeout = TimeSpan.FromSeconds(6.0);
 
     /// <summary>
     /// The game accepts the aetheryte interaction a few meters away from it, walking precisely onto it is not needed
-    /// and vnavmesh often stops next to it.
+    /// and vnavmesh often stops next to it. A big aetheryte is a much larger object, so vnavmesh keeps a wider
+    /// distance from it and needs its own, larger threshold.
     /// </summary>
-    private const float ArrivalDistance = 5.0f;
+    private const float ImmediateTeleportDistance = 4.0f;
+    private const float ShardStopDistance = 6.9f;
+    private const float AetheryteStopDistance = 10.9f;
+
+    /// <summary>
+    /// Vertical distance beyond which a stepping stone is considered to be on another floor.
+    /// Two decks of a city are usually much further apart than this, while objects on one floor stay well within it.
+    /// </summary>
+    private const float VerticalTolerance = 10.0f;
+
+    /// <summary>
+    /// A shard is only worth hopping to when it is reasonably close to the destination, otherwise the map simply has
+    /// no aethernet network and walking is the answer.
+    /// </summary>
+    private const float ShardSearchRadius = 150.0f;
+
+    /// <summary>
+    /// Icons the game uses for aetherytes in the map marker sheet, the second one shows up on some maps.
+    /// </summary>
+    private const ushort AetheryteIcon = 60453;
+    private const ushort AetheryteIconAlt = 60959;
 
     private static uint pendingAetheryteRowId;
     private static Vector3 pendingWalkTarget;
+    private static float pendingStopDistance = ShardStopDistance;
     private static uint startedTerritory;
     private static DateTime startedAt;
 
+    /// <summary>
+    /// Where to walk after the queued teleport finished, lets one click chain "teleport, then walk the rest".
+    /// </summary>
+    private static Vector3? pendingFinalTarget;
+    private static bool pendingFinalFly;
+    private static DateTime teleportIssuedAt;
+    private static DateTime lastFinalWalkLog;
+
+    /// <summary>
+    /// Used to log the arrival check only when it flips instead of every frame.
+    /// </summary>
+    private static bool lastReportedInRange;
+
+    private static readonly TimeSpan CrossMapTimeout = TimeSpan.FromSeconds(60);
+    private static uint pendingCrossMapPlaceNameId;
+    private static Vector3? pendingCrossMapTarget;
+    private static bool pendingCrossMapFly;
+    private static uint crossMapOriginTerritory;
+    private static DateTime crossMapStartedAt;
+
     public static bool IsRunning => pendingAetheryteRowId is not 0;
+
+    /// <summary>
+    /// Navigate to an arbitrary point: teleport to the shard closest to it, then walk the remaining distance.
+    /// Targets on another map first teleport into that map and continue from there.
+    /// Plain walking is used whenever no usable shard exists or Lifestream refused the request.
+    /// </summary>
+    /// <param name="target">world position to end up at</param>
+    /// <param name="mapId">Map row the target belongs to, 0 when unknown</param>
+    /// <param name="fly">whether the final walking leg should fly</param>
+    public static void NavigateToMarker(Vector3 target, uint mapId, bool fly)
+    {
+        Cancel();
+
+        if (Service.ObjectTable.LocalPlayer is not { } player) return;
+        if (Service.Condition[ConditionFlag.InCombat]) return;
+
+        // Aethernet shortcuts are optional, walking plus a mount is the plain vnavmesh route.
+        if (!System.SystemConfig.EnableAethernetNavigation)
+        {
+            VnavController.NavigateTo(target, fly);
+
+            return;
+        }
+
+        // The target lives in another territory. A city is split over several territories that share one aethernet
+        // group, those are the same place and must not trigger a teleport.
+        var targetTerritory = mapId is 0 ? 0 : Service.DataManager.GetExcelSheet<Map>().GetRow(mapId).TerritoryType.RowId;
+
+        if (targetTerritory is not 0 && targetTerritory != Service.ClientState.TerritoryType)
+        {
+            var targetGroup = FindAethernetGroupForTerritory(targetTerritory);
+            var currentGroup = FindAethernetGroupForTerritory(Service.ClientState.TerritoryType);
+
+            if (targetGroup is 0 || targetGroup != currentGroup)
+            {
+                Service.Log.Information($"[Aethernet] territory {targetTerritory} (group {targetGroup}) differs from {Service.ClientState.TerritoryType} (group {currentGroup}), teleporting over");
+
+                if (TryTeleportToTerritory(mapId, target, fly)) return;
+
+                VnavController.NavigateTo(target, fly);
+
+                return;
+            }
+
+            Service.Log.Information($"[Aethernet] territory {targetTerritory} shares group {targetGroup} with the player, treating it as the same city");
+        }
+
+        if (!TryFindShardNearestTo(target, out var shard, out var shardPosition, out var shardDistance) ||
+            shardDistance > System.SystemConfig.AethernetSearchRadius)
+        {
+            Service.Log.Information($"[Aethernet] no usable shard near {target}, walking the whole way");
+            VnavController.NavigateTo(target, fly);
+
+            return;
+        }
+
+        if (shard is not { } shardRow) return;
+
+        Service.Log.Information($"[Aethernet] shard {shardRow.RowId} at {shardPosition} is the closest to {target}");
+
+        // Standing in range already, teleport and walk the rest.
+        if (LifestreamController.GetActiveAetheryte() is not 0)
+        {
+            var teleportStarted = LifestreamController.TryAethernetTeleportById(shardRow.RowId, out var available);
+
+            if (available && teleportStarted)
+            {
+                QueueFinalWalk(target, fly);
+                Service.Log.Information($"[Aethernet] teleporting to {shardRow.RowId}, then walking to {target}");
+
+                return;
+            }
+
+            // Installed but refused, most likely a shard of another city, walking is all that is left.
+            if (available)
+            {
+                Service.Log.Information($"[Aethernet] teleport to {shardRow.RowId} refused, walking to {target}");
+                VnavController.NavigateTo(target, fly);
+
+                return;
+            }
+        }
+
+        if (!TryFindNearestSource(shardRow.AethernetGroup, player.Position, out var walkSource, out var walkTarget))
+        {
+            VnavController.NavigateTo(target, fly);
+
+            return;
+        }
+
+        // The closest point the player can walk to is that shard, which means the target already sits next to it.
+        if (walkSource?.RowId == shardRow.RowId)
+        {
+            Service.Log.Information($"[Aethernet] shard {shardRow.RowId} is also the closest walkable point, walking to {target}");
+            VnavController.NavigateTo(target, fly);
+
+            return;
+        }
+
+        Service.Log.Information($"[Aethernet] walking to {walkTarget}, teleporting to {shardRow.RowId}, then walking to {target}");
+        VnavController.NavigateTo(walkTarget, fly: false);
+        QueueTeleportAfterArrival(walkTarget, shardRow.RowId, walkSource, target, fly);
+    }
 
     /// <summary>
     /// Walk to the closest point of the destination city and teleport to the destination once in range.
     /// When that point already is the destination the player is simply sent there and no teleport follows.
     /// </summary>
     /// <param name="placeNameRowId">destination shard, matches the marker data key</param>
-    /// <param name="navigated">true when a walk was started, independent of whether a teleport follows</param>
+    /// <param name="navigated">true when something was started, independent of whether a teleport follows</param>
     /// <returns>true when a teleport is queued for after arrival</returns>
     public static bool Begin(uint placeNameRowId, out bool navigated)
     {
@@ -48,19 +199,23 @@ public static class AethernetNavigator
         var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
         if (aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == placeNameRowId) is not { } destination) return false;
 
-        if (!TryFindNearestSource(destination.AethernetGroup, player.Position, out var walkSource, out var walkTarget))
-        {
-            walkSource = FindNearestSourceFromSheet(aetheryteSheet, destination.AethernetGroup, player.Position);
-            if (walkSource is not { } fallback) return false;
-            if (GetClosestLevelPosition(fallback, player.Position) is not { } fallbackPosition) return false;
+        if (!TryFindNearestSource(destination.AethernetGroup, player.Position, out var walkSource, out var walkTarget)) return false;
 
-            walkTarget = fallbackPosition;
+        var distance = Vector3.Distance(player.Position, walkTarget);
+
+        // Standing on it already, teleport right away instead of requesting a zero length walk.
+        if (distance <= ImmediateTeleportDistance)
+        {
+            Service.Log.Information($"[Aethernet] already at {walkTarget} ({distance:F1}y), teleporting to {destination.RowId}");
+            LifestreamController.TryAethernetTeleportById(destination.RowId, out _);
+
+            navigated = true;
+
+            return false;
         }
 
-        var walkSourceId = walkSource?.RowId ?? 0;
-
         // Already closest to the destination, walking there completes the request on its own.
-        if (walkSourceId == destination.RowId)
+        if (walkSource?.RowId == destination.RowId)
         {
             Service.Log.Information($"[Aethernet] nearest point is the destination at {walkTarget}, walking there directly");
             VnavController.NavigateTo(walkTarget, fly: false);
@@ -70,11 +225,9 @@ public static class AethernetNavigator
             return false;
         }
 
-        var distance = Vector3.Distance(player.Position, walkTarget);
-
-        Service.Log.Information($"[Aethernet] walking to source {walkSourceId} at {walkTarget} ({distance:F0}y) before teleporting to {destination.RowId}");
+        Service.Log.Information($"[Aethernet] walking to source {walkSource?.RowId} at {walkTarget} ({distance:F0}y) before teleporting to {destination.RowId}");
         VnavController.NavigateTo(walkTarget, fly: false);
-        QueueTeleportAfterArrival(walkTarget, destination.RowId);
+        QueueTeleportAfterArrival(walkTarget, destination.RowId, walkSource);
 
         navigated = true;
 
@@ -82,31 +235,211 @@ public static class AethernetNavigator
     }
 
     /// <summary>
-    /// Queue a teleport that fires once the player reaches <paramref name="walkTarget"/>.
-    /// Kept separate from <see cref="Begin"/> because the point the player walks to and the teleport target can differ,
-    /// a big aetheryte for example is a valid teleport destination but is reached through a nearby shard.
+    /// Queue a teleport that fires once the player reaches <paramref name="walkTarget"/>, optionally followed by a walk.
     /// </summary>
-    public static void QueueTeleportAfterArrival(Vector3 walkTarget, uint teleportTargetRowId)
+    /// <param name="walkTarget">where to walk to</param>
+    /// <param name="teleportTargetRowId">aetheryte to teleport to once there</param>
+    /// <param name="walkSource">the object being walked to, decides how close is considered close enough</param>
+    /// <param name="finalTarget">optional point to walk to after the teleport finished</param>
+    /// <param name="finalFly">whether that last walk should fly</param>
+    public static void QueueTeleportAfterArrival(Vector3 walkTarget, uint teleportTargetRowId, Aetheryte? walkSource,
+        Vector3? finalTarget = null, bool finalFly = false)
     {
         pendingAetheryteRowId = teleportTargetRowId;
         pendingWalkTarget = walkTarget;
+        pendingStopDistance = GetStopDistance(walkSource);
         startedTerritory = Service.ClientState.TerritoryType;
         startedAt = DateTime.UtcNow;
+
+        pendingFinalTarget = finalTarget;
+        pendingFinalFly = finalFly;
+
+        Service.Log.Information($"[Aethernet] queued walk to {walkTarget}, teleport to {teleportTargetRowId}, stopDistance={pendingStopDistance:F1}, final={(finalTarget is { } final ? final.ToString() : "none")}");
     }
+
+    /// <summary>
+    /// Walk to a point once the already issued teleport finished.
+    /// </summary>
+    public static void QueueFinalWalk(Vector3 target, bool fly)
+    {
+        pendingFinalTarget = target;
+        pendingFinalFly = fly;
+        teleportIssuedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// A cross map teleport lands at the big aetheryte of that city. Remember the real destination so the aethernet and
+    /// walking part can run after the map finished loading, the same way a chained task would do it.
+    /// </summary>
+    /// <param name="placeNameRowId">shard that was clicked, 0 when only a coordinate is known</param>
+    /// <param name="target">coordinate to walk to after arriving</param>
+    /// <param name="fly">whether that walk should fly</param>
+    public static void QueueAfterTerritoryChange(uint placeNameRowId, Vector3? target = null, bool fly = false)
+    {
+        pendingCrossMapPlaceNameId = placeNameRowId;
+        pendingCrossMapTarget = target;
+        pendingCrossMapFly = fly;
+        crossMapOriginTerritory = Service.ClientState.TerritoryType;
+        crossMapStartedAt = DateTime.UtcNow;
+
+        Service.Log.Information($"[Aethernet] queued cross map continuation: shard={placeNameRowId} target={target} originTerritory={crossMapOriginTerritory} fly={fly}");
+    }
+
+    /// <summary>
+    /// Teleport into the territory of the target. Every territory has its own coordinate space, so the city has to be
+    /// resolved through the sheet instead of by comparing world positions.
+    /// </summary>
+    private static bool TryTeleportToTerritory(uint mapId, Vector3 target, bool fly)
+    {
+        var map = Service.DataManager.GetExcelSheet<Map>().GetRow(mapId);
+        if (map.RowId is 0) return false;
+
+        // The map marker sheet lists every aetheryte placed on that map, which is far more reliable than deriving
+        // the city from the territory row, those are split across several rows per city.
+        var gate = FindAetheryteOnMap(map, target);
+
+        if (gate is null)
+        {
+            var targetTerritory = map.TerritoryType.RowId;
+            var group = FindAethernetGroupForTerritory(targetTerritory);
+            gate = FindGateForGroup(group);
+
+            Service.Log.Information($"[Aethernet] no aetheryte marker on map {mapId}, falling back to territory {targetTerritory} group {group} -> gate {gate?.RowId}");
+        }
+
+        if (gate is not { } gateRow) return false;
+
+        Service.Log.Information($"[Aethernet] cross map via aetheryte {gateRow.RowId}, then continuing to {target}");
+
+        if (!LifestreamController.TryTeleport(gateRow.RowId, out _))
+        {
+            System.Teleporter.Teleport(gateRow.RowId);
+        }
+
+        QueueAfterTerritoryChange(0, target, fly);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Aetheryte closest to the target among the ones the map itself declares.
+    /// The map marker sheet stores the icons of a map, an aetheryte icon carries the Aetheryte row as its data key.
+    /// </summary>
+    private static Aetheryte? FindAetheryteOnMap(Map map, Vector3 target)
+    {
+        var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
+
+        Aetheryte? nearest = null;
+        var nearestDistance = float.MaxValue;
+
+        foreach (var markerRow in Service.DataManager.GetSubrowExcelSheet<MapMarker>())
+        {
+            if (markerRow.RowId != map.MapMarkerRange) continue;
+
+            foreach (var marker in markerRow)
+            {
+                // 60453 is the regular aetheryte icon, 60959 the alternate one used on some maps.
+                if (marker.Icon is not (AetheryteIcon or AetheryteIconAlt)) continue;
+
+                var aetheryteId = marker.DataKey.RowId;
+                if (aetheryteId is 0) continue;
+
+                var row = aetheryteSheet.GetRow(aetheryteId);
+                if (row.RowId is 0) continue;
+
+                // The map marker sheet uses plain map pixels, unlike the runtime markers which are scaled by 16.
+                var worldPosition = MapPixelsToWorld(map, marker.X, marker.Y);
+                var distance = Vector3.Distance(target, worldPosition);
+                if (distance >= nearestDistance) continue;
+
+                nearestDistance = distance;
+                nearest = row;
+            }
+        }
+
+        if (nearest is { } found)
+        {
+            Service.Log.Information($"[Aethernet] map {map.RowId} declares aetheryte {found.RowId} at {nearestDistance:F0}y from the target");
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Aethernet group of a territory, resolved through any aetheryte that sits there.
+    /// Shards are checked as well because a city is split over several territories and the big aetheryte only
+    /// belongs to one of them.
+    /// </summary>
+    public static uint FindAethernetGroupForTerritory(uint territory)
+    {
+        foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
+        {
+            if (candidate.AethernetGroup is 0) continue;
+            if (candidate.Territory.RowId == territory) return candidate.AethernetGroup;
+
+            foreach (var levelReference in candidate.Level)
+            {
+                if (levelReference.ValueNullable is not { } level) continue;
+                if (level.Territory.RowId != territory) continue;
+
+                return candidate.AethernetGroup;
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Big aetheryte that serves as the entry point of an aethernet group.
+    /// </summary>
+    private static Aetheryte? FindGateForGroup(uint aethernetGroup)
+    {
+        foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
+        {
+            if (!candidate.IsAetheryte) continue;
+            if (candidate.AethernetGroup != aethernetGroup) continue;
+
+            return candidate;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// A big aetheryte is a much larger object, vnavmesh stops further away from it than from a small shard.
+    /// </summary>
+    private static float GetStopDistance(Aetheryte? source)
+        => source is { IsAetheryte: true } ? AetheryteStopDistance : ShardStopDistance;
 
     public static void Cancel()
     {
         pendingAetheryteRowId = 0;
         pendingWalkTarget = default;
+        pendingStopDistance = ShardStopDistance;
         startedTerritory = 0;
         startedAt = default;
+
+        pendingFinalTarget = null;
+        pendingFinalFly = false;
+        teleportIssuedAt = default;
+        lastFinalWalkLog = default;
+        lastReportedInRange = false;
+
+        pendingCrossMapPlaceNameId = 0;
+        pendingCrossMapTarget = null;
+        pendingCrossMapFly = false;
+        crossMapOriginTerritory = 0;
+        crossMapStartedAt = default;
     }
 
     /// <summary>
-    /// Called every frame, issues the queued teleport as soon as the player is close enough to the walk target.
+    /// Called every frame, drives the teleport chain, its final walk and the cross map continuation.
     /// </summary>
     public static void Update()
     {
+        UpdateCrossMapContinuation();
+        UpdateFinalWalk();
+
         if (pendingAetheryteRowId is 0) return;
 
         if (Service.Condition[ConditionFlag.InCombat] ||
@@ -126,27 +459,152 @@ public static class AethernetNavigator
         if (Service.ObjectTable.LocalPlayer is not { } player) return;
 
         // GetActiveAetheryte does not update reliably while the map is open, so the distance is the primary check.
-        var inRange = LifestreamController.GetActiveAetheryte() is not 0 ||
-                      Vector3.Distance(player.Position, pendingWalkTarget) <= ArrivalDistance;
+        var activeAetheryte = LifestreamController.GetActiveAetheryte();
+        var distanceToTarget = Vector3.Distance(player.Position, pendingWalkTarget);
+        var inRange = activeAetheryte is not 0 || distanceToTarget <= pendingStopDistance;
+
+        // Log only when the state flips, printing this every frame would flood the log.
+        if (inRange != lastReportedInRange)
+        {
+            Service.Log.Information($"[Aethernet] inRange={inRange} activeAetheryte={activeAetheryte} player={player.Position} walkTarget={pendingWalkTarget} distance={distanceToTarget:F1} stopDistance={pendingStopDistance:F1}");
+            lastReportedInRange = inRange;
+        }
 
         if (!inRange) return;
 
         var destination = pendingAetheryteRowId;
         var distance = Vector3.Distance(player.Position, pendingWalkTarget);
 
-        Cancel();
-
         // The walk was only a means to get in range, stop it so the player does not keep running after the teleport.
         VnavController.Stop();
 
         Service.Log.Information($"[Aethernet] arrived ({distance:F1}y), teleporting to {destination}");
         LifestreamController.TryAethernetTeleportById(destination, out _);
+
+        pendingAetheryteRowId = 0;
+        teleportIssuedAt = DateTime.UtcNow;
     }
 
     /// <summary>
-    /// Nearest point of the group that the player can actually walk to.
-    /// Both shards (data type 4, key is a PlaceName row) and big aetherytes (data type 3, key is an Aetheryte row)
-    /// qualify, the game accepts the interaction from either of them.
+    /// Walks to the final target once Lifestream finished moving the player.
+    /// </summary>
+    private static void UpdateFinalWalk()
+    {
+        if (pendingFinalTarget is not { } final) return;
+
+        // Still walking towards the shard, the teleport has not been issued yet and its timestamp is meaningless.
+        if (pendingAetheryteRowId is not 0) return;
+
+        var waited = DateTime.UtcNow - teleportIssuedAt;
+
+        // Give Lifestream a moment to pick the request up before its busy flag is meaningful.
+        if (waited < TeleportStartupDelay) return;
+
+        var busy = LifestreamController.IsBusy();
+        var betweenAreas = Service.Condition[ConditionFlag.BetweenAreas];
+
+        if (busy || betweenAreas)
+        {
+            // The busy flag can stay set long after the teleport finished, walking must not be blocked forever.
+            if (waited < TeleportBusyTimeout)
+            {
+                if (DateTime.UtcNow - lastFinalWalkLog > TimeSpan.FromSeconds(2.0))
+                {
+                    lastFinalWalkLog = DateTime.UtcNow;
+                    Service.Log.Information($"[Aethernet] waiting for the teleport to settle: busy={busy} betweenAreas={betweenAreas} waited={waited.TotalSeconds:F1}s");
+                }
+
+                return;
+            }
+
+            Service.Log.Warning($"[Aethernet] teleport still busy after {waited.TotalSeconds:F1}s, walking anyway");
+        }
+
+        pendingFinalTarget = null;
+
+        Service.Log.Information($"[Aethernet] teleport finished, walking to {final}");
+        VnavController.NavigateTo(final, pendingFinalFly);
+    }
+
+    /// <summary>
+    /// Runs the aethernet half of a cross map teleport once the new map has loaded.
+    /// </summary>
+    private static void UpdateCrossMapContinuation()
+    {
+        if (pendingCrossMapPlaceNameId is 0 && pendingCrossMapTarget is null) return;
+
+        if (DateTime.UtcNow - crossMapStartedAt > CrossMapTimeout)
+        {
+            Service.Log.Information("[Aethernet] cross map continuation timed out");
+            pendingCrossMapPlaceNameId = 0;
+            pendingCrossMapTarget = null;
+
+            return;
+        }
+
+        // Still on the loading screen, or the teleport has not started yet.
+        if (Service.Condition[ConditionFlag.BetweenAreas]) return;
+        if (Service.ClientState.TerritoryType == crossMapOriginTerritory) return;
+
+        // Wait for the navmesh, otherwise the walk would be rejected right after loading.
+        if (!VnavController.IsReady()) return;
+
+        var destination = pendingCrossMapPlaceNameId;
+        var target = pendingCrossMapTarget;
+        var fly = pendingCrossMapFly;
+
+        pendingCrossMapPlaceNameId = 0;
+        pendingCrossMapTarget = null;
+
+        if (target is { } coordinate)
+        {
+            Service.Log.Information($"[Aethernet] arrived in the new territory, continuing to {coordinate}");
+            NavigateToMarker(coordinate, 0, fly);
+
+            return;
+        }
+
+        Service.Log.Information($"[Aethernet] arrived in the new territory, continuing with aethernet to {destination}");
+        Begin(destination, out _);
+    }
+
+    /// <summary>
+    /// Shard closest to an arbitrary point, used to decide which aethernet hop gets closest to a destination.
+    /// </summary>
+    public static bool TryFindShardNearestTo(Vector3 target, out Aetheryte? shard, out Vector3 position, out float distance)
+    {
+        shard = null;
+        position = default;
+        distance = float.MaxValue;
+
+        var found = false;
+        var nearestDistance = float.MaxValue;
+
+        foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
+        {
+            // Big aetherytes are destinations, not stepping stones, only shards are useful here.
+            if (candidate.IsAetheryte) continue;
+            if (!AetheryteLocations.Positions.TryGetValue(candidate.RowId, out var candidatePosition)) continue;
+
+            var candidateDistance = Vector3.Distance(target, candidatePosition);
+            if (candidateDistance >= nearestDistance) continue;
+
+            nearestDistance = candidateDistance;
+            shard = candidate;
+            position = candidatePosition;
+            found = true;
+        }
+
+        if (found) distance = nearestDistance;
+
+        Service.Log.Information($"[Aethernet] closest shard to {target}: picked={shard?.RowId} at {position} distance={nearestDistance:F0}y");
+
+        return found;
+    }
+
+    /// <summary>
+    /// Nearest point of the city the player can walk to. Positions come from the measured coordinate table, the map
+    /// markers and the level rows of the sheet are not reliable enough for path finding.
     /// </summary>
     public static unsafe bool TryFindNearestSource(uint aethernetGroup, Vector3 position, out Aetheryte? source, out Vector3 sourcePosition)
     {
@@ -156,129 +614,86 @@ public static class AethernetNavigator
         var agent = AgentMap.Instance();
         if (agent is null) return false;
 
-        var mapScale = DrawHelpers.GetMapScaleFactor();
-        if (mapScale is 0.0f) return false;
-
-        var mapOffset = DrawHelpers.GetRawMapOffsetVector();
         var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
 
         var found = false;
+        var candidates = 0;
         var nearestDistance = float.MaxValue;
 
+        // Only the aetherytes drawn on the currently displayed map can be walked to. A city spans several maps
+        // (New and Old Gridania for example) that share one aethernet group, and their coordinates overlap in
+        // places, so the sheet alone would happily pick a shard that is actually on the other map.
         for (var index = 0; index < agent->MapMarkerCount; index++)
         {
             ref var marker = ref agent->MapMarkers[index];
 
-            // Copy out of the reference first, a ref local can not be captured by the lookups below.
             var dataType = marker.DataType;
+            if (dataType is not (3 or 4)) continue;
+
             var dataKey = marker.DataKey;
-            var markerPosition = new Vector2(marker.MapMarker.X, marker.MapMarker.Y);
 
-            Aetheryte? candidate = null;
-
+            Aetheryte candidate;
             if (dataType is 4)
             {
-                candidate = aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == dataKey);
+                // A shard stores its PlaceName row, the aetheryte row has to be looked up through it.
+                if (aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == dataKey) is not { } shardRow) continue;
+                candidate = shardRow;
             }
-            else if (dataType is 3)
+            else
             {
+                // A big aetheryte stores its own row directly.
                 var row = aetheryteSheet.GetRow(dataKey);
-                if (row.RowId is not 0) candidate = row;
+                if (row.RowId is 0) continue;
+                candidate = row;
             }
 
-            if (candidate is not { } candidateRow) continue;
-            if (candidateRow.AethernetGroup != aethernetGroup) continue;
+            if (candidate.AethernetGroup != aethernetGroup) continue;
 
-            var flat = markerPosition / 16.0f / mapScale + mapOffset;
-            var candidatePosition = new Vector3(flat.X, position.Y, flat.Y);
+            // Measured positions, the marker pixels are less precise and the level rows are unreliable.
+            if (!AetheryteLocations.Positions.TryGetValue(candidate.RowId, out var candidatePosition)) continue;
+
+            candidates++;
 
             var distance = Vector3.Distance(position, candidatePosition);
             if (distance >= nearestDistance) continue;
 
             nearestDistance = distance;
-            source = candidateRow;
+            source = candidate;
             sourcePosition = candidatePosition;
             found = true;
         }
+
+        Service.Log.Information($"[Aethernet] nearest source on this map, group {aethernetGroup}: candidates={candidates} picked={source?.RowId} at {sourcePosition} distance={nearestDistance:F0}y (origin {position})");
 
         return found;
     }
 
     /// <summary>
-    /// Fallback when the map does not expose any usable marker, for example while the map is still loading.
+    /// Convert a map marker sheet position (plain map pixels, 0 to 2048) into world coordinates.
+    /// Mirrors the conversion the game uses, the runtime map markers store the same value scaled by 16.
     /// </summary>
-    private static Aetheryte? FindNearestSourceFromSheet(ExcelSheet<Aetheryte> aetheryteSheet, uint aethernetGroup, Vector3 playerPosition)
+    private static Vector3 MapPixelsToWorld(Map map, float x, float y)
     {
-        Aetheryte? nearest = null;
-        var nearestDistance = float.MaxValue;
+        var scale = map.SizeFactor / 100.0f;
 
-        foreach (var candidate in aetheryteSheet)
-        {
-            if (candidate.AethernetGroup != aethernetGroup) continue;
-
-            if (GetClosestLevelPosition(candidate, playerPosition) is not { } candidatePosition) continue;
-
-            var distance = Vector3.Distance(playerPosition, candidatePosition);
-            if (distance >= nearestDistance) continue;
-
-            nearestDistance = distance;
-            nearest = candidate;
-        }
-
-        return nearest;
+        return new Vector3(
+            (x / scale) - map.OffsetX - (1024.0f / scale),
+            0.0f,
+            (y / scale) - map.OffsetY - (1024.0f / scale));
     }
 
     /// <summary>
-    /// Position of an aetheryte as the player sees it on the map.
-    /// The level rows of the sheet do not necessarily point at the object itself, so the marker the game draws is used
-    /// for the horizontal position and the sheet only for the height.
+    /// Position of an aetheryte as the player sees it in the world.
     /// </summary>
-    public static unsafe Vector3? ResolvePosition(Aetheryte shard, Vector3 playerPosition)
+    public static Vector3? ResolvePosition(Aetheryte aetheryte, Vector3 playerPosition)
     {
-        var levelPosition = GetClosestLevelPosition(shard, playerPosition);
+        if (AetheryteLocations.Positions.TryGetValue(aetheryte.RowId, out var position)) return position;
 
-        if (TryGetMapMarkerPosition(shard.AethernetName.RowId, shard.RowId) is { } mapPosition) {
-            return new Vector3(mapPosition.X, levelPosition?.Y ?? playerPosition.Y, mapPosition.Y);
-        }
-
-        return levelPosition;
+        return GetClosestLevelPosition(aetheryte, playerPosition);
     }
 
     /// <summary>
-    /// Turn the position of the marker the game draws for an aetheryte into world coordinates,
-    /// mirrors the conversion used while drawing.
-    /// </summary>
-    private static unsafe Vector2? TryGetMapMarkerPosition(uint placeNameRowId, uint aetheryteRowId)
-    {
-        var agent = AgentMap.Instance();
-        if (agent is null) return null;
-
-        var mapScale = DrawHelpers.GetMapScaleFactor();
-        if (mapScale is 0.0f) return null;
-
-        var mapOffset = DrawHelpers.GetRawMapOffsetVector();
-
-        for (var index = 0; index < agent->MapMarkerCount; index++) {
-            ref var marker = ref agent->MapMarkers[index];
-
-            // Shards carry the PlaceName row as key, big aetherytes carry their own row id.
-            var matches = marker.DataType switch {
-                4 => marker.DataKey == placeNameRowId,
-                3 => marker.DataKey == aetheryteRowId,
-                _ => false,
-            };
-
-            if (!matches) continue;
-
-            return new Vector2(marker.MapMarker.X, marker.MapMarker.Y) / 16.0f / mapScale + mapOffset;
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// A shard can reference several level rows, some of which are not the shard itself. Picking the closest one is
-    /// the safest way to get a height that is near the player.
+    /// Fallback for rows the coordinate table does not cover, picks the level row closest to the player.
     /// </summary>
     private static Vector3? GetClosestLevelPosition(Aetheryte aetheryte, Vector3 playerPosition)
     {

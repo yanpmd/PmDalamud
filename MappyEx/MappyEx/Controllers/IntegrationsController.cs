@@ -276,6 +276,9 @@ public unsafe class IntegrationsController : IDisposable
 
         System.SystemConfig.FollowPlayer = false;
         System.MapRenderer.DrawOffset = -coordinates;
+
+        // The marker is the reason the map was opened, do not let the automatic centering move it away again.
+        System.MapRenderer.MarkCurrentMapCentered();
     }
 
     private static void CenterOnMarker(MapMarkerData marker)
@@ -285,6 +288,8 @@ public unsafe class IntegrationsController : IDisposable
 
         System.SystemConfig.FollowPlayer = false;
         System.MapRenderer.DrawOffset = -coordinates;
+
+        System.MapRenderer.MarkCurrentMapCentered();
     }
 
     public static bool ShouldShowMap()

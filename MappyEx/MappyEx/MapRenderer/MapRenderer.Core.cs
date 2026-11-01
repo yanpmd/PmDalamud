@@ -24,6 +24,18 @@ public unsafe partial class MapRenderer : IDisposable
     public Vector2 DrawOffset { get; set; }
     public Vector2 DrawPosition { get; private set; }
 
+    /// <summary>
+    /// Map the draw offset was last positioned for, used to notice map switches.
+    /// </summary>
+    private uint centeredMapId;
+
+    /// <summary>
+    /// Position inside a map that should be centered as soon as the game shows that map.
+    /// </summary>
+    private (uint MapId, Vector2 Position)? pendingFocus;
+
+    private int pendingFocusAge;
+
     private IDalamudTextureWrap? blendedTexture;
     private string blendedPath = string.Empty;
 
@@ -39,7 +51,78 @@ public unsafe partial class MapRenderer : IDisposable
 
     public void CenterOnGameObject(IGameObject obj) => CenterOnCoordinate(new Vector2(obj.Position.X, obj.Position.Z));
 
-    public void CenterOnCoordinate(Vector2 coord) => DrawOffset = -coord * DrawHelpers.GetMapScaleFactor() + DrawHelpers.GetMapOffsetVector();
+    public void CenterOnCoordinate(Vector2 coord)
+    {
+        DrawOffset = -coord * DrawHelpers.GetMapScaleFactor() + DrawHelpers.GetMapOffsetVector();
+
+        centeredMapId = AgentMap.Instance()->SelectedMapId;
+    }
+
+    /// <summary>
+    /// Centers on a specific position of a map, used when a place inside the map was picked.
+    /// The position is reapplied once the game actually switched to that map, it lags behind the click.
+    /// </summary>
+    public void RequestTextureFocus(uint mapId, Vector2 texturePosition)
+    {
+        pendingFocus = (mapId, texturePosition);
+        pendingFocusAge = 0;
+
+        DrawOffset = DrawHelpers.GetMapCenterOffsetVector() - texturePosition;
+        centeredMapId = mapId;
+    }
+
+    /// <summary>
+    /// Keeps the automatic centering from moving a view that was placed on purpose, like a quest or flag marker.
+    /// </summary>
+    public void MarkMapCentered(uint mapId) => centeredMapId = mapId;
+
+    public void MarkCurrentMapCentered() => centeredMapId = AgentMap.Instance()->SelectedMapId;
+
+    /// <summary>
+    /// Centers on the part of the map that actually holds content, many maps only fill a corner of their texture.
+    /// </summary>
+    public void CenterOnMapContent(uint mapId)
+    {
+        DrawOffset = DrawHelpers.TryGetMapContentCenter(mapId, out var center)
+            ? DrawHelpers.GetMapCenterOffsetVector() - center
+            : Vector2.Zero;
+
+        centeredMapId = mapId;
+    }
+
+    /// <summary>
+    /// Re-centers the view after the game switched to another map, so a map does not open on empty background.
+    /// </summary>
+    public void UpdateMapCentering()
+    {
+        var mapId = AgentMap.Instance()->SelectedMapId;
+
+        if (pendingFocus is { } focus && focus.MapId == mapId) {
+            DrawOffset = DrawHelpers.GetMapCenterOffsetVector() - focus.Position;
+            centeredMapId = mapId;
+            pendingFocus = null;
+
+            return;
+        }
+
+        if (pendingFocus is not null) {
+            // Waiting for the game to switch maps, give up if that never happens.
+            if (pendingFocusAge++ < 300) return;
+
+            pendingFocus = null;
+        }
+
+        if (mapId == centeredMapId) return;
+
+        // Following the player and the locked center mode both position the map on their own.
+        if (System.SystemConfig.FollowPlayer || System.SystemConfig.LockCenterOnMap) {
+            centeredMapId = mapId;
+
+            return;
+        }
+
+        CenterOnMapContent(mapId);
+    }
 
     public void DrawBaseTexture()
     {
@@ -52,6 +135,7 @@ public unsafe partial class MapRenderer : IDisposable
     public void DrawDynamicElements()
     {
         DrawFogOfWar();
+        DrawCoordinateGrid();
         DrawMapMarkers();
     }
 

@@ -70,6 +70,7 @@ public unsafe class UnacceptedQuestsTabItem : ITabItem
 
                         var mapOffsetVector = DrawHelpers.GetMapOffsetVector();
                         System.MapRenderer.DrawOffset = -marker.Position.AsMapVector() * AgentMap.Instance()->SelectedMapSizeFactorFloat + mapOffsetVector;
+                        System.MapRenderer.MarkMapCentered(marker.MapId);
                     }
 
                     ImGui.SetCursorScreenPos(cursorStart);
@@ -117,6 +118,7 @@ public unsafe class AcceptedQuestsTabItem : ITabItem
                         System.IntegrationsController.OpenMap(marker.MapId);
                         System.SystemConfig.FollowPlayer = false;
                         System.MapRenderer.DrawOffset = -marker.Position.AsMapVector();
+                        System.MapRenderer.MarkMapCentered(marker.MapId);
                     }
 
                     var iconId = marker.IconId switch

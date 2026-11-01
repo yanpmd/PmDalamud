@@ -43,6 +43,31 @@ public class SystemConfig : CharacterConfiguration
 {
     public string Language = "Auto";
     public float ZoomSpeed = 0.25f;
+
+    /// <summary>
+    /// When navigating to a marker, hop to the closest aethernet shard instead of walking the whole way.
+    /// </summary>
+    public bool EnableAethernetNavigation = true;
+
+    /// <summary>
+    /// How far a shard may be from the destination before the aethernet network is considered useless for that map.
+    /// </summary>
+    public float AethernetSearchRadius = 150.0f;
+
+    /// <summary>
+    /// Summon a mount before long trips, short ones are faster on foot.
+    /// </summary>
+    public bool AutoMount = true;
+
+    /// <summary>
+    /// Distance from which a mount is worth summoning.
+    /// </summary>
+    public float AutoMountDistance = 50.0f;
+
+    /// <summary>
+    /// Preferred mount row id, 0 asks the mount roulette and lets the game pick whatever is available.
+    /// </summary>
+    public uint MountId;
     public float IconScale = 0.50f;
     public bool ShowMiscTooltips = true;
 
@@ -73,6 +98,8 @@ public class SystemConfig : CharacterConfiguration
     public Vector2 WindowSize = new(500.0f, 500.0f);
     public bool AlwaysShowToolbar = false;
     public bool ShowToolbarOnHover = true;
+    public bool ShowMapSidebar = false;
+    public float MapSidebarWidth = 260.0f;
     public bool ScaleWithZoom = true;
     public bool AcceptedSpoilerWarning = false;
     public Vector4 AreaColor = KnownColor.CornflowerBlue.Vector() with { W = 0.33f };
@@ -84,6 +111,8 @@ public class SystemConfig : CharacterConfiguration
     public bool CenterOnQuest = true;
     public bool LockCenterOnMap = false;
     public bool ShowCoordinateBar = true;
+    public bool ShowCoordinateGrid = false;
+    public Vector4 CoordinateGridColor = KnownColor.White.Vector() with { W = 0.25f };
     public float ToolbarFade = 0.33f;
     public float CoordinateBarFade = 0.66f;
     public Vector4 CoordinateTextColor = KnownColor.White.Vector();

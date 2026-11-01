@@ -17,6 +17,7 @@ internal sealed class WindowSizingConfigurationNode : TabbedVerticalListNode
         new("Sizing.Saddlebags", config => config.SaddleBagWindowSizing, InventoryWindowSizingLimits.SaddleBag),
         new("Sizing.Retainers", config => config.RetainerWindowSizing, InventoryWindowSizingLimits.Retainer),
         new("Sizing.Armoury", config => config.ArmouryWindowSizing, InventoryWindowSizingLimits.Armoury),
+        new("Sizing.CompanyChest", config => config.CompanyChestWindowSizing, InventoryWindowSizingLimits.CompanyChest),
     ];
 
     private readonly Action? _onLayoutChanged;

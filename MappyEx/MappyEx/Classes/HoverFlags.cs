@@ -11,6 +11,8 @@ public enum HoverFlags
     CoordinateBar = 1 << 2,
     Window = 1 << 3,
     WindowInnerFrame = 1 << 4,
+    Overlay = 1 << 5,
+    Sidebar = 1 << 6,
 }
 
 public static class HoverFlagsExtensions

@@ -72,6 +72,7 @@ public static class StylePresets
             System.AddonSaddleBagWindow,
             System.AddonRetainerWindow,
             System.AddonArmouryWindow,
+            System.AddonCompanyChestWindow,
         };
 
         foreach (var window in windows)
