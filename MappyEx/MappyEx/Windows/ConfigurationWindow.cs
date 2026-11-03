@@ -557,10 +557,10 @@ public class MarkerGroupsTab : ScrollableTab
                 ImGui.SameLine();
 
                 // No step buttons here, they would eat the whole field.
-                var iconId = (int)group.IconId;
+                var iconId = (int)Math.Min(group.IconId, IconHelper.MaxIconId);
                 ImGui.SetNextItemWidth(iconIdWidth);
                 if (ImGui.InputInt("##groupIcon", ref iconId)) {
-                    group.IconId = (uint)Math.Max(1, iconId);
+                    group.IconId = IconHelper.Clamp(iconId);
                     MarkerGroups.InvalidateCache();
                 }
 
@@ -570,12 +570,16 @@ public class MarkerGroupsTab : ScrollableTab
 
                 ImGui.SameLine();
 
-                if (group.IconId is not 0) {
-                    var texture = Service.TextureProvider.GetFromGameIcon(group.IconId).GetWrapOrEmpty();
+                if (IconHelper.GetTexture(group.IconId) is { } texture) {
                     ImGui.Image(texture.Handle, new Vector2(previewSize, previewSize));
                 }
                 else {
                     ImGui.Dummy(new Vector2(previewSize, previewSize));
+                }
+
+                // The id does not exist, every marker of the group would be drawn without an icon.
+                if (!IconHelper.IsValid(group.IconId)) {
+                    ImGui.TextColored(KnownColor.Orange.Vector(), Localization.Get("CustomGroup.InvalidIconId", "This icon id does not exist."));
                 }
 
                 ImGui.SameLine();
@@ -649,14 +653,20 @@ public class IconConfigurationTab : ITabItem
                     if (customIconIds.Contains(iconId)) continue;
                     if (DrawHelpers.IsDisallowedIcon(iconId)) continue;
 
-                    var texture = Service.TextureProvider.GetFromGameIcon(iconId).GetWrapOrEmpty();
+                    var texture = IconHelper.GetTexture(iconId);
                     var cursorStart = ImGui.GetCursorScreenPos();
                     if (ImGui.Selectable($"##iconSelect{iconId}", currentSetting == settings, ImGuiSelectableFlags.None, ImGuiHelpers.ScaledVector2(32.0f, 32.0f))) {
                         currentSetting = currentSetting == settings ? null : settings;
                     }
 
                     ImGui.SetCursorScreenPos(cursorStart);
-                    ImGui.Image(texture.Handle, texture.Size / 2.0f * ImGuiHelpers.GlobalScale);
+
+                    if (texture is not null) {
+                        ImGui.Image(texture.Handle, texture.Size / 2.0f * ImGuiHelpers.GlobalScale);
+                    }
+                    else {
+                        ImGui.Dummy(ImGuiHelpers.ScaledVector2(16.0f, 16.0f));
+                    }
                 }
             }
         }
@@ -674,7 +684,7 @@ public class IconConfigurationTab : ITabItem
                 else {
                     // Draw background texture
                     var settingsChanged = false;
-                    var texture = Service.TextureProvider.GetFromGameIcon(currentSetting.IconId).GetWrapOrEmpty();
+                    var texture = IconHelper.GetTexture(currentSetting.IconId);
                     var smallestAxis = MathF.Min(ImGui.GetContentRegionAvail().X, ImGui.GetContentRegionAvail().Y);
 
                     if (ImGui.GetContentRegionAvail().X > ImGui.GetContentRegionAvail().Y) {
@@ -682,7 +692,13 @@ public class IconConfigurationTab : ITabItem
                         ImGui.SetCursorPosX(remainingSpace / 2.0f);
                     }
 
-                    ImGui.Image(texture.Handle, new Vector2(smallestAxis, smallestAxis), Vector2.Zero, Vector2.One, new Vector4(1.0f, 1.0f, 1.0f, 0.20f));
+                    if (texture is not null) {
+                        ImGui.Image(texture.Handle, new Vector2(smallestAxis, smallestAxis), Vector2.Zero, Vector2.One, new Vector4(1.0f, 1.0f, 1.0f, 0.20f));
+                    }
+                    else {
+                        ImGui.Dummy(new Vector2(smallestAxis, smallestAxis));
+                    }
+
                     ImGui.SetCursorPos(Vector2.Zero);
 
                     // Draw settings

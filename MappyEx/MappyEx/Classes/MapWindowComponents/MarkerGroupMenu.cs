@@ -50,9 +50,15 @@ public static class MarkerGroupMenu
             using var id = ImRaii.PushId(group.Id);
 
             var visible = System.SystemConfig.GetGroupVisibility(group.Id, group.DefaultVisible);
-            var texture = Service.TextureProvider.GetFromGameIcon(group.IconId).GetWrapOrEmpty();
 
-            ImGui.Image(texture.Handle, iconSize);
+            // The icon of a group is user defined, an id that does not exist must not reach the texture provider.
+            if (IconHelper.GetTexture(group.IconId) is { } texture) {
+                ImGui.Image(texture.Handle, iconSize);
+            }
+            else {
+                ImGui.Dummy(iconSize);
+            }
+
             ImGui.SameLine();
 
             if (ImGui.MenuItem(group.DisplayName, string.Empty, visible))

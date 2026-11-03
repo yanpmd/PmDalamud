@@ -32,13 +32,16 @@ public static class MappyGuiTweaks
     {
         using var imRaiiId = ImRaii.PushId(id);
 
-        var texture = Service.TextureProvider.GetFromGameIcon(iconId).GetWrapOrEmpty();
         var size = ImGuiHelpers.ScaledVector2(24.0f, 24.0f);
 
         var buttonColor = active ? new Vector4(0.1f, 0.7f, 0.2f, 1.0f) : new Vector4(0.28f, 0.28f, 0.28f, 1.0f);
 
         using var color = ImRaii.PushColor(ImGuiCol.Button, buttonColor);
-        var result = ImGui.ImageButton(texture.Handle, size);
+
+        // An icon id that does not exist must not reach the texture provider.
+        var result = IconHelper.GetTexture(iconId) is { } texture
+            ? ImGui.ImageButton(texture.Handle, size)
+            : ImGui.Button("##invalidIcon", size);
 
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && tooltip is not null) {
             ImGui.SetTooltip(tooltip);

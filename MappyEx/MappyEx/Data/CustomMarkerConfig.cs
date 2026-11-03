@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using KamiLib.Configuration;
 using Lumina.Excel.Sheets;
+using Mappy.Classes;
 using Mappy.Data.Crescent;
 using Action = System.Action;
 using Map = Lumina.Excel.Sheets.Map;
@@ -265,7 +266,37 @@ public class CustomMarkerConfig
         Save();
     }
 
-    public static CustomMarkerConfig Load() => Service.PluginInterface.LoadConfigFile<CustomMarkerConfig>("CustomMarkers.data.json");
+    public static CustomMarkerConfig Load()
+    {
+        var config = Service.PluginInterface.LoadConfigFile<CustomMarkerConfig>("CustomMarkers.data.json");
+
+        config.RepairBrokenIcons();
+
+        return config;
+    }
+
+    /// <summary>
+    /// Replace icon ids that do not exist. A broken id makes the icon of a marker disappear and the marker itself
+    /// unreachable, the placeholder keeps it visible and lets the user correct the id.
+    /// </summary>
+    private void RepairBrokenIcons()
+    {
+        foreach (var marker in Markers)
+        {
+            if (marker.IconId is 0 || IconHelper.IsValid(marker.IconId)) continue;
+
+            Service.Log.Warning($"[CustomMarkers] the icon {marker.IconId} of the marker \"{marker.Name}\" does not exist, the placeholder is used instead");
+            marker.IconId = DrawHelpers.QuestionMarkIcon;
+        }
+
+        foreach (var group in CustomGroups)
+        {
+            if (group.IconId is 0 || IconHelper.IsValid(group.IconId)) continue;
+
+            Service.Log.Warning($"[CustomMarkers] the icon {group.IconId} of the group \"{group.Name}\" does not exist, the placeholder is used instead");
+            group.IconId = DrawHelpers.QuestionMarkIcon;
+        }
+    }
 
     public void Save()
     {

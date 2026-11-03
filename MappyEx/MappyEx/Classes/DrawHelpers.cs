@@ -169,7 +169,8 @@ public static class DrawHelpers
 
     private static void DrawIcon(MarkerInfo markerInfo)
     {
-        var texture = Service.TextureProvider.GetFromGameIcon(markerInfo.IconId).GetWrapOrEmpty();
+        // A wrong icon id must never reach the texture provider, the marker is drawn without an image instead.
+        var texture = IconHelper.GetTexture(markerInfo.IconId);
         var scale = System.SystemConfig.ScaleWithZoom ? markerInfo.Scale : 1.0f;
 
         var iconScale = System.SystemConfig.IconScale;
@@ -187,20 +188,27 @@ public static class DrawHelpers
         var iconSetting = GetIconSetting(markerInfo);
         var settingScale = iconSetting.Scale * markerInfo.IconScaleMultiplier;
 
-        ImGui.SetCursorPos(markerInfo.Position + markerInfo.Offset - texture.Size * iconScale / 2.0f * scale * settingScale);
-        var cursorScreenPos = ImGui.GetCursorScreenPos();
-        var iconSize = texture.Size * scale * iconScale * settingScale;
+        // A placeholder keeps the marker clickable and gives the invalid icon a visible spot on the map.
+        var size = texture is null ? new Vector2(ImGui.GetFontSize()) : texture.Size * scale * iconScale * settingScale;
 
-        ImGui.Image(texture.Handle, iconSize, Vector2.Zero, Vector2.One, iconSetting.Color);
+        ImGui.SetCursorPos(markerInfo.Position + markerInfo.Offset - size / 2.0f);
+        var cursorScreenPos = ImGui.GetCursorScreenPos();
+
+        if (texture is not null) {
+            ImGui.Image(texture.Handle, size, Vector2.Zero, Vector2.One, iconSetting.Color);
+        }
+        else {
+            ImGui.Dummy(size);
+        }
 
         if (DebugMode) {
             foreach (var x in Enumerable.Range(-1, 3)) {
                 foreach (var y in Enumerable.Range(-1, 3)) {
-                    ImGui.GetWindowDrawList().AddRect(cursorScreenPos + new Vector2(x, y), cursorScreenPos + iconSize, ImGui.GetColorU32(KnownColor.White.Vector()), 3.0f);
+                    ImGui.GetWindowDrawList().AddRect(cursorScreenPos + new Vector2(x, y), cursorScreenPos + size, ImGui.GetColorU32(KnownColor.White.Vector()), 3.0f);
                 }
             }
 
-            ImGui.GetWindowDrawList().AddRect(cursorScreenPos, cursorScreenPos + iconSize, ImGui.GetColorU32(KnownColor.Red.Vector()), 3.0f);
+            ImGui.GetWindowDrawList().AddRect(cursorScreenPos, cursorScreenPos + size, ImGui.GetColorU32(KnownColor.Red.Vector()), 3.0f);
         }
     }
 
@@ -276,7 +284,13 @@ public static class DrawHelpers
             if (markerInfo.PrimaryText?.Invoke() is { Length: > 0 } primaryText) {
                 using var tooltip = ImRaii.Tooltip();
 
-                ImGui.Image(Service.TextureProvider.GetFromGameIcon(markerInfo.IconId).GetWrapOrEmpty().Handle, ImGuiHelpers.ScaledVector2(32.0f, 32.0f));
+                // The icon may not exist, the tooltip still works without the image.
+                if (IconHelper.GetTexture(markerInfo.IconId) is { } iconTexture) {
+                    ImGui.Image(iconTexture.Handle, ImGuiHelpers.ScaledVector2(32.0f, 32.0f));
+                }
+                else {
+                    ImGui.Dummy(ImGuiHelpers.ScaledVector2(32.0f, 32.0f));
+                }
 
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 7.5f * ImGuiHelpers.GlobalScale);

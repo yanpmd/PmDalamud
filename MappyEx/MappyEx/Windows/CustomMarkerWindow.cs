@@ -8,6 +8,7 @@ using Dalamud.Interface.Utility.Raii;
 using KamiLib.Classes;
 using KamiLib.Extensions;
 using KamiLib.Window;
+using Mappy.Classes;
 using Mappy.Data;
 
 namespace Mappy.Windows;
@@ -59,17 +60,24 @@ public class CustomMarkerWindow : Window
         }
         else {
             ImGui.TextUnformatted(Localization.Get("CustomMarker.IconId", "Icon ID"));
-            var iconId = (int)marker.IconId;
+            var iconId = (int)Math.Min(marker.IconId, IconHelper.MaxIconId);
             ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X - 72.0f * ImGuiHelpers.GlobalScale);
             if (ImGui.InputInt("##customMarkerIconId", ref iconId, 1, 10)) {
-                marker.IconId = (uint)Math.Max(1, iconId);
+                marker.IconId = IconHelper.Clamp(iconId);
             }
 
             ImGui.SameLine();
 
-            if (marker.IconId is not 0) {
-                var texture = Service.TextureProvider.GetFromGameIcon(marker.IconId).GetWrapOrEmpty();
+            if (IconHelper.GetTexture(marker.IconId) is { } texture) {
                 ImGui.Image(texture.Handle, ImGuiHelpers.ScaledVector2(24.0f, 24.0f));
+            }
+            else {
+                ImGui.Dummy(ImGuiHelpers.ScaledVector2(24.0f, 24.0f));
+            }
+
+            // The id does not exist, the marker would be drawn without an icon.
+            if (!IconHelper.IsValid(marker.IconId)) {
+                ImGui.TextColored(KnownColor.Orange.Vector(), Localization.Get("CustomMarker.InvalidIconId", "This icon id does not exist."));
             }
 
             ImGui.TextUnformatted(Localization.Get("CustomMarker.Scale", "Scale"));
