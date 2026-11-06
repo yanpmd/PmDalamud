@@ -272,6 +272,15 @@ public static class MapMarkerInfoExtensions {
         var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
         var currentTerritory = Service.ClientState.TerritoryType;
 
+        // A crystal without an aethernet group is the entrance of a wilderness zone, it does not belong to any city
+        // network. Those must never be treated as "the area the player is in", two of them would match each other and
+        // the click would walk to the crystal instead of teleporting to it, no matter how far away it is.
+        if (target.AethernetGroup is 0) {
+            Service.Log.Information($"[Aethernet] area=wilderness target={target.RowId} territory={target.Territory.RowId} current={currentTerritory}");
+
+            return false;
+        }
+
         // 0) The entry itself sits in the area the player is in. The master aetheryte of a city usually belongs to a
         // different layer (Limsa Upper vs Lower Decks), so it has to be checked on its own.
         if (target.Territory.RowId == currentTerritory) {

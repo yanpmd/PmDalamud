@@ -118,14 +118,19 @@ public static class AethernetNavigator
         // group, those are the same place and must not trigger a teleport.
         var targetTerritory = mapId is 0 ? 0 : Service.DataManager.GetExcelSheet<Map>().GetRow(mapId).TerritoryType.RowId;
         var targetGroup = targetTerritory is 0 ? 0 : FindAethernetGroupForTerritory(targetTerritory);
+        var currentTerritory = Service.ClientState.TerritoryType;
 
-        if (targetTerritory is not 0 && targetTerritory != Service.ClientState.TerritoryType)
+        // A wilderness zone is not part of any city network, it has no shards to hop between and its crystals are
+        // plain teleports. The intra city logic below must never apply to it.
+        var targetIsWilderness = targetTerritory is not 0 && targetGroup is 0;
+
+        if (targetTerritory is not 0 && targetTerritory != currentTerritory)
         {
-            var currentGroup = FindAethernetGroupForTerritory(Service.ClientState.TerritoryType);
+            var currentGroup = FindAethernetGroupForTerritory(currentTerritory);
 
-            if (targetGroup is 0 || targetGroup != currentGroup)
+            if (targetIsWilderness || targetGroup != currentGroup)
             {
-                Service.Log.Information($"[Aethernet] territory {targetTerritory} (group {targetGroup}) differs from {Service.ClientState.TerritoryType} (group {currentGroup}), teleporting over");
+                Service.Log.Information($"[Aethernet] territory {targetTerritory} (group {targetGroup}) differs from {currentTerritory} (group {currentGroup}), teleporting over");
 
                 if (TryTeleportToTerritory(mapId, target, fly)) return;
 
@@ -135,6 +140,15 @@ public static class AethernetNavigator
             }
 
             Service.Log.Information($"[Aethernet] territory {targetTerritory} shares group {targetGroup} with the player, treating it as the same city");
+        }
+
+        // The target sits in the wilderness zone the player is already in, there is no crystal to hop to, just walk.
+        if (targetIsWilderness)
+        {
+            Service.Log.Information($"[Aethernet] wilderness target {targetTerritory} in the current territory, walking the whole way");
+            VnavController.NavigateToWhenReady(target, fly, NavmeshTimeout);
+
+            return;
         }
 
         // The crystal has to belong to the destination's own city and territory. Every territory has its own coordinate
@@ -219,6 +233,9 @@ public static class AethernetNavigator
                           ?? aetheryteSheet.FirstOrNull(entry => entry.AethernetName.RowId == placeNameRowId);
 
         if (destination is not { } destinationRow) return false;
+
+        // A crystal without an aethernet group is not part of any city network, there are no shards to hop to.
+        if (destinationRow.AethernetGroup is 0) return false;
 
         if (!TryFindNearestSource(destinationRow.AethernetGroup, player.Position, out var walkSource, out var walkTarget)) return false;
 
@@ -318,14 +335,20 @@ public static class AethernetNavigator
         if (map.RowId is 0) return false;
 
         // The map marker sheet lists every aetheryte placed on that map, which is far more reliable than deriving
-        // the city from the territory row, those are split across several rows per city.
-        var gate = FindAetheryteOnMap(map, target);
+        // the city from the territory row, those are split across several rows per city. The big crystal of a zone
+        // is preferred, a shard can only be reached through the city network.
+        var gate = FindAetheryteOnMap(map, target, true) ?? FindAetheryteOnMap(map, target);
 
         if (gate is null)
         {
             var targetTerritory = map.TerritoryType.RowId;
             var group = FindAethernetGroupForTerritory(targetTerritory);
+
+            // A city is entered through the big aetheryte of its group.
             gate = FindGateForGroup(group);
+
+            // A wilderness zone has no group at all, its entry crystal is the only way in.
+            if (gate is null) gate = FindGateForTerritory(targetTerritory, map.RowId);
 
             Service.Log.Information($"[Aethernet] no aetheryte marker on map {mapId}, falling back to territory {targetTerritory} group {group} -> gate {gate?.RowId}");
         }
@@ -348,7 +371,8 @@ public static class AethernetNavigator
     /// Aetheryte closest to the target among the ones the map itself declares.
     /// The map marker sheet stores the icons of a map, an aetheryte icon carries the Aetheryte row as its data key.
     /// </summary>
-    private static Aetheryte? FindAetheryteOnMap(Map map, Vector3 target)
+    /// <param name="requireBig">only the big aetheryte of a zone qualifies, a shard cannot be teleported to</param>
+    private static Aetheryte? FindAetheryteOnMap(Map map, Vector3 target, bool requireBig = false)
     {
         var aetheryteSheet = Service.DataManager.GetExcelSheet<Aetheryte>();
 
@@ -370,6 +394,9 @@ public static class AethernetNavigator
                 var row = aetheryteSheet.GetRow(aetheryteId);
                 if (row.RowId is 0) continue;
 
+                // A shard is only reachable through the city network, the big crystal of a zone is a plain teleport.
+                if (requireBig && !row.IsAetheryte) continue;
+
                 // The map marker sheet uses plain map pixels, unlike the runtime markers which are scaled by 16.
                 var worldPosition = MapPixelsToWorld(map, marker.X, marker.Y);
                 var distance = Vector3.Distance(target, worldPosition);
@@ -382,7 +409,7 @@ public static class AethernetNavigator
 
         if (nearest is { } found)
         {
-            Service.Log.Information($"[Aethernet] map {map.RowId} declares aetheryte {found.RowId} at {nearestDistance:F0}y from the target");
+            Service.Log.Information($"[Aethernet] map {map.RowId} declares aetheryte {found.RowId} at {nearestDistance:F0}y from the target (bigOnly={requireBig})");
         }
 
         return nearest;
@@ -417,6 +444,10 @@ public static class AethernetNavigator
     /// </summary>
     private static Aetheryte? FindGateForGroup(uint aethernetGroup)
     {
+        // Group 0 is not a city, it is what the crystals of the wilderness zones use. Matching it would pick a
+        // crystal of a completely unrelated zone.
+        if (aethernetGroup is 0) return null;
+
         foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
         {
             if (!candidate.IsAetheryte) continue;
@@ -426,6 +457,32 @@ public static class AethernetNavigator
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Big aetheryte that sits in a territory. The crystals of a wilderness zone have no aethernet group, so the
+    /// group cannot resolve them and the territory is the only way to find the entry crystal of that zone.
+    /// </summary>
+    /// <param name="territory">territory to look in</param>
+    /// <param name="mapId">map of that territory, its own crystal is preferred</param>
+    private static Aetheryte? FindGateForTerritory(uint territory, uint mapId)
+    {
+        if (territory is 0) return null;
+
+        Aetheryte? fallback = null;
+
+        foreach (var candidate in Service.DataManager.GetExcelSheet<Aetheryte>())
+        {
+            if (!candidate.IsAetheryte) continue;
+            if (!IsInTerritory(candidate, territory)) continue;
+
+            // The crystal that belongs to the map itself is the entry of that zone.
+            if (mapId is not 0 && candidate.Map.RowId == mapId) return candidate;
+
+            fallback ??= candidate;
+        }
+
+        return fallback;
     }
 
     /// <summary>

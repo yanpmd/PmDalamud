@@ -175,6 +175,9 @@ public class MapFunctionsTab : ScrollableTab
 
             ImGuiHelpers.ScaledDummy(5.0f);
             configChanged |= ImGui.DragFloat(Localization.Get("Config.MapSidebarWidth", "Sidebar Width"), ref System.SystemConfig.MapSidebarWidth, 1.0f, 160.0f, 500.0f);
+
+            ImGuiHelpers.ScaledDummy(5.0f);
+            DrawMapBrowserFilter();
         }
 
         ImGuiTweaks.Header(Localization.Get("Header.Coordinates", "Coordinates"));
@@ -199,6 +202,28 @@ public class MapFunctionsTab : ScrollableTab
         if (configChanged) {
             SystemConfig.Save();
         }
+    }
+
+    private static readonly MapBrowserFilter[] mapBrowserFilters = Enum.GetValues<MapBrowserFilter>();
+
+    /// <summary>
+    /// Which maps the map browser lists, dungeons and places without a crystal can be hidden.
+    /// </summary>
+    private static void DrawMapBrowserFilter()
+    {
+        var filterIndex = Array.IndexOf(mapBrowserFilters, System.SystemConfig.MapBrowserFilter);
+        if (filterIndex < 0) filterIndex = 0;
+
+        var labels = mapBrowserFilters.Select(filter => Localization.Get($"MapBrowserFilter.{filter}", filter.ToString())).ToArray();
+
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted(Localization.Get("Config.MapBrowserFilter", "Listed Maps"));
+        ImGui.SameLine();
+
+        ImGui.SetNextItemWidth(-1.0f);
+        if (!ImGui.Combo("##mapBrowserFilter", ref filterIndex, labels, labels.Length)) return;
+
+        System.SystemConfig.MapBrowserFilter = mapBrowserFilters[filterIndex];
     }
 
     private void DrawCenterModeRadio()

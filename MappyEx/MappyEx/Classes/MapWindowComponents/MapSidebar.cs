@@ -3,6 +3,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using Mappy.Data;
 
 namespace Mappy.Classes.MapWindowComponents;
 
@@ -26,18 +27,44 @@ public class MapSidebar
         if (!tree) return;
 
         foreach (var region in MapIndex.Regions) {
+            // A region without a single map that passes the filter is not worth a tree node.
+            if (!HasVisibleMap(region)) continue;
+
             using var regionId = ImRaii.PushId(region.Name);
 
             if (!ImGui.TreeNodeEx(region.Name, ImGuiTreeNodeFlags.SpanAvailWidth)) continue;
 
             foreach (var zone in region.Zones) {
                 foreach (var area in zone.Areas) {
+                    if (!IsVisible(area)) continue;
+
                     DrawMap(area, currentMapId);
                 }
             }
 
             ImGui.TreePop();
         }
+    }
+
+    /// <summary>
+    /// Whether the map passes the filter of the map browser.
+    /// </summary>
+    private static bool IsVisible(MapIndex.Area area) => System.SystemConfig.MapBrowserFilter switch
+    {
+        MapBrowserFilter.OnlyAetheryte => area.HasAetheryte,
+        MapBrowserFilter.HideInstances => !area.IsInstance,
+        _ => true,
+    };
+
+    private static bool HasVisibleMap(MapIndex.Region region)
+    {
+        foreach (var zone in region.Zones) {
+            foreach (var area in zone.Areas) {
+                if (IsVisible(area)) return true;
+            }
+        }
+
+        return false;
     }
 
     private static void DrawMap(MapIndex.Area area, uint currentMapId)

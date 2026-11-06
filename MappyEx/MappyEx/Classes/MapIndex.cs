@@ -47,6 +47,17 @@ public static class MapIndex
         /// </summary>
         public required uint TerritoryRowId { get; init; }
 
+        /// <summary>
+        /// Whether an aetheryte of the map can be used to teleport there.
+        /// </summary>
+        public bool HasAetheryte { get; init; }
+
+        /// <summary>
+        /// Whether the map belongs to instanced content, a dungeon, a trial or anything else that is entered
+        /// through a duty.
+        /// </summary>
+        public bool IsInstance { get; init; }
+
         public string Label { get; set; } = string.Empty;
         public List<SubArea> SubAreas { get; } = [];
     }
@@ -111,6 +122,18 @@ public static class MapIndex
 
     private static void Build()
     {
+        // The aetherytes are the crystals the player can teleport to, a map without one is a dungeon or a place the
+        // crystal network does not reach.
+        var aetheryteMapIds = new HashSet<uint>();
+        var aetheryteTerritoryIds = new HashSet<uint>();
+
+        foreach (var aetheryte in Service.DataManager.GetExcelSheet<Aetheryte>()) {
+            if (aetheryte is not { IsAetheryte: true }) continue;
+
+            if (aetheryte.Map.RowId is not 0) aetheryteMapIds.Add(aetheryte.Map.RowId);
+            if (aetheryte.Territory.RowId is not 0) aetheryteTerritoryIds.Add(aetheryte.Territory.RowId);
+        }
+
         var maps = Service.DataManager.GetExcelSheet<Map>()
             .Where(map => map is { PlaceName.RowId: not 0, TerritoryType.ValueNullable.LoadingImage.RowId: not 0, })
             .Where(map => map is not { PriorityUI: 0, PriorityCategoryUI: 0 })
@@ -137,10 +160,14 @@ public static class MapIndex
                 region.Zones.Add(zone);
             }
 
+            var territory = map.TerritoryType.ValueNullable;
+
             var area = new Area {
                 Map = map,
-                Version = map.TerritoryType.ValueNullable?.ExVersion.RowId ?? uint.MaxValue,
+                Version = territory?.ExVersion.RowId ?? uint.MaxValue,
                 TerritoryRowId = map.TerritoryType.RowId,
+                HasAetheryte = HasAetheryte(map, territory, aetheryteMapIds, aetheryteTerritoryIds),
+                IsInstance = territory?.ContentFinderCondition.RowId is not null and not 0,
             };
 
             zone.Areas.Add(area);
@@ -186,6 +213,20 @@ public static class MapIndex
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Whether the player can teleport to the map with an aetheryte.
+    /// </summary>
+    private static bool HasAetheryte(Map map, TerritoryType? territory, HashSet<uint> aetheryteMapIds, HashSet<uint> aetheryteTerritoryIds)
+    {
+        // The territory points at the crystal of the zone, that is the most direct answer.
+        if (territory?.Aetheryte.RowId is not null and not 0) return true;
+
+        // The crystal can also sit on a map of the territory, the sheet does not always fill both fields.
+        if (aetheryteMapIds.Contains(map.RowId)) return true;
+
+        return aetheryteTerritoryIds.Contains(map.TerritoryType.RowId);
     }
 
     private static void AddAetherytes(Dictionary<uint, Area> areaByMapId)

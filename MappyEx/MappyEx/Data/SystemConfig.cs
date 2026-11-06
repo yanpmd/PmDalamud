@@ -28,7 +28,6 @@ public enum FadeMode
 {
     [Description("Always")]
     Always = 1 << 0,
-
     [Description("When Moving")]
     WhenMoving = 1 << 2,
 
@@ -37,6 +36,21 @@ public enum FadeMode
 
     [Description("When Unfocused")]
     WhenUnFocused = 1 << 4,
+}
+
+/// <summary>
+/// Which maps the map browser lists.
+/// </summary>
+public enum MapBrowserFilter
+{
+    [Description("All Maps")]
+    All = 0,
+
+    [Description("Only Maps With An Aetheryte")]
+    OnlyAetheryte = 1,
+
+    [Description("Hide Instance Maps")]
+    HideInstances = 2,
 }
 
 public class SystemConfig : CharacterConfiguration
@@ -100,6 +114,11 @@ public class SystemConfig : CharacterConfiguration
     public bool ShowToolbarOnHover = true;
     public bool ShowMapSidebar = false;
     public float MapSidebarWidth = 260.0f;
+
+    /// <summary>
+    /// Which maps the map browser lists, dungeons and places without a crystal can be hidden.
+    /// </summary>
+    public MapBrowserFilter MapBrowserFilter = MapBrowserFilter.All;
     public bool ScaleWithZoom = true;
     public bool AcceptedSpoilerWarning = false;
     public Vector4 AreaColor = KnownColor.CornflowerBlue.Vector() with { W = 0.33f };
