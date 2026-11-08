@@ -24,7 +24,6 @@ public class GeneralSettings
     public bool HideGameArmoury { get; set; } = false;
     public bool OpenCompanyChestWithGameInventory { get; set; } = true;
     public bool HideGameCompanyChest { get; set; } = false;
-    public CompanyChestPage CompanyChestPage { get; set; } = CompanyChestPage.Page1;
     public ArmouryPart ArmouryPart { get; set; } = ArmouryPart.MainHand;
     public ArmouryGrouping ArmouryGrouping { get; set; } = ArmouryGrouping.ByRole;
     public bool ShowCategoryItemCount { get; set; } = false;

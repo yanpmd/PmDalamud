@@ -37,8 +37,9 @@ public static unsafe class InventoryScanner
 
     private const ulong AggregatedKeyTag = 1UL << 63;
 
-    public static ulong MakeAggregatedItemKey(uint itemId, bool isHighQuality)
-        => AggregatedKeyTag | ((ulong)itemId << 1) | (isHighQuality ? 1UL : 0UL);
+    public static ulong MakeAggregatedItemKey(uint itemId, bool isHighQuality, InventoryType? groupContainer = null)
+        => AggregatedKeyTag | ((ulong)itemId << 1) | (isHighQuality ? 1UL : 0UL)
+           | (groupContainer is { } container ? ((ulong)(uint)container << 32) : 0UL);
 
     public static ulong MakeNaturalSlotKey(InventoryType container, int slot)
         => ((ulong)(uint)container << 32) | (uint)slot;
@@ -69,6 +70,11 @@ public static unsafe class InventoryScanner
         int nonEmptySlots = 0;
         int collisions = 0;
 
+        // The company chest shows every tab in a single list and marks each item
+        // with the tab it belongs to, so stacks of the same item in different tabs
+        // must not be folded into one another.
+        bool groupByContainer = source == InventorySourceType.CompanyChest;
+
         for (int inventoryIndex = 0; inventoryIndex < inventories.Length; inventoryIndex++)
         {
             var inventoryType = inventories[inventoryIndex];
@@ -98,7 +104,7 @@ public static unsafe class InventoryScanner
                 bool isCollectable = (item.Flags & InventoryItem.ItemFlags.Collectable) != 0;
 
                 ulong key = !isCollectable && stackMode == InventoryStackMode.AggregateByItemId && (aggregateUnstackable || ItemInfo.IsAggregatable(id))
-                    ? MakeAggregatedItemKey(id, isHq)
+                    ? MakeAggregatedItemKey(id, isHq, groupByContainer ? inventoryType : null)
                     : MakeNaturalSlotKey(inventoryType, slot);
 
                 Services.Logger.DebugOnly($"Slot {inventoryType}[{slot}] ItemId={id} Qty={quantity} Key=0x{key: X16}");

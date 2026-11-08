@@ -16,24 +16,12 @@ using KamiToolKit.Nodes;
 namespace AetherBags.Addons;
 
 /// <summary>
-/// Replacement window for the free company chest. The chest has four item tabs,
-/// each its own 50 slot container, so a tab bar sits under the header and only
-/// the selected tab is scanned.
+/// Replacement window for the free company chest. All chest tabs are shown in a
+/// single list; deposits fill the pages in order without the player picking one.
 /// </summary>
 public unsafe class AddonCompanyChestWindow : InventoryAddonBase
 {
-    private const float PageBarHeight = 30f;
-    private const float PageButtonGap = 2f;
-    private const uint PageButtonFontSize = 11;
-
-    private static readonly Vector3 PageSelectedTint = new(0.95f, 0.62f, 0.10f);
-    private static readonly Vector4 PageSelectedTextColor = new(0.10f, 0.07f, 0.02f, 1.0f);
-
     private readonly CompanyChestState _inventoryState = new();
-    private readonly List<TextButtonNode> _pageButtons = new();
-
-    /// <summary>Page of each button, kept in sync with <see cref="_pageButtons"/>.</summary>
-    private readonly List<CompanyChestPage> _pageOrder = new();
 
     private TextNode? _gilNode;
 
@@ -47,32 +35,16 @@ public unsafe class AddonCompanyChestWindow : InventoryAddonBase
     protected override InventoryWindowSizingLimits WindowSizingLimits => InventoryWindowSizingLimits.CompanyChest;
     protected override InventoryWindowSizingSettings WindowSizingSettings => System.Config.General.CompanyChestWindowSizing;
 
-    protected override Vector2 ContentAreaPosition
-        => ContentStartPosition + new Vector2(0f, PageBarHeight);
-
-    protected override Vector2 ContentAreaSize
-    {
-        get
-        {
-            Vector2 size = ContentSize;
-            return new Vector2(size.X, MathF.Max(0f, size.Y - PageBarHeight));
-        }
-    }
-
     protected override void OnSetup(AtkUnitBase* addon, Span<AtkValue> atkValueSpan)
     {
-        EnsureValidPage();
-
         InitializeBackgroundDropTarget();
 
         WindowNode?.AddColor = _tintColor;
 
-        CreatePageBar();
-
         ScrollableCategories = new InventoryScrollingAreaNode<WrappingGridNode<InventoryCategoryNodeBase>>
         {
-            Position = ContentAreaPosition,
-            Size = ContentAreaSize,
+            Position = ContentStartPosition,
+            Size = ContentSize,
             ContentHeight = 0f,
             AutoHideScrollBar = true,
         };
@@ -162,129 +134,11 @@ public unsafe class AddonCompanyChestWindow : InventoryAddonBase
         RefreshCategoriesCore(autosize: true);
     }
 
-    /// <summary>
-    /// Falls back to the first unlocked tab when the saved page is locked, which
-    /// would otherwise leave the window permanently empty.
-    /// </summary>
-    private static void EnsureValidPage()
-    {
-        if (CompanyChestPages.IsAvailable(CompanyChestState.CurrentPage)) return;
-
-        foreach (var item in CompanyChestPages.Items)
-        {
-            if (!CompanyChestPages.IsAvailable(item.page)) continue;
-
-            CompanyChestState.CurrentPage = item.page;
-            return;
-        }
-    }
-
-    private void CreatePageBar()
-    {
-        // The addon object is reused across opens and its nodes are destroyed with
-        // the old addon, so drop stale references and rebuild rather than reusing
-        // dead nodes (touching them throws inside the native text node).
-        _pageButtons.Clear();
-        _pageOrder.Clear();
-
-        foreach (var (page, _) in CompanyChestPages.Items)
-        {
-            // Locked chest tabs get no button at all: the company unlocks them by
-            // rank, and showing a dead tab just looks like the plugin lost a page.
-            if (!CompanyChestPages.IsAvailable(page)) continue;
-
-            // Attach before touching the label: sizing a button forwards to its
-            // label node, which needs a live native node.
-            var button = new TextButtonNode
-            {
-                String = CompanyChestPages.GetName(page),
-                OnClick = () => SwitchPage(page),
-            };
-            button.AttachNode(this);
-
-            button.LabelNode.FontSize = PageButtonFontSize;
-            button.Size = new Vector2(20f, PageBarHeight - 2f);
-
-            _pageButtons.Add(button);
-            _pageOrder.Add(page);
-        }
-
-        LayoutPageBar();
-        UpdatePageButtonStates();
-    }
-
-    /// <summary>
-    /// Spreads the chest tab buttons evenly across the window width and follows
-    /// window resizing.
-    /// </summary>
-    private void LayoutPageBar()
-    {
-        int count = _pageButtons.Count;
-        if (count == 0) return;
-
-        const float gilWidth = 150f;
-
-        float totalWidth = ContentSize.X;
-        float barWidth = MathF.Max(0f, totalWidth - gilWidth);
-
-        float buttonWidth = (barWidth - ((count - 1) * PageButtonGap)) / count;
-        if (buttonWidth < 24f) buttonWidth = 24f;
-
-        float x = ContentStartPosition.X;
-        float y = ContentStartPosition.Y;
-
-        for (int i = 0; i < count; i++)
-        {
-            _pageButtons[i].Position = new Vector2(x + (i * (buttonWidth + PageButtonGap)), y);
-            _pageButtons[i].Size = new Vector2(buttonWidth, PageBarHeight - 2f);
-        }
-
-        if (_gilNode is not null)
-        {
-            _gilNode.Position = new Vector2(x + barWidth + 4f, y + 4f);
-            _gilNode.Size = new Vector2(gilWidth - 8f, 18f);
-        }
-    }
-
-    private void UpdatePageButtonStates()
-    {
-        var current = CompanyChestState.CurrentPage;
-
-        for (int i = 0; i < _pageButtons.Count; i++)
-        {
-            bool selected = _pageOrder[i] == current;
-
-            _pageButtons[i].BackgroundNode.AddColor = selected
-                ? PageSelectedTint
-                : Vector3.Zero;
-
-            _pageButtons[i].LabelNode.TextColor = selected
-                ? PageSelectedTextColor
-                : ColorHelper.GetColor(50u);
-        }
-    }
-
-    private void SwitchPage(CompanyChestPage page)
-    {
-        if (CompanyChestState.CurrentPage == page) return;
-        if (!CompanyChestPages.IsAvailable(page)) return;
-
-        CompanyChestState.CurrentPage = page;
-        Util.SaveConfig(System.Config);
-
-        UpdatePageButtonStates();
-
-        _inventoryState.RefreshFromGame();
-        RefreshCategoriesCore(autosize: true);
-    }
-
     protected override void RefreshCategoriesCore(bool autosize)
     {
         if (!IsSetupComplete)
             return;
 
-        // The highlight is refreshed by SwitchPage only; doing it here as well
-        // would re-colour the tab buttons on every refresh.
         if (SlotCounterNode is not null)
             SlotCounterNode.String = _inventoryState.GetEmptySlotsString();
 
@@ -302,8 +156,6 @@ public unsafe class AddonCompanyChestWindow : InventoryAddonBase
     {
         base.LayoutContent();
 
-        LayoutPageBar();
-
         Vector2 contentPos = ContentStartPosition;
         Vector2 contentSize = ContentSize;
 
@@ -311,14 +163,18 @@ public unsafe class AddonCompanyChestWindow : InventoryAddonBase
 
         if (SlotCounterNode != null)
             SlotCounterNode.Position = new Vector2(contentPos.X + contentSize.X - 80f, footerY);
+
+        if (_gilNode is not null)
+        {
+            _gilNode.Position = new Vector2(contentPos.X + contentSize.X - 80f - 150f, footerY + 1f);
+            _gilNode.Size = new Vector2(140f, 18f);
+        }
     }
 
     protected override void OnFinalize(AtkUnitBase* addon)
     {
         IsSetupComplete = false;
 
-        _pageButtons.Clear();
-        _pageOrder.Clear();
         _gilNode = null;
 
         // Runs inside a reverse P/Invoke from the game's addon vtable: an exception

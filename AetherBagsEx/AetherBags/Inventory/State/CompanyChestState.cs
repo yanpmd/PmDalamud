@@ -5,37 +5,42 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace AetherBags.Inventory.State;
 
-public class CompanyChestState : InventoryStateBase
+public unsafe class CompanyChestState : InventoryStateBase
 {
-    /// <summary>Each company chest tab holds 50 slots.</summary>
-    private const int SlotsPerPage = 50;
-
     public override InventorySourceType SourceType => InventorySourceType.CompanyChest;
 
     /// <summary>
-    /// The chest tab currently shown. Only that page is scanned, matching the game
-    /// UI where each chest is a separate 50 slot container.
+    /// Every unlocked chest tab is scanned, so all items can be shown in one list.
     /// </summary>
-    public static CompanyChestPage CurrentPage
+    public override InventoryType[] Inventories => CompanyChestPages.GetAvailableContainers();
+
+    public override int TotalSlots
     {
-        get => System.Config?.General?.CompanyChestPage ?? CompanyChestPage.Page1;
-        set
+        get
         {
-            if (System.Config is null) return;
-            System.Config.General.CompanyChestPage = value;
+            var manager = InventoryManager.Instance();
+            if (manager == null) return 0;
+
+            int total = 0;
+            foreach (var type in Inventories)
+            {
+                var container = manager->GetInventoryContainer(type);
+                if (container == null) continue;
+                total += container->Size;
+            }
+
+            return total;
         }
     }
 
-    public override InventoryType[] Inventories => CompanyChestPages.GetContainers(CurrentPage);
-
-    public override int TotalSlots => Inventories.Length * SlotsPerPage;
-
     public override int EmptySlots => InventoryScanner.GetEmptySlotsInContainers(Inventories);
 
-    // Drops must land in the visible tab, otherwise an item could be routed into
-    // a chest page the player is not looking at.
+    /// <summary>
+    /// Deposits and drops treat the chest as one continuous space: the first
+    /// empty slot is taken from page 1, then page 2, and so on.
+    /// </summary>
     public override InventoryLocation GetFirstEmptySlot()
-        => InventoryScanner.GetFirstEmptySlotFromContainers(Inventories);
+        => InventoryScanner.GetFirstEmptySlotFromContainers(CompanyChestPages.GetDepositContainers());
 
     /// <summary>
     /// True when the free company chest is open and its pages hold items. The

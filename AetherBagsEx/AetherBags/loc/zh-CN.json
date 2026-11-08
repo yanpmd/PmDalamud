@@ -225,7 +225,12 @@
   "ContextMenu.DepositAllRetainer": "全部放入雇员",
   "ContextMenu.DepositAllCompanyChest": "全部存入部队储物箱",
   "ContextMenu.WithdrawAllCompanyChest": "全部取出部队储物箱",
+  "ContextMenu.DepositItemToCompanyChest": "存入储物柜",
+  "ContextMenu.WithdrawItemToInventory": "取回背包",
+  "ContextMenu.GameMenu": "游戏菜单…",
   "Transfer.Progress": "转移中 {0}/{1}",
+  "Organizer.Sorting": "整理中 {0}/{1}",
+  "Organizer.Merging": "合并中 {0}/{1}",
   "ContextMenu.NoVisibleItems": "没有可见的道具。",
   "ContextMenu.CopiedUniqueIds": "已复制 {0} 个唯一道具 ID 到剪贴板。",
   "ContextMenu.CopiedVisibleItems": "已复制 {0} 个可见道具到剪贴板。",
@@ -391,6 +396,9 @@
   "ReadOnly.OverrideTooltip": "用自己的设置覆盖此游戏分类。",
 
   "RetainerWindow.EntrustDuplicates": "存放重复道具",
+
+  "InventoryWindow.Sort": "整理",
+  "InventoryWindow.Merge": "合并",
 
   "Section.BasicSettings": "基础设置",
   "Section.ItemOrdering": "道具排序",

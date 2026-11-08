@@ -339,10 +339,13 @@ private void ApplyBorder(BorderStyle style)
 
         if (!atkEventData->IsRightClick) return;
 
-        if (Services.KeyState[VirtualKey.CONTROL] && ItemContextMenuHandler.TryShowExternalMenu(ItemInfo))
-        {
-            return;
-        }
+        bool controlHeld = Services.KeyState[VirtualKey.CONTROL];
+        if (ItemContextMenuHandler.TryShowItemMenu(ItemInfo, controlHeld)) return;
+
+        // The native menu is built on top of the shared AgentContext menu; clear
+        // any leftover entries so a previous category menu cannot leak into it.
+        var agentContext = AgentContext.Instance();
+        if (agentContext != null) agentContext->ClearMenu();
 
         AgentInventoryContext* context = AgentInventoryContext.Instance();
         context->OpenForItemSlot(item.Container, item.Slot, 0, context->AddonId);

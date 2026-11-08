@@ -162,7 +162,8 @@ public static unsafe class InventoryTypeExtensions
             InventoryType.FreeCompanyPage2 or
             InventoryType.FreeCompanyPage3 or
             InventoryType.FreeCompanyPage4 or
-            InventoryType.FreeCompanyPage5;
+            InventoryType.FreeCompanyPage5 or
+            InventoryType.FreeCompanyCrystals;
 
         public int UIPageSize => inventoryType switch
         {

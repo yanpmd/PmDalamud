@@ -5,7 +5,6 @@ using AetherBags.Hooks;
 using AetherBags.Inventory;
 using AetherBags.Inventory.Items;
 using AetherBags.Inventory.Scanning;
-using AetherBags.Inventory.State;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace AetherBags.Helpers;
@@ -32,10 +31,10 @@ public static class CategoryTransferQueue
     private readonly record struct PendingMove(InventoryType Container, ushort Slot, uint ItemId);
 
     /// <summary>
-    /// Interval between company chest moves. The server throttles chest operations,
-    /// so a whole category has to be walked slowly instead of one move per tick.
+    /// Interval between company chest operations. The server throttles them, so
+    /// transfers and the organizer both walk the chest step by step.
     /// </summary>
-    private static readonly TimeSpan CompanyChestMoveDelay = TimeSpan.FromSeconds(1);
+    internal static readonly TimeSpan CompanyChestOperationDelay = TimeSpan.FromSeconds(0.5);
 
     private static readonly Queue<PendingMove> Pending = new();
     private static CategoryTransferKind _kind;
@@ -83,7 +82,9 @@ public static class CategoryTransferQueue
 
     private static bool Start(IEnumerable<ItemInfo> items, CategoryTransferKind kind)
     {
-        if (_running) return false;
+        // Repeated single-item transfers join a running batch in the same
+        // direction instead of being silently dropped by the chest throttle.
+        if (_running && _kind != kind) return false;
 
         // Categories can aggregate stacks from other containers (crystals,
         // external sources, ...); only move stacks that sit on the expected side.
@@ -94,12 +95,16 @@ public static class CategoryTransferQueue
             CategoryTransferKind.FromSaddleBag => container.IsSaddleBag,
             CategoryTransferKind.FromRetainer => container.IsRetainer,
             CategoryTransferKind.FromArmoury => container.IsArmory,
-            CategoryTransferKind.FromCompanyChest => container.IsCompanyChest,
+            // Crystals live in their own container and cannot be moved with a
+            // normal item move, so they are left where they are.
+            CategoryTransferKind.FromCompanyChest => container.IsCompanyChest
+                && container != InventoryType.FreeCompanyCrystals,
             _ => false,
         };
 
-        Pending.Clear();
+        if (!_running) Pending.Clear();
 
+        int added = 0;
         foreach (var item in items)
         {
             var inventoryItem = item.Item;
@@ -107,9 +112,16 @@ public static class CategoryTransferQueue
             if (!IsOnExpectedSide(inventoryItem.Container)) continue;
 
             Pending.Enqueue(new PendingMove(inventoryItem.Container, (ushort)inventoryItem.Slot, inventoryItem.ItemId));
+            added++;
         }
 
-        if (Pending.Count == 0) return false;
+        if (added == 0) return false;
+
+        if (_running)
+        {
+            _total = _processed + Pending.Count;
+            return true;
+        }
 
         _kind = kind;
         _destinationSource = kind switch
@@ -119,10 +131,10 @@ public static class CategoryTransferQueue
             _ => InventorySourceType.MainBags,
         };
 
-        // The company chest has several independent tabs; deposit into the one the
-        // player is currently looking at instead of the first page with room.
+        // Deposits ignore tab boundaries: pages are tried in order and a full
+        // page automatically spills over into the next unlocked one.
         _destinationContainers = kind == CategoryTransferKind.ToCompanyChest
-            ? CompanyChestPages.GetContainers(CompanyChestState.CurrentPage)
+            ? CompanyChestPages.GetDepositContainers()
             : null;
 
         if (!HasDestinationSlot())
@@ -198,12 +210,20 @@ public static class CategoryTransferQueue
 
         _processed++;
 
-        // The company chest is rate limited server side, one move per second keeps
-        // the batch from being rejected. Other destinations accept one per tick.
+        // The company chest is rate limited server side, a half second between
+        // moves keeps the batch from being rejected. Other destinations accept
+        // one move per tick.
         if (_kind is CategoryTransferKind.ToCompanyChest or CategoryTransferKind.FromCompanyChest)
-            Services.Framework.RunOnTick(Step, CompanyChestMoveDelay);
+        {
+            // A single item should refresh the window right away instead of
+            // waiting out the throttle for a step that will never move anything.
+            if (Pending.Count == 0) Finish();
+            else Services.Framework.RunOnTick(Step, CompanyChestOperationDelay);
+        }
         else
+        {
             Services.Framework.RunOnTick(Step);
+        }
     }
 
     private static bool MoveViaSlotSwap(PendingMove move)

@@ -225,7 +225,12 @@
   "ContextMenu.DepositAllRetainer": "Deposit All To Retainer",
   "ContextMenu.DepositAllCompanyChest": "Deposit All To Company Chest",
   "ContextMenu.WithdrawAllCompanyChest": "Withdraw All From Company Chest",
+  "ContextMenu.DepositItemToCompanyChest": "Deposit To Company Chest",
+  "ContextMenu.WithdrawItemToInventory": "Withdraw To Inventory",
+  "ContextMenu.GameMenu": "Game Menu...",
   "Transfer.Progress": "Transferring {0}/{1}",
+  "Organizer.Sorting": "Sorting {0}/{1}",
+  "Organizer.Merging": "Merging {0}/{1}",
   "ContextMenu.NoVisibleItems": "No visible items.",
   "ContextMenu.CopiedUniqueIds": "Copied {0} unique item IDs to the clipboard.",
   "ContextMenu.CopiedVisibleItems": "Copied {0} visible items to the clipboard.",
@@ -391,6 +396,9 @@
   "ReadOnly.OverrideTooltip": "Override this game category with your own settings.",
 
   "RetainerWindow.EntrustDuplicates": "Entrust Duplicates",
+
+  "InventoryWindow.Sort": "Sort",
+  "InventoryWindow.Merge": "Merge",
 
   "Section.BasicSettings": "Basic Settings",
   "Section.ItemOrdering": "Item Ordering",

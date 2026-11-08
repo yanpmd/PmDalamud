@@ -39,6 +39,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     protected TextNode? SlotCounterNode { get; set; }
     protected CircleButtonNode SettingsButtonNode = null!;
 
+    /// <summary>Rewrites the real slots of this window so they follow the display order.</summary>
+    private TextButtonNode? _sortButtonNode;
+
+    /// <summary>Folds duplicate stacks of this window's containers into each other.</summary>
+    private TextButtonNode? _mergeButtonNode;
+
     /// <summary>Shows the batch transfer progress while a category move is running.</summary>
     protected TextNode? TransferProgressNode { get; private set; }
 
@@ -74,6 +80,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     protected const float SettingsButtonOffset = 62f;
     protected const float ScrollBarWidth = 16f;
     protected const float ContentHeightOffset = 4f;
+
+    private const float OrganizerButtonWidth = 60f;
+    private const float OrganizerButtonHeight = 26f;
+    private const float OrganizerButtonGap = 4f;
+    private const float OrganizerButtonsX = 4f;
+    private const uint OrganizerButtonFontSize = 11;
 
     protected bool RefreshQueued;
     protected bool RefreshAutosizeQueued;
@@ -410,7 +422,14 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     /// Width reserved on the left of the window header for window specific
     /// controls. The search bar stays centered in whatever space is left.
     /// </summary>
-    protected virtual float HeaderLeftReserve => 0f;
+    protected virtual float HeaderLeftReserve => ShowOrganizerButtons ? OrganizerButtonsWidth : 0f;
+
+    /// <summary>
+    /// Every bag window can sort and merge the contents of its containers.
+    /// </summary>
+    protected virtual bool ShowOrganizerButtons => true;
+
+    private static float OrganizerButtonsWidth => (OrganizerButtonWidth * 2f) + OrganizerButtonGap;
 
     protected HeaderLayout CalculateHeaderLayout(AtkUnitBase* addon)
     {
@@ -826,6 +845,64 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         {
             SettingsButtonNode.Position = new Vector2(header.HeaderWidth - SettingsButtonOffset, header.HeaderY);
         }
+
+        if (_sortButtonNode != null && _mergeButtonNode != null)
+        {
+            _sortButtonNode.Position = new Vector2(OrganizerButtonsX, header.HeaderY + 2f);
+            _mergeButtonNode.Position = new Vector2(OrganizerButtonsX + OrganizerButtonWidth + OrganizerButtonGap, header.HeaderY + 2f);
+        }
+    }
+
+    /// <summary>
+    /// Creates the sort and merge buttons every bag window shows in its header.
+    /// </summary>
+    private void CreateOrganizerButtons()
+    {
+        if (!ShowOrganizerButtons) return;
+
+        _sortButtonNode = new TextButtonNode
+        {
+            Size = new Vector2(OrganizerButtonWidth, OrganizerButtonHeight),
+            String = Localization.Get("InventoryWindow.Sort"),
+            OnClick = OnSortClicked,
+        };
+        _sortButtonNode.AttachNode(this);
+        _sortButtonNode.LabelNode.FontSize = OrganizerButtonFontSize;
+
+        _mergeButtonNode = new TextButtonNode
+        {
+            Size = new Vector2(OrganizerButtonWidth, OrganizerButtonHeight),
+            String = Localization.Get("InventoryWindow.Merge"),
+            OnClick = OnMergeClicked,
+        };
+        _mergeButtonNode.AttachNode(this);
+        _mergeButtonNode.LabelNode.FontSize = OrganizerButtonFontSize;
+    }
+
+    /// <summary>
+    /// Writes the order the window displays into the real inventory slots.
+    /// </summary>
+    private void OnSortClicked()
+    {
+        if (InventoryOrganizer.IsRunning) return;
+
+        var order = new List<ItemInfo>();
+        foreach (var category in InventoryState.GetCategories(string.Empty))
+        {
+            order.AddRange(category.Items);
+        }
+
+        InventoryOrganizer.StartSort(InventoryState.Inventories, order);
+    }
+
+    /// <summary>
+    /// Folds duplicate stacks of the window's containers into each other.
+    /// </summary>
+    private void OnMergeClicked()
+    {
+        if (InventoryOrganizer.IsRunning) return;
+
+        InventoryOrganizer.StartMerge(InventoryState.Inventories);
     }
 
     protected void ResizeWindow(float width, float height)
@@ -902,6 +979,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     {
         ContextMenu = new ContextMenu();
 
+        CreateOrganizerButtons();
+
+        // The buttons were created after the window was laid out, so they still
+        // need their place in the header.
+        UpdateHeaderLayout();
+
         TransferProgressNode = new TextNode
         {
             Size = new Vector2(240f, 18f),
@@ -955,17 +1038,26 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     {
         if (TransferProgressNode is null) return;
 
-        bool running = AetherBags.Helpers.CategoryTransferQueue.IsRunning;
+        bool transferRunning = CategoryTransferQueue.IsRunning;
+        bool organizerRunning = InventoryOrganizer.IsRunning;
+        bool running = transferRunning || organizerRunning;
 
         if (TransferProgressNode.IsVisible != running)
             TransferProgressNode.IsVisible = running;
 
         if (!running) return;
 
-        TransferProgressNode.String = Localization.F(
-            "Transfer.Progress",
-            AetherBags.Helpers.CategoryTransferQueue.Processed,
-            AetherBags.Helpers.CategoryTransferQueue.Total);
+        TransferProgressNode.String = transferRunning
+            ? Localization.F(
+                "Transfer.Progress",
+                CategoryTransferQueue.Processed,
+                CategoryTransferQueue.Total)
+            : Localization.F(
+                InventoryOrganizer.Kind == InventoryOrganizer.OperationKind.Sort
+                    ? "Organizer.Sorting"
+                    : "Organizer.Merging",
+                InventoryOrganizer.Processed,
+                InventoryOrganizer.Total);
     }
 
     private static bool IsFocusedAddon(AtkUnitBase* addon)
@@ -997,6 +1089,8 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         // is created (its native text node is already gone).
         TransferProgressNode = null;
         SlotCounterNode = null;
+        _sortButtonNode = null;
+        _mergeButtonNode = null;
 
         HoverSubscribed.Clear();
         SearchDebouncer.Dispose();

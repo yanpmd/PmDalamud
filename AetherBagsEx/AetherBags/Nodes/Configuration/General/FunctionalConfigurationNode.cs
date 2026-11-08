@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using AetherBags.Configuration;
+using AetherBags.Helpers;
 using AetherBags.Inventory;
 using AetherBags.Nodes.Input;
 using FFXIVClientStructs.FFXIV.Component.GUI;
