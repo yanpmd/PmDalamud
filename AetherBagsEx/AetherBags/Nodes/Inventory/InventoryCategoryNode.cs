@@ -52,6 +52,9 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
     private int _lastItemsPerLine;
     private bool _itemsNeedPopulation;
     private CategorizedInventory _categorizedInventory;
+    private string _lastHeaderText = string.Empty;
+    private Vector4 _lastHeaderColor;
+    private string? _lastHeaderTooltip;
 
     public event Action<InventoryCategoryNode, bool>? OnHeaderHoverChanged;
     public bool NeedsItemPopulation => _itemsNeedPopulation;
@@ -180,12 +183,27 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
             ? $"{data.Category.Name} ({data.Items.Count})"
             : data.Category.Name;
 
-        _categoryNameTextNode.String = _fullHeaderText;
-        _categoryNameTextNode.TextColor = ArmouryJobGroups.MatchesCurrentJob(data.Key)
+        // Writing the text rebuilds the native text buffer and re-lays it out, and measuring the header
+        // performs a native font measurement. Only do it when the content actually changed, otherwise every
+        // category pays for it on every refresh.
+        if (_fullHeaderText != _lastHeaderText) {
+            _categoryNameTextNode.String = _fullHeaderText;
+            _lastHeaderText = _fullHeaderText;
+            RefreshHeaderMinWidth();
+        }
+
+        Vector4 headerColor = ArmouryJobGroups.MatchesCurrentJob(data.Key)
             ? CurrentJobHeaderColor
             : data.Category.Color;
-        _categoryNameTextNode.TextTooltip = data.Category.Description;
-        RefreshHeaderMinWidth();
+        if (headerColor != _lastHeaderColor) {
+            _categoryNameTextNode.TextColor = headerColor;
+            _lastHeaderColor = headerColor;
+        }
+
+        if (data.Category.Description != _lastHeaderTooltip) {
+            _categoryNameTextNode.TextTooltip = data.Category.Description;
+            _lastHeaderTooltip = data.Category.Description;
+        }
 
         if (itemsChanged || categoryChanged)
         {
@@ -489,9 +507,9 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
             itemNode.IsCollected = CollectionStatus.IsCollected(info.Item.ItemId);
 
             bool ants = info.IsRelationshipHighlighted;
-            if (itemNode.IconNode.IconExtras.AntsNode.IsVisible != ants) itemNode.IconNode.IconExtras.AntsNode.IsVisible = ants;
-            if (ants && config.AnimationEnabled) itemNode.IconNode.IconExtras.AntsNode.Timeline?.PlayAnimation(26);
-            else itemNode.IconNode.IconExtras.AntsNode.Timeline?.StopAnimation();
+            var antsNode = itemNode.IconNode.IconExtras.AntsNode;
+            if (antsNode.IsVisible != ants) antsNode.IsVisible = ants;
+            itemNode.AntsAnimationActive = ants && config.AnimationEnabled;
         }
     }
 

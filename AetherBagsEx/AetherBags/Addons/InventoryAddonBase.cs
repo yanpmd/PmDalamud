@@ -79,7 +79,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     protected static float FooterHeight => StylePresets.Current.FooterHeight;
     protected const float FooterTopSpacing = 4f;
     protected const float SettingsButtonOffset = 62f;
-    protected const float ScrollBarWidth = 16f;
+    protected const float ScrollBarWidth = InventoryScrollingLayout.ScrollBarWidth;
     protected const float ContentHeightOffset = 4f;
 
     private const float OrganizerButtonWidth = 60f;

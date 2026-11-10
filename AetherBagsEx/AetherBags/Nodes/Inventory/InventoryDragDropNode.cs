@@ -37,6 +37,26 @@ public class InventoryDragDropNode : DragDropNode
     private bool _isCollected;
     private bool _isCollectable;
     private ItemDecoration? _currentDecoration;
+    private bool _antsAnimationActive;
+
+    /// <summary>
+    /// Gets or sets whether the "ants" animation that marks relationship highlights is running.
+    /// </summary>
+    /// <remarks>
+    /// Starting and stopping the animation are native calls, so they are only issued when the state
+    /// actually flips. Without this guard every item would issue a native call on every refresh.
+    /// </remarks>
+    public bool AntsAnimationActive {
+        get => _antsAnimationActive;
+        set {
+            if (_antsAnimationActive == value) return;
+            _antsAnimationActive = value;
+
+            var antsNode = IconNode.IconExtras.AntsNode;
+            if (value) antsNode.Timeline?.PlayAnimation(26);
+            else antsNode.Timeline?.StopAnimation();
+        }
+    }
 
     public unsafe InventoryDragDropNode()
     {
@@ -459,5 +479,7 @@ private void ApplyBorder(BorderStyle style)
         IconNode.IsGlamoured = false;
         IsDraggable = true;
         IconNode.IconExtras.AntsNode.IsVisible = false;
+        _antsAnimationActive = false;
+        IconNode.IconExtras.AntsNode.Timeline?.StopAnimation();
     }
 }

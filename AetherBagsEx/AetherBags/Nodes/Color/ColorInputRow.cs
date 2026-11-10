@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Threading;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.BaseTypes;
 using KamiToolKit.BaseTypes.ComponentNode;
@@ -11,6 +12,8 @@ namespace AetherBags.Nodes.Color;
 
 public class ColorInputRow : HorizontalListNode
 {
+    private static int _colorPickerInstanceCounter;
+
     private ColorPickerAddon? _colorPickerAddon;
     private readonly LabelTextNode _labelTextNode;
     private readonly ColorPreviewButtonNode _colorPreview;
@@ -68,8 +71,11 @@ public class ColorInputRow : HorizontalListNode
     private void InitializeColorPicker() {
         if (_colorPickerAddon is not null) return;
 
+        // Every picker needs its own addon name. Two pickers sharing a name make the game return an
+        // arbitrary one of them when the addon is looked up by name, and the close callback of one picker
+        // would then act on the other.
         _colorPickerAddon = new ColorPickerAddon {
-            InternalName = "ColorPicker_AetherBags",
+            InternalName = $"ColorPicker_AetherBags_{Interlocked.Increment(ref _colorPickerInstanceCounter)}",
             Title = Localization.Get("ColorPicker.Title"),
         };
     }

@@ -89,7 +89,7 @@ public unsafe class AddonInventoryWindow : InventoryAddonBase
         var existingLoot = System.LootedItemsTracker.LootedItems;
         if (existingLoot.Count > 0)
         {
-            UpdateLootedCategory(existingLoot);
+            UpdateLootedCategory(existingLoot, autosize: true);
         }
 
         RefreshCategoriesCore(autosize: true);
@@ -102,13 +102,16 @@ public unsafe class AddonInventoryWindow : InventoryAddonBase
         if (!IsOpen || !IsSetupComplete) return;
 
         UpdateRecentlyLootedHighlight();
-        UpdateLootedCategory(lootedItems);
+        UpdateLootedCategory(lootedItems, autosize: true);
     }
 
     protected override void RefreshCategoriesCore(bool autosize)
     {
         UpdateRecentlyLootedHighlight();
-        UpdateLootedCategory(System.LootedItemsTracker.LootedItems);
+
+        // The base class performs the autosizing, so letting the looted category do it as well would
+        // size the window twice on every refresh.
+        UpdateLootedCategory(System.LootedItemsTracker.LootedItems, autosize);
         base.RefreshCategoriesCore(autosize);
     }
 
@@ -126,7 +129,7 @@ public unsafe class AddonInventoryWindow : InventoryAddonBase
         }
     }
 
-    private void UpdateLootedCategory(IReadOnlyList<LootedItemInfo> lootedItems)
+    private void UpdateLootedCategory(IReadOnlyList<LootedItemInfo> lootedItems, bool autosize)
     {
         bool shouldShow = lootedItems.Count > 0 && System.Config.General.ShowRecentlyLooted;
 
@@ -140,7 +143,7 @@ public unsafe class AddonInventoryWindow : InventoryAddonBase
             {
                 CategoriesNode.SetHoistedNode(_lootedCategoryNode);
             }
-            AutoSizeWindow();
+            if (autosize) AutoSizeWindow();
         }
         else if (_lootedCategoryNode is not null)
         {
@@ -151,7 +154,7 @@ public unsafe class AddonInventoryWindow : InventoryAddonBase
                 CategoriesNode.SetHoistedNode(null);
             _lootedCategoryNode.IsVisible = false;
             CategoriesNode.InvalidateLayout();
-            AutoSizeWindow();
+            if (autosize) AutoSizeWindow();
         }
     }
 

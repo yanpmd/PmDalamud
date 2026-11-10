@@ -63,6 +63,7 @@ public static class LayoutListSyncExtensions {
             }
         }
 
+        var createdNodes = new List<NodeBase>();
         foreach (var data in dataList) {
             var key = getKeyFromData(data);
             if (nodesByKey.TryGetValue(key, out var existing)) {
@@ -71,9 +72,15 @@ public static class LayoutListSyncExtensions {
             }
 
             var created = createNodeMethod(data);
-            list.AddNode(created);
+            createdNodes.Add(created);
             nodesByKey[key] = created;
             structureChanged = true;
+        }
+
+        if (createdNodes.Count > 0) {
+            // Adding the nodes one at a time recalculates the layout of the whole list for every single
+            // node, which is quadratic in the number of entries.
+            list.AddNode(createdNodes);
         }
 
         // Bring the nodes into the order of the data list. Nodes that do not hold data keep the slot they
@@ -96,11 +103,21 @@ public static class LayoutListSyncExtensions {
             }
         }
 
+        bool orderChanged = false;
         if (list.GetNodes<TU>().Count() > 1) {
-            list.ReorderNodes((left, right) => slots[left].CompareTo(slots[right]));
+            var current = list.Nodes.Where(node => node is TU).ToList();
+            var target = current.OrderBy(node => slots[node]).ToList();
+            orderChanged = !current.SequenceEqual(target);
+
+            if (orderChanged) {
+                list.ReorderNodes((left, right) => slots[left].CompareTo(slots[right]));
+            }
         }
 
-        list.RecalculateLayout();
-        return structureChanged;
+        if (structureChanged || orderChanged) {
+            list.RecalculateLayout();
+        }
+
+        return structureChanged || orderChanged;
     }
 }

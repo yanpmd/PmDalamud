@@ -25,12 +25,14 @@ public class ScrollingListNode : SimpleComponentNode {
         base.OnSizeChanged();
 
         listNode.Size = Size;
-        listNode.ContentNode.RecalculateLayout();
-        listNode.FitToContentHeight();
 
         // Keep the content width stable no matter whether the scroll bar is currently shown. Otherwise the
         // content would jump sideways by the scroll bar thickness every time the bar appears or disappears.
+        // The width has to be applied before the layout is recalculated, otherwise the layout is computed from
+        // the width the upstream node wrote.
         listNode.ContentNode.Width = Math.Max(0.0f, Width - listNode.ScrollBarNode.Width - 2.0f);
+        listNode.ContentNode.RecalculateLayout();
+        listNode.FitToContentHeight();
     }
 
     public bool FitContents {
