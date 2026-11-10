@@ -7,8 +7,8 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 using Lumina.Text.ReadOnly;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Nodes.Configuration.Category;
 
@@ -200,6 +200,13 @@ public sealed class ItemSortCriteriaEditorNode : VerticalListNode
         var fields = GetAvailableFields();
         _addFieldDropdown.Options = fields;
         _addFieldDropdown.IsEnabled = fields.Count > 0;
+
+        // The dropdown does not select an entry on its own, so without this it would keep showing the
+        // placeholder text instead of the field that would be added.
+        if (fields.Count > 0 && !fields.Contains(_addFieldDropdown.SelectedOption)) {
+            _addFieldDropdown.SelectedOption = fields[0];
+        }
+
         _addDirectionDropdown.IsEnabled = fields.Count > 0 && _addFieldDropdown.SelectedOption != ItemSortField.UseGlobal;
     }
 
@@ -302,7 +309,7 @@ public sealed class ItemSortCriterionItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.UpArrow,
+            Icon = CircleButtonIcon.UpArrow,
             TextTooltip = Localization.Get("ItemSort.MoveUp"),
             IsEnabled = !isFirst,
             OnClick = () => OnMoveUp?.Invoke(),
@@ -311,7 +318,7 @@ public sealed class ItemSortCriterionItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.ArrowDown,
+            Icon = CircleButtonIcon.ArrowDown,
             TextTooltip = Localization.Get("ItemSort.MoveDown"),
             IsEnabled = !isLast,
             OnClick = () => OnMoveDown?.Invoke(),
@@ -320,7 +327,7 @@ public sealed class ItemSortCriterionItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.Cross,
+            Icon = CircleButtonIcon.Cross,
             TextTooltip = Localization.Get("ItemSort.Remove"),
             OnClick = () => OnRemove?.Invoke(),
         });

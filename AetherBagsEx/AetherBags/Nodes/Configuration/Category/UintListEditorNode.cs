@@ -6,8 +6,8 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 using Lumina.Text.ReadOnly;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Nodes.Configuration.Category;
 
@@ -71,7 +71,7 @@ public sealed class UintListEditorNode : VerticalListNode
         var searchButton = new CircleButtonNode
         {
             Size = new Vector2(28),
-            Icon = ButtonIcon.MagnifyingGlass,
+            Icon = CircleButtonIcon.MagnifyingGlass,
             OnClick = () => OnSearchButtonClicked?.Invoke(),
             TextTooltip = Localization.Get("ListEditor.SearchDatabase")
         };
@@ -215,7 +215,7 @@ public sealed class UintListItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.UpArrow,
+            Icon = CircleButtonIcon.UpArrow,
             TextTooltip = Localization.Get("ItemSort.MoveUp"),
             IsEnabled = !isFirst,
             OnClick = () => OnMoveUp?.Invoke(),
@@ -224,7 +224,7 @@ public sealed class UintListItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.ArrowDown,
+            Icon = CircleButtonIcon.ArrowDown,
             TextTooltip = Localization.Get("ItemSort.MoveDown"),
             IsEnabled = !isLast,
             OnClick = () => OnMoveDown?.Invoke(),
@@ -233,7 +233,7 @@ public sealed class UintListItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.Cross,
+            Icon = CircleButtonIcon.Cross,
             TextTooltip = Localization.Get("ItemSort.Remove"),
             OnClick = () => OnRemove?.Invoke(),
         });

@@ -4,8 +4,8 @@ using System.Numerics;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 using Lumina.Text.ReadOnly;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Nodes.Configuration.Category;
 
@@ -147,7 +147,7 @@ public sealed class StringListItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(28, 28),
-            Icon = ButtonIcon.Cross,
+            Icon = CircleButtonIcon.Cross,
             OnClick = () => OnRemove?.Invoke(),
         });
     }

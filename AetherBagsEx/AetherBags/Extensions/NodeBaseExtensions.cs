@@ -1,5 +1,6 @@
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 
 namespace AetherBags.Extensions;

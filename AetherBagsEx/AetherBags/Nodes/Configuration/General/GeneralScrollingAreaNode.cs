@@ -5,6 +5,7 @@ using AetherBags.Configuration;
 using AetherBags.Helpers;
 using AetherBags.Nodes.Configuration.Layout;
 using KamiToolKit.Nodes;
+using AetherBags.Compat;
 
 namespace AetherBags.Nodes.Configuration.General;
 
@@ -47,7 +48,7 @@ public sealed class GeneralScrollingAreaNode : ScrollingListNode
             String = Localization.Get("Settings.Language"),
         });
 
-        var languageDropdown = new TextDropDownNode
+        var languageDropdown = new StringDropDownNode
         {
             Size = new Vector2(200, 24),
             Options = languageNames,

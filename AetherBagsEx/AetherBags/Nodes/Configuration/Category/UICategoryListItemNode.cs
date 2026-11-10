@@ -3,6 +3,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
 using Lumina.Excel.Sheets;
+using KamiToolKit.Interfaces;
 
 namespace AetherBags.Nodes.Configuration.Category;
 

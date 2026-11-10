@@ -3,59 +3,80 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using KamiToolKit.Classes;
-using KamiToolKit.Premade.Node.Simple;
-using Lumina.Text.ReadOnly;
+using KamiToolKit.Interfaces;
+using KamiToolKit.Internal.Classes;
+using Lumina.Data.Parsing.Uld;
 
 namespace KamiToolKit.Nodes;
 
-public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNode<T>, IListItemNode, new() {
-    public readonly ScrollBarNode ScrollBarNode;
-    public readonly TextNode NoResultsTextNode;
+/// <summary>
+/// A virtual list that only allocates one node per <see cref="IListItemNode.ItemHeight"/>,
+/// as the list is scrolled the same nodes are recycled to show the new values.
+/// This is far more efficient than creating new nodes in runtime, and more efficient when showing large lists.
+/// Please avoid using <see cref="VerticalListNode"/> with more than 30 items, and use this node instead.
+/// </summary>
+/// <typeparam name="T">The data model to use.</typeparam>
+/// <typeparam name="TU">The view to render the data models data.</typeparam>
+public unsafe class ListNode<T, TU> : ResNode, IControllerNavigable where TU : ListItemNode<T>, IListItemNode, new() {
 
-    public ListNode() {
-        itemHeight = TU.ItemHeight;
+    /// <summary>
+    /// Not intended for public use, but it's here if you absolutely need it.
+    /// </summary>
+    public ListNavNode? UpwardsNavNode { get; private set; }
 
-        ScrollBarNode = new ScrollBarNode {
-            OnValueChanged = OnScrollUpdate,
-            ScrollSpeed = (int)itemHeight,
-            HideWhenDisabled = true,
-        };
-        ScrollBarNode.AttachNode(this);
+    /// <summary>
+    /// Not intended for public use, but it's here if you absolutely need it.
+    /// </summary>
+    public ListNavNode? DownwardsNavNode { get; private set; }
 
-        NoResultsTextNode = new TextNode {
-            AlignmentType = AlignmentType.Center,
-        };
-        NoResultsTextNode.AttachNode(this);
+    /// <summary>
+    /// Not intended for public use, but it's here if you absolutely need it.
+    /// </summary>
+    public ScrollBarNode ScrollBarNode { get; }
 
-        AddEvent(AtkEventType.MouseWheel, OnMouseWheel);
-    }
+    /// <summary>
+    /// Not intended for public use, but it's here if you absolutely need it.
+    /// </summary>
+    public ResNode NoResultsTextNodeContainer { get; }
 
-    protected override void OnSizeChanged() {
-        base.OnSizeChanged();
+    /// <summary>
+    /// Not intended for public use, but it's here if you absolutely need it.
+    /// </summary>
+    public TextNode NoResultsTextNode { get; }
 
-        ScrollBarNode.Size = new Vector2(8.0f, Height);
-        ScrollBarNode.Position = new Vector2(Width - 8.0f, 0.0f);
+    /// <inheritdoc/>
+    public int NavIndex { get; set; }
 
-        NoResultsTextNode.Size = new Vector2(Width - 8.0f, Height);
-        NoResultsTextNode.Position = Vector2.Zero;
+    /// <inheritdoc/>
+    public int NavLeft { get; set; }
 
-        var newNodeCount = (int)(Height / (itemHeight + ItemSpacing));
-        if (newNodeCount != nodeCount) {
-            FullRebuild();
-        }
+    /// <inheritdoc/>
+    public int NavRight { get; set; }
 
-        foreach (var node in nodeList) {
-            node.Width = ScrollBarNode.Bounds.Left - 8.0f;
-        }
+    /// <inheritdoc/>
+    public int NavUp { get; set; }
 
-        RecalculateScroll();
-    }
+    /// <inheritdoc/>
+    public int NavDown { get; set; }
 
-    public ReadOnlySeString? NoResultsString { get; set; }
+    /// <summary>
+    /// Gets or sets whether the "No results found." placeholder text should show when there are no elements.
+    /// </summary>
+    public bool ShowNoResultsPlaceholder { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets the action to be invoked when an item is selected.
+    /// </summary>
     public Action<T?>? OnItemSelected { get; set; }
 
+    /// <summary>
+    /// Gets the list of currently selected items.
+    /// </summary>
+    public List<T> SelectedItems { get; private set; } = [];
+
+    /// <summary>
+    /// Gets or sets the item spacing.
+    /// </summary>
     public float ItemSpacing {
         get;
         set {
@@ -64,6 +85,17 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
         }
     }
 
+    /// <summary>
+    /// When updating <see cref="OptionsList"/>, automatically resets scroll to the top.
+    /// </summary>
+    /// <remarks>
+    /// This may be undesirable if the list is being constantly updated.
+    /// </remarks>
+    public bool AutoResetScroll { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the options list that is used for rendering.
+    /// </summary>
     public required List<T> OptionsList {
         get;
         set {
@@ -78,40 +110,53 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
                 RecalculateScroll();
             }
 
-            if (NoResultsString is { } warningString && value.Count is 0) {
-                NoResultsTextNode.String = warningString;
-                NoResultsTextNode.IsVisible = true;
-            }
-            else {
-                NoResultsTextNode.IsVisible = false;
+            NoResultsTextNodeContainer.IsVisible = value.Count is 0 && ShowNoResultsPlaceholder;
+
+            if (AutoResetScroll) {
+                ResetScroll();
             }
         }
     } = [];
 
-    private readonly List<TU> nodeList = [];
-    private readonly float itemHeight;
-    private T? selectedItem;
-    private int scrollPosition;
-    private int nodeCount;
+    /// <summary>
+    /// Gets a read-only enumerable for the available option nodes.
+    /// </summary>
+    public IReadOnlyList<TU> OptionNodes => nodeList;
 
     /// <summary>
-    /// Resets and rebuilds list
+    /// Gets or sets whether multiselect will be allowed.
     /// </summary>
-    public void FullRebuild() {
-        foreach (var node in nodeList) {
-            node.Dispose();
-        }
-        nodeList.Clear();
+    /// <remarks>
+    /// When enabled, the list will not clear the
+    /// </remarks>
+    public bool AllowMultipleSelection { get; set; }
 
-        scrollPosition = Math.Clamp(scrollPosition, 0, Math.Max(OptionsList.Count - nodeCount, 0));
-        selectedItem = default;
-
-        RebuildNodeList();
+    /// <summary>
+    /// Resets scroll position back to the top.
+    /// </summary>
+    /// <remarks>
+    /// When changing the list data, you will likely need to invoke this manually.
+    /// </remarks>
+    public void ResetScroll() {
+        scrollPosition = 0;
+        ScrollBarNode.ScrollPosition = 0;
         PopulateNodes();
-        RecalculateScroll();
     }
 
+    /// <summary>
+    /// Clears the currently selected item.
+    /// </summary>
+    public void ClearSelection() {
+        SelectedItems.Clear();
+        PopulateNodes();
+    }
+
+    /// <summary>
+    /// Updates the data being displayed.
+    /// </summary>
     public void Update() {
+        NoResultsTextNodeContainer.IsVisible = !NoResultsTextNode.String.IsEmpty && OptionsList.Count is 0 && ShowNoResultsPlaceholder;
+
         PopulateNodes();
 
         foreach (var node in nodeList) {
@@ -119,6 +164,106 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
                 node.Update();
             }
         }
+    }
+
+    /// <summary>
+    /// Resets and rebuilds list
+    /// </summary>
+    /// <remarks>
+    /// Use sparingly, this is an expensive operation.
+    /// </remarks>
+    public void FullRebuild() {
+        UpwardsNavNode?.Dispose();
+        UpwardsNavNode = null;
+
+        DownwardsNavNode?.Dispose();
+        DownwardsNavNode = null;
+
+        foreach (var node in nodeList) {
+            node.Dispose();
+        }
+        nodeList.Clear();
+
+        scrollPosition = Math.Clamp(scrollPosition, 0, Math.Max(OptionsList.Count - nodeCount, 0));
+        SelectedItems.Clear();
+
+        UpwardsNavNode = new ListNavNode {
+            Position = new Vector2(0.0f, 0.0f),
+            Size = new Vector2(Width, 4.0f),
+            OnUpNavReceived = OnUpNavReceived,
+            IsVisible = NavIndex is not 0,
+        };
+        UpwardsNavNode.AttachNode(this);
+
+        RebuildNodeList();
+
+        DownwardsNavNode = new ListNavNode {
+            Position = new Vector2(0.0f, Height - 4.0f),
+            Size = new Vector2(Width, 4.0f),
+            OnDownNavReceived = OnDownNavReceived,
+            IsVisible = NavIndex is not 0,
+        };
+        DownwardsNavNode.AttachNode(this);
+
+        PopulateNodes();
+        RecalculateScroll();
+    }
+
+    /// <summary>
+    /// Constructs a new <see cref="ListNode{T, TU}"/>
+    /// </summary>
+    public ListNode() {
+        itemHeight = TU.ItemHeight;
+
+        ScrollBarNode = new ScrollBarNode {
+            OnValueChanged = OnScrollUpdate,
+            ScrollSpeed = (int)itemHeight,
+            HideWhenDisabled = true,
+        };
+        ScrollBarNode.AttachNode(this);
+
+        NoResultsTextNodeContainer = new ResNode {
+            IsVisible = false,
+        };
+        NoResultsTextNodeContainer.AttachNode(this);
+
+        NoResultsTextNode = new TextNode {
+            AlignmentType = AlignmentType.Center,
+            TextId = 5494, // "No results found."
+            SheetType = NodeData.SheetType.Addon,
+        };
+        NoResultsTextNode.AttachNode(NoResultsTextNodeContainer);
+
+        AddEvent(AtkEventType.MouseWheel, OnMouseWheel);
+        AddNodeFlags(NodeFlags.HasCollision);
+    }
+
+    /// <inheritdoc />
+    protected override void OnSizeChanged() {
+        base.OnSizeChanged();
+
+        ScrollBarNode.Size = new Vector2(8.0f, Height);
+        ScrollBarNode.Position = new Vector2(Width - 8.0f, 0.0f);
+
+        NoResultsTextNodeContainer.Size = new Vector2(Width - 8.0f, Height);
+        NoResultsTextNodeContainer.Position = Vector2.Zero;
+
+        NoResultsTextNode.Size = NoResultsTextNodeContainer.Size;
+        NoResultsTextNode.Position = Vector2.Zero;
+
+        var newNodeCount = (int)(Height / (itemHeight + ItemSpacing));
+        if (newNodeCount != nodeCount) {
+            FullRebuild();
+        }
+
+        foreach (var node in nodeList) {
+            node.Width = ScrollBarNode.Bounds.Left - 8.0f;
+        }
+
+        UpwardsNavNode?.Width = Width;
+        DownwardsNavNode?.Width = Width;
+
+        RecalculateScroll();
     }
 
     private void RebuildNodeList() {
@@ -129,13 +274,13 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
             var node = new TU {
                 Size = new Vector2(ScrollBarNode.Bounds.Left - 8.0f, itemHeight),
                 Position = new Vector2(0.0f, index * (itemHeight + ItemSpacing)),
-                NodeId = (uint)index + 2,
                 OnClick = clickedNode => {
                     SelectItem(((TU)clickedNode).ItemData);
-                    OnItemSelected?.Invoke(selectedItem);
+                    OnItemSelected?.Invoke(((TU)clickedNode).ItemData);
                 },
                 IsVisible = false,
             };
+
             node.AttachNode(this);
             nodeList.Add(node);
         }
@@ -149,10 +294,12 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
                 var item = OptionsList[dataIndex];
                 node.ItemData = item;
                 node.IsVisible = true;
-                node.IsSelected = GenericUtil.AreEqual(item, selectedItem);
+                node.ShowClickableCursor = !node.InteractionsDisabled;
+                node.IsSelected = SelectedItems.Any(selectedItem => GenericUtil.AreEqual(node.ItemData, selectedItem));
             }
             else {
                 node.IsVisible = false;
+                node.ShowClickableCursor = false;
             }
         }
     }
@@ -160,28 +307,60 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
     private void SelectItem(T? item) {
         if (item is null) return;
 
-        selectedItem = item;
+        if (!AllowMultipleSelection) {
+            SelectedItems.Clear();
+        }
+
+        if (!SelectedItems.Remove(item)) {
+            SelectedItems.Add(item);
+        }
 
         foreach (var node in nodeList) {
-            if (node.ItemData is null) {
+            if (node.ItemData is null && !AllowMultipleSelection) {
                 node.IsSelected = false;
             }
             else {
-                node.IsSelected = GenericUtil.AreEqual(node.ItemData, selectedItem);
+                node.IsSelected = SelectedItems.Any(selectedItem => GenericUtil.AreEqual(node.ItemData, selectedItem));
             }
         }
-    }
-
-    public void ResetScroll() {
-        scrollPosition = 0;
-        ScrollBarNode.ScrollPosition = 0;
-        PopulateNodes();
     }
 
     private void RecalculateScroll() {
         if (OptionsList.Count < nodeCount) {
             ScrollBarNode.ScrollPosition = 0;
             ScrollBarNode.IsEnabled = false;
+        }
+
+        // Recalculate Controller Nav
+        if (NavIndex is not 0) {
+            UpwardsNavNode?.NavIndex = NavIndex;
+            UpwardsNavNode?.NavUp = NavUp;
+            UpwardsNavNode?.NavLeft = NavLeft;
+            UpwardsNavNode?.NavRight = NavRight;
+            UpwardsNavNode?.NavDown = NavIndex + 1;
+
+            DownwardsNavNode?.NavIndex = nodeList.Count * 4 + NavIndex + 1;
+            DownwardsNavNode?.NavUp = (nodeList.Count - 1 ) * 4 + NavIndex + 1;
+            DownwardsNavNode?.NavLeft = NavLeft;
+            DownwardsNavNode?.NavRight = NavRight;
+            DownwardsNavNode?.NavDown = NavDown;
+        }
+
+        foreach (var index in Enumerable.Range(0, nodeList.Count)) {
+            if (NavIndex is not 0) {
+                var node = nodeList[index];
+
+                // We'll allocate 4 nav slots per list item to do sub-nav via left/right.
+                if (index is 0) {
+                    node.ProcessNav(index * 4 + NavIndex + 1, NavIndex, (index + 1) * 4 + NavIndex + 1, NavLeft, NavRight);
+                }
+                else if (index == nodeCount - 1) {
+                    node.ProcessNav(index * 4 + NavIndex + 1, (index - 1) * 4 + NavIndex + 1, nodeList.Count * 4 + NavIndex + 1, NavLeft, NavRight);
+                }
+                else {
+                    node.ProcessNav(index * 4 + NavIndex + 1, (index - 1) * 4 + NavIndex + 1, (index + 1) * 4 + NavIndex + 1, NavLeft, NavRight);
+                }
+            }
         }
 
         var totalHeight = (int)(OptionsList.Count * (itemHeight + ItemSpacing) + ItemSpacing);
@@ -192,6 +371,10 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
     private void OnScrollUpdate(int newPosition) {
         scrollPosition = (int)(newPosition / (itemHeight + ItemSpacing));
         PopulateNodes();
+
+        if (ParentAddon is not null) {
+            ParentAddon->UpdateCollisionNodeList(false);
+        }
     }
 
     private void OnMouseWheel(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
@@ -201,6 +384,51 @@ public unsafe class ListNode<T, TU> : SimpleComponentNode where TU : ListItemNod
         ScrollBarNode.ScrollPosition = (int)(scrollPosition * (itemHeight + ItemSpacing));
         PopulateNodes();
 
+        if (ParentAddon is not null) {
+            ParentAddon->UpdateCollisionNodeList(false);
+        }
+
         atkEvent->SetEventIsHandled();
     }
+
+    private void OnUpNavReceived() {
+        if (scrollPosition > 0) {
+            UpwardsNavNode?.NavUp = 0;
+            scrollPosition--;
+            ScrollBarNode.ScrollPosition = (int)(scrollPosition * (itemHeight + ItemSpacing));
+            PopulateNodes();
+
+            if (!AllowMultipleSelection) {
+                var node = nodeList[0];
+                node.OnClick?.Invoke(node);
+            }
+
+            if (scrollPosition is 0) {
+                UpwardsNavNode?.NavUp = NavUp;
+            }
+        }
+    }
+
+    private void OnDownNavReceived() {
+        if (scrollPosition < OptionsList.Count - nodeList.Count) {
+            DownwardsNavNode?.NavDown = 0;
+            scrollPosition++;
+            ScrollBarNode.ScrollPosition = (int)(scrollPosition * (itemHeight + ItemSpacing));
+            PopulateNodes();
+
+            if (!AllowMultipleSelection) {
+                var node = nodeList[^1];
+                node.OnClick?.Invoke(node);
+            }
+
+            if (scrollPosition is 0) {
+                DownwardsNavNode?.NavDown = NavDown;
+            }
+        }
+    }
+
+    private readonly List<TU> nodeList = [];
+    private readonly float itemHeight;
+    private int scrollPosition;
+    private int nodeCount;
 }

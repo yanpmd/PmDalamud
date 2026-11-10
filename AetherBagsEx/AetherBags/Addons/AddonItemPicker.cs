@@ -1,5 +1,5 @@
 using AetherBags.Nodes.Configuration.Category;
-using KamiToolKit.Premade.Addon.Search;
+using AetherBags.Compat.Search;
 
 namespace AetherBags.Addons;
 

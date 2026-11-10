@@ -10,8 +10,9 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 using GameKeybind = FFXIVClientStructs.FFXIV.Client.System.Input.Keybind;
+using KamiToolKit.BaseTypes;
+using AetherBags.Compat;
 using PluginKeybind = AetherBags.Configuration.Keybind;
 
 namespace AetherBags.Addons.Config;

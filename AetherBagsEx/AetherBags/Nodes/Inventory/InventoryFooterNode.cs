@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using System.Numerics;
 using AetherBags.Currency;
 using AetherBags.Nodes.Currency;
+using AetherBags.Nodes.Layout;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node.Simple;
+using KamiToolKit.Nodes.Simplified;
 using Lumina.Text.ReadOnly;
 using static AetherBags.Inventory.State.InventoryStateBase;
 

@@ -12,6 +12,7 @@ using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Addons;
 
@@ -70,7 +71,7 @@ public unsafe class AddonRetainerWindow : InventoryAddonBase
         {
             Position = new Vector2(header.HeaderWidth - SettingsButtonOffset, header.HeaderY),
             Size = new Vector2(28f),
-            Icon = ButtonIcon.GearCog,
+            Icon = CircleButtonIcon.GearCog,
             OnClick = System.AddonConfigurationWindow.Toggle
         };
         SettingsButtonNode.AttachNode(this);

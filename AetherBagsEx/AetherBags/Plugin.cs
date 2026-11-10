@@ -31,7 +31,7 @@ public class Plugin : IDalamudPlugin
 
         BackupHelper.DoConfigBackup(pluginInterface);
 
-        KamiToolKitLibrary.Initialize(pluginInterface);
+        KamiToolKitLibrary.Initialize(pluginInterface, "AetherBagsEx");
 
         System.IPC = new IPCService();
         System.IPC.RefreshExternalSources();
@@ -157,7 +157,16 @@ public class Plugin : IDalamudPlugin
         System.AddonChangelogWindow.Dispose();
 
         Util.SaveConfig(System.Config);
-        KamiToolKitLibrary.Dispose();
+
+        // KamiToolKit must be released on the main thread: it unhooks the native close callback and
+        // reclaims the nodes it allocated. Dalamud does not guarantee that plugin disposal happens on
+        // the framework thread, and KamiToolKit skips all cleanup when it is called from anywhere else.
+        if (Dalamud.Utility.ThreadSafety.IsMainThread) {
+            KamiToolKitLibrary.Dispose();
+        }
+        else {
+            Services.Framework.RunOnFrameworkThread(KamiToolKitLibrary.Dispose);
+        }
     }
 
     private void OnLogin()

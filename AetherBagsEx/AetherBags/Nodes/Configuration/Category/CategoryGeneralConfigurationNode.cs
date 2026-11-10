@@ -8,11 +8,11 @@ using AetherBags.Inventory;
 using AetherBags.Inventory.Context;
 using AetherBags.Nodes.Input;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
-using KamiToolKit.Premade.Node.Simple;
+using KamiToolKit.Nodes.Simplified;
 
 namespace AetherBags.Nodes.Configuration.Category;
 

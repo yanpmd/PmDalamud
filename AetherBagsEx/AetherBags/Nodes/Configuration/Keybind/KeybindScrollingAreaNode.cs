@@ -1,6 +1,6 @@
 using AetherBags.Configuration;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
+using AetherBags.Compat;
 
 namespace AetherBags.Nodes.Configuration.Keybind;
 
@@ -18,7 +18,7 @@ internal sealed class KeybindConfigurationNode : TabbedVerticalListNode
 {
     public KeybindConfigurationNode(KeybindSettings config)
     {
-        ItemVerticalSpacing = 2;
+        ItemSpacing = 2;
 
         AddNode(new CategoryTextNode
         {

@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using KamiToolKit.Dalamud;
+using KamiToolKit.Interfaces;
+using KamiToolKit.Internal.Classes;
+using KamiToolKit.UiOverlay;
 
 namespace KamiToolKit.Controllers;
 
@@ -13,11 +18,15 @@ namespace KamiToolKit.Controllers;
 /// Addon controller for dynamically managing addons, typical use case is intended to
 /// be for a single tasks, that can apply to one or many addons at once.
 /// </summary>
-public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>, IDisposable {
+public class DynamicAddonController : IAddonEventController<AtkUnitBase>, IDisposable, IAsyncDisposable {
 
     private readonly HashSet<string> trackedAddons = [];
     private bool isEnabled;
 
+    /// <summary>
+    /// Addon names to bind to.
+    /// </summary>
+    /// <exception cref="Exception">Throws when attempting to attach to NamePlate, use <see cref="OverlayController"/> instead.</exception>
     public required List<string> AddonNames {
         init {
             if (value.Any(name => name is "NamePlate")) {
@@ -30,6 +39,28 @@ public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>,
         }
     }
 
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnSetup { get; init; }
+
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnFinalize { get; init; }
+
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnPreRefresh { get; init; }
+
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnRefresh { get; init; }
+
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnUpdate { get; init; }
+
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnDraw { get; init; }
+
+    /// <inheritdoc/>>
+    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnPreUpdate { get; init; }
+
+    /// <inheritdoc/>>
     public void Enable() {
         foreach (var name in trackedAddons) {
             AddListeners(name);
@@ -38,6 +69,14 @@ public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>,
         isEnabled = true;
     }
 
+    /// <inheritdoc/>>
+    public async Task EnableAsync() {
+        await Task.WhenAll(trackedAddons.Select(AddListenersAsync));
+
+        isEnabled = true;
+    }
+
+    /// <inheritdoc/>>
     public void Disable() {
         isEnabled = false;
 
@@ -46,9 +85,19 @@ public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>,
         }
     }
 
+    /// <inheritdoc/>>
+    public async Task DisableAsync() {
+        isEnabled = false;
+
+        await Task.WhenAll(trackedAddons.Select(RemoveListenersAsync));
+    }
+
+    /// <summary>
+    /// Adds an addon to the tracked addons list.
+    /// </summary>
     public void AddAddon(string name) {
         if (name is "NamePlate") {
-            Services.Log.Error("Attaching to NamePlate is not supported. Use OverlayController instead.");
+            IPluginLog.Get().Error("Attaching to NamePlate is not supported. Use OverlayController instead.");
             return;
         }
 
@@ -59,6 +108,10 @@ public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>,
         }
     }
 
+    /// <summary>
+    /// Removes an addon from the tracked addons list.
+    /// </summary>
+    /// <param name="name"></param>
     public void RemoveAddon(string name) {
         trackedAddons.Remove(name);
 
@@ -67,7 +120,20 @@ public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>,
         }
     }
 
-    private void OnAddonEvent(AddonEvent type, AddonArgs args) {
+    /// <inheritdoc />
+    public void Dispose() {
+        IAddonLifecycle.Get().UnregisterListener(OnAddonEvent);
+        Disable();
+    }
+
+    /// <inheritdoc/>>
+    public async ValueTask DisposeAsync() {
+        IAddonLifecycle.Get().UnregisterListener(OnAddonEvent);
+
+        await DisableAsync();
+    }
+
+    private unsafe void OnAddonEvent(AddonEvent type, AddonArgs args) {
         var addon = (AtkUnitBase*)args.Addon.Address;
 
         switch (type) {
@@ -94,54 +160,82 @@ public unsafe class DynamicAddonController : IAddonEventController<AtkUnitBase>,
             case AddonEvent.PostUpdate:
                 OnUpdate?.Invoke(addon);
                 return;
+
+            case AddonEvent.PreDraw:
+                OnDraw?.Invoke(addon);
+                return;
         }
     }
 
-    private void AddListeners(string name) {
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PreRefresh, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PreRequestedUpdate, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, name, OnAddonEvent);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PostUpdate, name, OnAddonEvent);
+    private unsafe void AddListeners(string name) {
+        ThreadSafety.AssertMainThread();
 
-        Services.Framework.RunOnFrameworkThread(() => {
-            var addon = RaptureAtkUnitManager.Instance()->GetAddonByName(name);
-            if (addon is not null) {
-                OnSetup?.Invoke(addon);
+        RegisterListeners(name);
+
+        var addon = RaptureAtkUnitManager.Instance()->GetAddonByName(name);
+        if (addon is not null) {
+            OnSetup?.Invoke(addon);
+        }
+    }
+
+    private async Task AddListenersAsync(string name) {
+        RegisterListeners(name);
+
+        await IFramework.Get().Run(() => {
+            unsafe {
+                var addon = RaptureAtkUnitManager.Instance()->GetAddonByName(name);
+                if (addon is not null) {
+                    OnSetup?.Invoke(addon);
+                }
             }
         });
     }
 
-    private void RemoveListeners(string name) {
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PreRefresh, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PreRequestedUpdate, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PreUpdate, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PostRequestedUpdate, name, OnAddonEvent);
-        Services.AddonLifecycle.UnregisterListener(AddonEvent.PostUpdate, name, OnAddonEvent);
+    private unsafe void RemoveListeners(string name) {
+        ThreadSafety.AssertMainThread();
 
-        Services.Framework.RunOnFrameworkThread(() => {
-            var addon = RaptureAtkUnitManager.Instance()->GetAddonByName(name);
-            if (addon is not null) {
-                OnFinalize?.Invoke(addon);
+        UnregisterListeners(name);
+
+        var addon = RaptureAtkUnitManager.Instance()->GetAddonByName(name);
+        if (addon is not null) {
+            OnFinalize?.Invoke(addon);
+        }
+    }
+
+    private async Task RemoveListenersAsync(string name) {
+        UnregisterListeners(name);
+
+        await IFramework.Get().Run(() => {
+            unsafe {
+                var addon = RaptureAtkUnitManager.Instance()->GetAddonByName(name);
+                if (addon is not null) {
+                    OnFinalize?.Invoke(addon);
+                }
             }
         });
     }
 
-    public void Dispose() {
-        Services.AddonLifecycle.UnregisterListener(OnAddonEvent);
-        Disable();
+    private void RegisterListeners(string name) {
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostSetup, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreFinalize, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreRefresh, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreRequestedUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostRefresh, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostRequestedUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreDraw, name, OnAddonEvent);
     }
 
-    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnSetup { get; init; }
-    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnFinalize { get; init; }
-    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnPreRefresh { get; init; }
-    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnRefresh { get; init; }
-    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnUpdate { get; init; }
-    public IAddonEventController<AtkUnitBase>.AddonControllerEvent? OnPreUpdate { get; init; }
+    private void UnregisterListeners(string name) {
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PostSetup, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PreFinalize, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PreRefresh, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PreRequestedUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PreUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PostRefresh, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PostRequestedUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PostUpdate, name, OnAddonEvent);
+        IAddonLifecycle.Get().UnregisterListener(AddonEvent.PreDraw, name, OnAddonEvent);
+    }
 }

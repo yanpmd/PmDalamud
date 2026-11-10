@@ -4,7 +4,8 @@ using AetherBags.Helpers;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node.Simple;
+using KamiToolKit.Nodes.Simplified;
+using AetherBags.Compat;
 
 namespace AetherBags.Nodes.Configuration.Category;
 

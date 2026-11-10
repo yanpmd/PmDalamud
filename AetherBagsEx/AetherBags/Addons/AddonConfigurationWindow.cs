@@ -7,8 +7,10 @@ using AetherBags.Nodes.Configuration.Currency;
 using AetherBags.Nodes.Configuration.General;
 using AetherBags.Nodes.Configuration.Keybind;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 using KamiToolKit.Nodes;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Addons;
 
@@ -32,7 +34,7 @@ public class AddonConfigurationWindow : NativeAddon
         {
             Position = new Vector2(Size.X - 66f, 6f),
             Size = new Vector2(28f),
-            Icon = ButtonIcon.QuestionMark,
+            Icon = CircleButtonIcon.QuestionMark,
             OnClick = System.AddonChangelogWindow.Toggle,
         };
         _changelogButtonNode.AttachNode(windowNode.HeaderContainerNode);

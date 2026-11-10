@@ -1,9 +1,26 @@
 using System.Linq;
+using KamiToolKit.BaseTypes.ComponentNode;
 using KamiToolKit.Enums;
 
 namespace KamiToolKit.Nodes;
 
+/// <summary>
+/// A <see cref="LayoutListNode"/> that represents a vertical list of elements.
+/// </summary>
+/// <remarks>
+/// If you are needing to represent the same element multiple times use a <see cref="ListNode{T,TU}"/> instead for performance reasons.
+/// </remarks>
 public class VerticalListNode : LayoutListNode {
+
+    /// <summary>
+    /// Nav index to move to when left is pressed while focusing any list element.
+    /// </summary>
+    public int NavLeft { get; set; }
+
+    /// <summary>
+    /// Nav index to move to when right is pressed while focusing any list element.
+    /// </summary>
+    public int NavRight { get; set; }
 
     /// <summary>
     /// Displays items starting from either the bottom or the top of the list
@@ -37,6 +54,7 @@ public class VerticalListNode : LayoutListNode {
     /// </summary>
     public bool FitWidth { get; set; }
 
+    /// <inheritdoc />
     protected override void OnRecalculateLayout() {
         var startY = Anchor switch {
             VerticalListAnchor.Top => 0.0f + FirstItemSpacing,
@@ -77,6 +95,38 @@ public class VerticalListNode : LayoutListNode {
 
         if (FitContents) {
             Height = NodeList.Sum(node => node.IsVisible ? node.Height + ItemSpacing : 0.0f) + FirstItemSpacing - ItemSpacing;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnRecalculateNavigation() {
+        var componentNodes = NodeList.OfType<ComponentNode>().ToList();
+        if (componentNodes.Count is 0) return;
+
+        if (Anchor is VerticalListAnchor.Bottom) {
+            componentNodes = componentNodes.AsEnumerable().Reverse().ToList();
+        }
+
+        foreach (var (index, node) in componentNodes.Index()) {
+            node.NavIndex = (byte) (index + NavIndex);
+            node.NavLeft = NavLeft;
+            node.NavRight = NavRight;
+
+            // First Element
+            if (index is 0) {
+                node.NavUp = (byte) (componentNodes.Count - 1 + NavIndex);
+            }
+            else {
+                node.NavUp = (byte) (index - 1 + NavIndex);
+            }
+
+            // Last Element
+            if (index == componentNodes.Count - 1) {
+                node.NavDown = (byte) NavIndex;
+            }
+            else {
+                node.NavDown = (byte) (index + 1 + NavIndex);
+            }
         }
     }
 }

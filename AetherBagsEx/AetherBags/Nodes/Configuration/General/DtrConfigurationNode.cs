@@ -3,7 +3,6 @@ using System.Numerics;
 using AetherBags.Configuration;
 using AetherBags.Tags;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 
 namespace AetherBags.Nodes.Configuration.General;
 
@@ -13,7 +12,7 @@ internal sealed class DtrConfigurationNode : TabbedVerticalListNode
     {
         DtrSettings config = System.Config.Dtr;
 
-        ItemVerticalSpacing = 2;
+        ItemSpacing = 2;
 
         AddNode(new CategoryTextNode
         {
@@ -78,7 +77,7 @@ internal sealed class DtrConfigurationNode : TabbedVerticalListNode
         var displayNameToKey = tagKeys.ToDictionary(key => Localization.Get($"Dtr.Tag.{key}"), key => key);
         var tagOptions = tagKeys.Select(key => Localization.Get($"Dtr.Tag.{key}")).ToList();
 
-        var tagDropdown = new TextDropDownNode
+        var tagDropdown = new StringDropDownNode
         {
             Size = new Vector2(320, 24),
             Options = tagOptions,

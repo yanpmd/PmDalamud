@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node.Simple;
+using KamiToolKit.Nodes.Simplified;
 using Lumina.Text.ReadOnly;
 
 namespace AetherBags.Nodes.Layout;
@@ -15,7 +16,7 @@ public class CollapsibleSectionNode : VerticalListNode
     protected readonly NineGridNode BackgroundNode;
     protected readonly ImageNode ArrowNode;
     protected readonly TextNode LabelNode;
-    protected new readonly CollisionNode CollisionNode;
+    protected readonly CollisionNode CollisionNode;
     protected readonly TabbedVerticalListNode ContentNode;
     protected readonly SimpleComponentNode HeaderNode;
 
@@ -130,7 +131,7 @@ public class CollapsibleSectionNode : VerticalListNode
         ContentNode = new TabbedVerticalListNode {
             IsVisible = false,
             X = 18.0f,
-            ItemVerticalSpacing = 4.0f,
+            ItemSpacing = 4.0f,
             TabSize = 18.0f,
             FitWidth = true,
         };

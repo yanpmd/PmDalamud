@@ -8,6 +8,7 @@ using AetherBags.Nodes.Layout;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Nodes.Inventory;
 
@@ -91,7 +92,7 @@ public class LootedItemsCategoryNode : InventoryCategoryNodeBase
         _clearButton = new CircleButtonNode
         {
             Size = new Vector2(ClearButtonSize),
-            Icon = ButtonIcon.CrossSmall,
+            Icon = CircleButtonIcon.CrossSmall,
             OnClick = () => OnClearAll?.Invoke(),
         };
         _clearButton.AttachNode(this);
@@ -134,10 +135,10 @@ public class LootedItemsCategoryNode : InventoryCategoryNodeBase
         }
     }
 
-    protected override void Dispose(bool disposing, bool isNativeDestructor)
+    protected override void Dispose(bool isNativeDestructor)
     {
         _isDisposed = true;
-        base.Dispose(disposing, isNativeDestructor);
+        base.Dispose(isNativeDestructor);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

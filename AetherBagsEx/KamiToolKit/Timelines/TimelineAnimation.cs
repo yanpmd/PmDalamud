@@ -1,19 +1,57 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using FFXIVClientStructs.FFXIV.Client.System.Memory;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using KamiToolKit.Classes;
 
 namespace KamiToolKit.Timelines;
 
+/// <summary>
+/// Managed class representing a AtkTimelineAnimation
+/// </summary>
 public unsafe class TimelineAnimation : IDisposable {
 
-    internal AtkTimelineAnimation* InternalAnimation;
+    /// <summary>
+    /// The starting frame index for this animation.
+    /// </summary>
+    /// <remarks>
+    /// Must be less than <see cref="EndFrameId"/>
+    /// </remarks>
+    public int StartFrameId {
+        get => InternalAnimation->StartFrameIdx;
+        set => InternalAnimation->StartFrameIdx = (ushort)value;
+    }
 
-    private List<TimelineKeyFrame> internalKeyFrames = [];
+    /// <summary>
+    /// The ending frame index for this animation.
+    /// </summary>
+    /// <remarks>
+    /// Must be greater than <see cref="StartFrameId"/>
+    /// </remarks>
+    public int EndFrameId {
+        get => InternalAnimation->EndFrameIdx;
+        set => InternalAnimation->EndFrameIdx = (ushort)value;
+    }
 
+    /// <summary>
+    /// Gets or sets the keyframes used.
+    /// </summary>
+    /// <remarks>
+    /// Use <see cref="TimelineBuilder"/> to more easily edit keyframes.
+    /// </remarks>
+    public List<TimelineKeyFrame> KeyFrames {
+        get => internalKeyFrames;
+        set {
+            internalKeyFrames = value;
+            Resync();
+        }
+    }
+
+    /// <summary>
+    /// Constructs a new instance of <see cref="TimelineAnimation"/>.
+    /// </summary>
     public TimelineAnimation() {
-        InternalAnimation = NativeMemoryHelper.UiAlloc<AtkTimelineAnimation>();
+        InternalAnimation = IMemorySpace.GetUISpace()->MallocZeroed<AtkTimelineAnimation>();
 
         InternalAnimation->StartFrameIdx = 0;
         InternalAnimation->EndFrameIdx = 0;
@@ -23,34 +61,17 @@ public unsafe class TimelineAnimation : IDisposable {
         }
     }
 
-    public int StartFrameId {
-        get => InternalAnimation->StartFrameIdx;
-        set => InternalAnimation->StartFrameIdx = (ushort)value;
-    }
-
-    public int EndFrameId {
-        get => InternalAnimation->EndFrameIdx;
-        set => InternalAnimation->EndFrameIdx = (ushort)value;
-    }
-
-    public List<TimelineKeyFrame> KeyFrames {
-        get => internalKeyFrames;
-        set {
-            internalKeyFrames = value;
-            Resync();
-        }
-    }
-
+    /// <inheritdoc />
     public void Dispose() {
         if (InternalAnimation is null) return;
 
         foreach (ref var spanGroup in InternalAnimation->KeyGroups) {
-            NativeMemoryHelper.UiFree(spanGroup.KeyFrames);
+            IMemorySpace.Free(spanGroup.KeyFrames);
             spanGroup.KeyFrames = null;
             spanGroup.KeyFrameCount = 0;
         }
 
-        NativeMemoryHelper.UiFree(InternalAnimation);
+        IMemorySpace.Free(InternalAnimation);
         InternalAnimation = null;
     }
 
@@ -60,11 +81,11 @@ public unsafe class TimelineAnimation : IDisposable {
             keyFrameGroup.Type = keyFrameSet.First().GroupType;
 
             if (keyFrameGroup.KeyFrames is not null) {
-                NativeMemoryHelper.UiFree(keyFrameGroup.KeyFrames, keyFrameGroup.KeyFrameCount);
+                IMemorySpace.Free(keyFrameGroup.KeyFrames);
                 keyFrameGroup.KeyFrames = null;
             }
 
-            keyFrameGroup.KeyFrames = NativeMemoryHelper.UiAlloc<AtkTimelineKeyFrame>(keyFrameSet.Count());
+            keyFrameGroup.KeyFrames = IMemorySpace.GetUISpace()->AllocateZeroedArray<AtkTimelineKeyFrame>(keyFrameSet.Count());
 
             var index = 0;
             foreach (var keyframe in keyFrameSet) {
@@ -75,18 +96,8 @@ public unsafe class TimelineAnimation : IDisposable {
             keyFrameGroup.KeyFrameCount = (ushort)keyFrameSet.Count();
         }
     }
-}
 
-public enum KeyFrameGroupType {
-    Position = 0,
-    Rotation = 1,
-    Scale = 2,
-    Alpha = 3,
-    Tint = 4,
+    internal AtkTimelineAnimation* InternalAnimation;
 
-    PartId = 5,
-    TextColor = 5,
-
-    TextEdge = 6,
-    TextLabel = 7,
+    private List<TimelineKeyFrame> internalKeyFrames = [];
 }

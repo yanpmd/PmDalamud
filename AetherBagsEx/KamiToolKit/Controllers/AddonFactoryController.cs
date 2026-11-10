@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using InteropGenerator.Runtime;
-using KamiToolKit.Dalamud;
+using KamiToolKit.BaseTypes;
+using KamiToolKit.Internal.Classes;
 
 namespace KamiToolKit.Controllers;
 
@@ -11,12 +15,12 @@ namespace KamiToolKit.Controllers;
 /// Controller intended to interact with the games native Addon Factory system
 /// to fully replace a built-in game addon with a custom <see cref="NativeAddon"/>.
 /// </summary>
-public unsafe class AddonFactoryController : IDisposable {
-    public required string AddonName { get; init; }
+public class AddonFactoryController : IDisposable, IAsyncDisposable {
 
-    private nint? originalFactoryCreateAddress;
-    private RaptureAtkModule.AddonFactoryInfo.CreateDelegate? pinnedFactoryCreateMethod;
-    private NativeAddon? nativeAddon;
+    /// <summary>
+    /// Addon name to bind to.
+    /// </summary>
+    public required string AddonName { get; init; }
 
     /// <summary>
     /// Function to allocate the <see cref="NativeAddon"/> that will replace the named addon.
@@ -29,54 +33,99 @@ public unsafe class AddonFactoryController : IDisposable {
     /// <summary>
     /// Enables the addon factory replacement.
     /// </summary>
-    public void Enable() => Services.Framework.RunOnFrameworkThread(() => {
+    /// <remarks>
+    /// Must be invoked from the main game thread.
+    /// </remarks>
+    public unsafe void Enable() {
+        ThreadSafety.AssertMainThread();
+
         var factoryInfo = RaptureAtkModule.Instance()->GetAddonFactoryInfo(AddonName);
         if (factoryInfo is null) return;
 
         originalFactoryCreateAddress = (nint?)factoryInfo->Create;
         pinnedFactoryCreateMethod = CreateCustomAddon;
         factoryInfo->Create = (delegate* unmanaged<RaptureAtkModule*, CStringPointer, uint, AtkValue*, AtkUnitBase*>) Marshal.GetFunctionPointerForDelegate(pinnedFactoryCreateMethod);
-    });
+    }
+
+    /// <summary>
+    /// Enables the addon factory replacement.
+    /// </summary>
+    /// <remarks>
+    /// Activation will be delayed until the next game tick.
+    /// </remarks>
+    public async Task EnableAsync() {
+
+        // Just run enable, there's not really any optimizing that we can do here.
+        await IFramework.Get().Run(Enable);
+    }
 
     /// <summary>
     /// Disables addon factory replacement and disposes any open replaced addons.
     /// </summary>
-    public void Disable() {
+    /// <remarks>
+    /// Must be invoked from the main game thread.
+    /// </remarks>
+    public unsafe void Disable() {
+        ThreadSafety.AssertMainThread();
+
         nativeAddon?.Dispose();
         nativeAddon = null;
 
-        Services.Framework.RunOnFrameworkThread(() => {
-            var factoryInfo = RaptureAtkModule.Instance()->GetAddonFactoryInfo(AddonName);
-            if (factoryInfo is null) return;
+        var factoryInfo = RaptureAtkModule.Instance()->GetAddonFactoryInfo(AddonName);
+        if (factoryInfo is null) return;
 
-            // This is dumb, but the compiler will warn otherwise.
-            if (originalFactoryCreateAddress is null) {
-                factoryInfo->Create = null;
-            }
-            else {
-                factoryInfo->Create = (delegate* unmanaged<RaptureAtkModule*, CStringPointer, uint, AtkValue*, AtkUnitBase*>) originalFactoryCreateAddress;
-            }
+        // This is dumb, but the compiler will warn otherwise.
+        if (originalFactoryCreateAddress is null) {
+            factoryInfo->Create = null;
+        }
+        else {
+            factoryInfo->Create = (delegate* unmanaged<RaptureAtkModule*, CStringPointer, uint, AtkValue*, AtkUnitBase*>) originalFactoryCreateAddress;
+        }
 
-            pinnedFactoryCreateMethod = null;
-            originalFactoryCreateAddress = null;
-        });
+        pinnedFactoryCreateMethod = null;
+        originalFactoryCreateAddress = null;
     }
 
-    private AtkUnitBase* CreateCustomAddon(RaptureAtkModule* raptureAtkModule, CStringPointer addonName, uint valueCount, AtkValue* values) {
+    /// <summary>
+    /// Disable the addon factory replacement.
+    /// </summary>
+    /// <remarks>
+    /// Applies after the next game tick.
+    /// </remarks>
+    public async Task DisableAsync() {
+
+        // Just run disable, there's not really any optimizing that we can do here.
+        await IFramework.Get().Run(Disable);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+        => Disable();
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync() {
+        await DisableAsync();
+    }
+
+    private unsafe AtkUnitBase* CreateCustomAddon(RaptureAtkModule* raptureAtkModule, CStringPointer addonName, uint valueCount, AtkValue* values) {
         try {
+
+            // We have no reasonable way to reuse the current instance, so dispose the previous and make a new one.
             nativeAddon?.Dispose();
+
             nativeAddon = CreateNativeAddonFunction();
             nativeAddon.InitializeForAddonFactory(valueCount, values);
 
             return nativeAddon;
         }
         catch (Exception e) {
-            Services.Log.Exception(e);
+            IPluginLog.Get().Exception(e);
         }
 
         return null;
     }
 
-    public void Dispose()
-        => Disable();
+    private nint? originalFactoryCreateAddress;
+    private RaptureAtkModule.AddonFactoryInfo.CreateDelegate? pinnedFactoryCreateMethod;
+    private NativeAddon? nativeAddon;
 }

@@ -7,7 +7,6 @@ using AetherBags.Inventory;
 using AetherBags.Nodes.Input;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 
 namespace AetherBags.Nodes.Configuration.General;
 
@@ -25,7 +24,7 @@ internal sealed class FunctionalConfigurationNode : TabbedVerticalListNode
     {
         GeneralSettings config = System.Config.General;
 
-        ItemVerticalSpacing = 2;
+        ItemSpacing = 2;
 
         var titleNode = new CategoryTextNode
         {

@@ -4,12 +4,27 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace KamiToolKit.Timelines;
 
+/// <summary>
+/// Conversion class used to convert between a managed object and <see cref="AtkTimelineNodeTint"/>
+/// </summary>
+/// <remarks>
+/// There's some nonsense with how the conversion has to happen that this just solves.
+/// </remarks>
 public class NodeTint {
 
-    public Vector3 AddColor;
+    /// <summary>
+    /// Intended for internal use, this class is magic, don't question it, or you'll dispell the magic.
+    /// </summary>
+    public Vector3 AddColor { get; set; }
 
-    public Vector3 MultiplyColor;
+    /// <summary>
+    /// Intended for internal use, this class is magic, don't question it, or you'll dispell the magic.
+    /// </summary>
+    public Vector3 MultiplyColor { get; set; }
 
+    /// <summary>
+    /// Intended for internal use, this class is magic, don't question it, or you'll dispell the magic.
+    /// </summary>
     public static implicit operator AtkTimelineNodeTint(NodeTint tint) => new() {
         MultiplyRGB = new ByteColor {
             R = (byte)tint.MultiplyColor.X, G = (byte)tint.MultiplyColor.Y, B = (byte)tint.MultiplyColor.Z,
@@ -17,6 +32,9 @@ public class NodeTint {
         AddRGBBitfield = Convert(tint.AddColor),
     };
 
+    /// <summary>
+    /// Intended for internal use, this class is magic, don't question it, or you'll dispell the magic.
+    /// </summary>
     public static implicit operator NodeTint(AtkTimelineNodeTint tint) => new() {
         AddColor = new Vector3(tint.AddR, tint.AddG, tint.AddB), MultiplyColor = tint.MultiplyRGB.ToVector4().AsVector3(),
     };

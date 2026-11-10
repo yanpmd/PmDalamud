@@ -6,6 +6,7 @@ using AetherBags.Inventory;
 using Dalamud.Game.ClientState.Keys;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
+using AetherBags.Compat;
 
 namespace AetherBags.Nodes.Configuration.Category;
 
@@ -112,9 +113,9 @@ public sealed class CategoryScrollingAreaNode : ScrollingListNode
         }
     }
 
-    protected override void Dispose(bool disposing, bool isNativeDestructor)
+    protected override void Dispose(bool isNativeDestructor)
     {
-        if (disposing)
+        if (!isNativeDestructor)
         {
             if (_categoryConfigurationAddon != null)
             {
@@ -123,6 +124,6 @@ public sealed class CategoryScrollingAreaNode : ScrollingListNode
             }
         }
 
-        base.Dispose(disposing, isNativeDestructor);
+        base.Dispose(isNativeDestructor);
     }
 }

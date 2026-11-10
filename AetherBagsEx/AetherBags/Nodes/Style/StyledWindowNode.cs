@@ -38,10 +38,10 @@ public sealed class StyledWindowNode : WindowNode
     {
         if (style is null) return;
 
-        BackgroundNode.Offsets = style.WindowOffsets;
-        BorderNode.Offsets = style.WindowOffsets;
-        BackgroundNode.AddColor = style.WindowTint;
-        BackgroundNode.Alpha = style.WindowAlpha;
+        BackgroundTextureNode.Offsets = style.WindowOffsets;
+        BorderTextureNode.Offsets = style.WindowOffsets;
+        BackgroundTextureNode.AddColor = style.WindowTint;
+        BackgroundTextureNode.Alpha = style.WindowAlpha;
 
         BackgroundImageNode.IsVisible = style.ShowWindowGradation;
         BackgroundImageNode.AddColor = style.WindowTint;

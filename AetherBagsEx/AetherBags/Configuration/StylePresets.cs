@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using AetherBags.Helpers;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 
 namespace AetherBags.Configuration;
 
@@ -66,7 +67,7 @@ public static class StylePresets
 
     private static void ReopenOpenWindows()
     {
-        var windows = new KamiToolKit.NativeAddon?[]
+        var windows = new NativeAddon?[]
         {
             System.AddonInventoryWindow,
             System.AddonSaddleBagWindow,

@@ -4,7 +4,6 @@ using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
 using System;
 using System.Numerics;
-using KamiToolKit.Premade.Node;
 
 namespace AetherBags.Nodes.Configuration.Category;
 
@@ -53,7 +52,7 @@ public sealed class StateFilterRowNode : HorizontalListNode
         _stateButton.SelectedState = _filter.State;
     }
 
-    private sealed class StateFilterButton : MultiStateButtonNode<int>
+    private sealed class StateFilterButton : AetherBags.Compat.MultiStateButtonNode<int>
     {
         private static readonly string[] StateLabels = ["StateFilter.Ignored", "StateFilter.Required", "StateFilter.Excluded"];
 

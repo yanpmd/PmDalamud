@@ -3,7 +3,6 @@ using System.Linq;
 using System.Numerics;
 using AetherBags.Configuration;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 
 namespace AetherBags.Nodes.Configuration.Layout;
 
@@ -29,7 +28,7 @@ internal sealed class StyleConfigurationNode : TabbedVerticalListNode
         int selectedIndex = Array.FindIndex(presets, p => p.preset == StylePresets.GetConfiguredPreset());
         if (selectedIndex < 0) selectedIndex = 0;
 
-        var presetDropdown = new TextDropDownNode
+        var presetDropdown = new StringDropDownNode
         {
             Size = new Vector2(220, 24),
             Options = names,

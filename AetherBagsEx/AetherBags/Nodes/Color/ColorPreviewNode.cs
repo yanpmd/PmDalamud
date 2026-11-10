@@ -4,7 +4,7 @@ using System.Numerics;
 using Dalamud.Interface;
 using KamiToolKit.Enums;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
+using AetherBags.Compat;
 
 namespace AetherBags.Nodes.Color;
 
@@ -92,22 +92,22 @@ public class ColorPreviewNode : ResNode
         return Path.Combine(baseDir, "Assets", "alpha_background.png");
     }
 
-    protected override void Dispose(bool disposing, bool isNativeDestructor)
+    protected override void Dispose(bool isNativeDestructor)
     {
         if (_isDisposed)
         {
-            base.Dispose(disposing, isNativeDestructor);
+            base.Dispose(isNativeDestructor);
             return;
         }
 
         _isDisposed = true;
-        if (disposing)
+        if (!isNativeDestructor)
         {
             _colorBackground.Dispose();
             _alphaLayer.Dispose();
             _colorForeground.Dispose();
         }
 
-        base.Dispose(disposing, isNativeDestructor);
+        base.Dispose(isNativeDestructor);
     }
 }

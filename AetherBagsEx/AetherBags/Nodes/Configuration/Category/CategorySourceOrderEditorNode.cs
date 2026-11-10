@@ -8,7 +8,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Nodes.Configuration.Category;
 
@@ -126,7 +126,7 @@ public sealed class CategorySourceOrderItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(buttonSize, buttonSize),
-            Icon = ButtonIcon.UpArrow,
+            Icon = CircleButtonIcon.UpArrow,
             TextTooltip = Localization.Get("ItemSort.MoveUp"),
             IsEnabled = !isFirst,
             OnClick = () => OnMoveUp?.Invoke(),
@@ -135,7 +135,7 @@ public sealed class CategorySourceOrderItemNode : HorizontalListNode
         AddNode(new CircleButtonNode
         {
             Size = new Vector2(buttonSize, buttonSize),
-            Icon = ButtonIcon.ArrowDown,
+            Icon = CircleButtonIcon.ArrowDown,
             TextTooltip = Localization.Get("ItemSort.MoveDown"),
             IsEnabled = !isLast,
             OnClick = () => OnMoveDown?.Invoke(),

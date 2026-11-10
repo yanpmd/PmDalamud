@@ -5,6 +5,7 @@ using AetherBags.Configuration;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using KamiToolKit.Enums;
 using Lumina.Excel.Sheets;
+using AetherBags.Compat.Search;
 using Action = System.Action;
 
 namespace AetherBags.Nodes.Configuration.Category;

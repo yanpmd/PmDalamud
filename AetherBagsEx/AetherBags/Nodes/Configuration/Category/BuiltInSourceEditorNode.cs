@@ -10,9 +10,10 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Enums;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
-using KamiToolKit.Premade.Node.Simple;
+using KamiToolKit.Nodes.Simplified;
 using Lumina.Excel.Sheets;
+using AetherBags.Compat;
+using AetherBags.Compat.Search;
 using Action = System.Action;
 
 namespace AetherBags.Nodes.Configuration.Category;

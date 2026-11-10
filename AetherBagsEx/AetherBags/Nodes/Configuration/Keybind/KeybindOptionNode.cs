@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AetherBags.Addons.Config;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 using KamiToolKit.Nodes;
 using KeybindDefinition = AetherBags.Configuration.Keybind;

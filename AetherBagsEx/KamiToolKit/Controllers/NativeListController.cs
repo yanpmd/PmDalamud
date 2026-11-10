@@ -1,26 +1,56 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Hooking;
+using Dalamud.Plugin.Services;
+using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.System.Memory;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit.Classes;
-using KamiToolKit.Dalamud;
+using KamiToolKit.Internal.Classes;
 
 namespace KamiToolKit.Controllers;
 
+/// <inheritdoc/>
 public class NativeListController : NativeListController<AtkUnitBase, ListItemData>;
 
+/// <inheritdoc/>
 public class NativeListController<T> : NativeListController<T, ListItemData> where T : unmanaged;
 
 /// <summary>
-/// Controller for modifying native lists.
+/// Controller for modifying native AtkListComponents and their various parts and properties.
 /// </summary>
-/// <typeparam name="T">The concrete addon type.</typeparam>
-/// <typeparam name="TU">A data model for this addons list items.</typeparam>
-public unsafe class NativeListController<T, TU> : IDisposable where T : unmanaged where TU : ListItemData, new() {
+public class NativeListController<T, TU> : IDisposable, IAsyncDisposable where T : unmanaged where TU : ListItemData, new() {
+
+    /// <summary>
+    /// Addon name to bind to.
+    /// </summary>
     public required string AddonName { get; init; }
+
+    /// <summary>
+    /// Delegate that is called when the controller is trying to determine if an element should be modified.
+    /// </summary>
+    public unsafe delegate bool ShouldModifyElementHandler(T* unitBase, TU listItem);
+
+    /// <summary>
+    /// Delegate that is called when the list controller is setting up and trying to hook the games node populator.
+    /// </summary>
+    public unsafe delegate AtkComponentListItemRenderer* GetPopulatorNodeHandler(T* addon);
+
+    /// <summary>
+    /// Delegate that is called to apply a change to a list entry.
+    /// </summary>
+    public unsafe delegate void UpdateElementHandler(T* unitBase, TU listItem);
+
+    /// <summary>
+    /// Delegate that is called to undo a change from a list entry.
+    /// </summary>
+    public unsafe delegate void ResetElementHandler(T* unitBase, TU listItem);
 
     /// <summary>
     /// Define a function that will return true if the provided list item should be modified by this controller.
@@ -45,26 +75,130 @@ public unsafe class NativeListController<T, TU> : IDisposable where T : unmanage
     /// </summary>
     public required GetPopulatorNodeHandler GetPopulatorNode { get; init; }
 
-    private Hook<AtkComponentListItemPopulator.PopulateDelegate>? onListPopulate;
-    private Hook<AtkComponentListItemPopulator.PopulateWithRendererDelegate>? onRendererPopulate;
+    /// <summary>
+    /// List of modified node indexes.
+    /// </summary>
+    public List<uint> ModifiedIndexes { get; } = [];
 
-    public readonly List<uint> ModifiedIndexes = [];
+    /// <summary>
+    /// Adds an attached node to the list item's collision list. Added nodes are owned by the controller.
+    /// </summary>
+    /// <param name="listItem">List item containing the node.</param>
+    /// <param name="node">Node to add.</param>
+    /// <remarks>
+    /// Configure the node's events before adding it. This must be invoked from the main game thread.
+    /// </remarks>
+    public unsafe void AddNode(TU listItem, NodeBase? node) {
+        if (node is null) return;
+        if (attachedNodes.Any(entry => entry.Node == node)) return;
 
-    public void Enable() {
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonSetup);
-        Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonFinalize);
+        ThreadSafety.AssertMainThread();
 
-        Services.Framework.RunOnFrameworkThread(() => {
-            var addon = (T*)RaptureAtkUnitManager.Instance()->GetAddonByName(AddonName);
-            if (addon is not null) {
-                Services.Log.Warning("Caution: ListController was loaded after list was initialized, data may be stale.");
-                LoadPopulators(addon);
+        var renderer = listItem.TryGetListItemRenderer();
+        if (renderer is null) return;
+
+        // Resize Collision Node List
+        var count = renderer->CollisionNodeListCount;
+        var buffer = (AtkResNode**)IMemorySpace.GetUISpace()->Realloc<nint>(renderer->CollisionNodeList, count + 1);
+
+        new Span<nint>(buffer, count).CopyTo(new Span<nint>(buffer + 1, count));
+        buffer[0] = node;
+
+        renderer->CollisionNodeList = buffer;
+        renderer->CollisionNodeListCount++;
+
+        attachedNodes.Add(new ListNodeEntry(node, renderer));
+    }
+
+    /// <summary>
+    /// Removes and disposes a node owned by this controller.
+    /// </summary>
+    /// <param name="node">Node to remove.</param>
+    /// <remarks>
+    /// This must be invoked from the main game thread.
+    /// </remarks>
+    public unsafe void RemoveNode(NodeBase node) {
+        if (attachedNodes.FirstOrDefault(entry => entry.Node == node) is not { } listEntry) return;
+
+        ThreadSafety.AssertMainThread();
+
+        var rendererData = listEntry.Renderer;
+
+        // Note this does not re-alloc the memory for the collision node list!
+        for (var index = 0; index < rendererData->CollisionNodeListCount; index++) {
+            if (rendererData->CollisionNodeList[index] != node.ResNode) {
+                continue;
+            }
+
+            rendererData->CollisionNodeListCount--;
+
+            for (var next = index; next < rendererData->CollisionNodeListCount; next++) {
+                rendererData->CollisionNodeList[next] = rendererData->CollisionNodeList[next + 1];
+            }
+
+            rendererData->CollisionNodeList[rendererData->CollisionNodeListCount] = null;
+            break;
+        }
+
+        if (rendererData->EventNode == node.ResNode) {
+            rendererData->EventNode = null;
+        }
+
+        node.Dispose();
+
+        attachedNodes.Remove(listEntry);
+    }
+
+    /// <summary>
+    /// Enables this native list controller.
+    /// </summary>
+    /// <remarks>
+    /// Warning, it can't properly track modified state if the list is already opened when the controller is enabled.
+    /// This must be invoked from the main game thread.
+    /// </remarks>
+    public unsafe void Enable() {
+        ThreadSafety.AssertMainThread();
+
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonSetup);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonFinalize);
+
+        var addon = (T*)RaptureAtkUnitManager.Instance()->GetAddonByName(AddonName);
+        if (addon is not null) {
+            IPluginLog.Get().Warning("Caution: ListController was loaded after list was initialized, data may be stale.");
+            LoadPopulators(addon);
+        }
+    }
+
+    /// <summary>
+    /// Enables this native list controller.
+    /// </summary>
+    public async Task EnableAsync() {
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonSetup);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonFinalize);
+
+        await IFramework.Get().Run(() => {
+            unsafe {
+                var addon = (T*)RaptureAtkUnitManager.Instance()->GetAddonByName(AddonName);
+                if (addon is not null) {
+                    IPluginLog.Get().Warning("Caution: ListController was loaded after list was initialized, data may be stale.");
+                    LoadPopulators(addon);
+                }
             }
         });
     }
 
+    /// <summary>
+    /// Disables this native list controller.
+    /// </summary>
+    /// <remarks>
+    /// This must be invoked from the main game thread.
+    /// </remarks>
     public void Disable() {
-        Services.AddonLifecycle.UnregisterListener(OnAddonSetup, OnAddonFinalize);
+        ThreadSafety.AssertMainThread();
+
+        IAddonLifecycle.Get().UnregisterListener(OnAddonSetup, OnAddonFinalize);
+
+        RemoveNodes();
 
         onListPopulate?.Dispose();
         onListPopulate = null;
@@ -73,44 +207,61 @@ public unsafe class NativeListController<T, TU> : IDisposable where T : unmanage
         onRendererPopulate = null;
     }
 
-    public void Dispose() {
-        onListPopulate?.Dispose();
+    /// <summary>
+    /// Disables this native list controller.
+    /// </summary>
+    public async Task DisableAsync() {
+        IAddonLifecycle.Get().UnregisterListener(OnAddonSetup, OnAddonFinalize);
+
+        await IFramework.Get().Run(RemoveNodes);
+
+        await onListPopulate.DisposeAsync();
         onListPopulate = null;
 
-        onRendererPopulate?.Dispose();
+        await onRendererPopulate.DisposeAsync();
         onRendererPopulate = null;
-
-        Disable();
     }
 
-    private void OnAddonSetup(AddonEvent type, AddonArgs args)
+    /// <inheritdoc />
+    public void Dispose()
+        => Disable();
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+        => await DisableAsync();
+
+    private unsafe void OnAddonSetup(AddonEvent type, AddonArgs args)
         => LoadPopulators((T*)args.Addon.Address);
 
     private void OnAddonFinalize(AddonEvent type, AddonArgs args) {
         onListPopulate?.Disable();
         onRendererPopulate?.Disable();
 
+        RemoveNodes();
+
         ModifiedIndexes.Clear();
     }
 
-    private void LoadPopulators(T* addon) {
+    private unsafe void LoadPopulators(T* addon) {
         var populateMethod = GetPopulatorNode(addon)->Populator;
 
         if (populateMethod.Populate is not null) {
-            onListPopulate ??= Services.GameInteropProvider.HookFromAddress<AtkComponentListItemPopulator.PopulateDelegate>(populateMethod.Populate, OnPopulateDetour);
+            onListPopulate ??= IGameInteropProvider.Get().HookFromAddress<AtkComponentListItemPopulator.PopulateDelegate>(populateMethod.Populate, OnPopulateDetour);
             onListPopulate?.Enable();
         }
 
         if (populateMethod.PopulateWithRenderer is not null) {
-            onRendererPopulate ??= Services.GameInteropProvider.HookFromAddress<AtkComponentListItemPopulator.PopulateWithRendererDelegate>(populateMethod.PopulateWithRenderer, OnRendererPopulateDetour);
+            onRendererPopulate ??= IGameInteropProvider.Get().HookFromAddress<AtkComponentListItemPopulator.PopulateWithRendererDelegate>(populateMethod.PopulateWithRenderer, OnRendererPopulateDetour);
             onRendererPopulate?.Enable();
         }
     }
 
-    private void OnPopulateDetour(AtkEventListener* unitBase, AtkComponentListItemPopulator.ListItemInfo* itemInfo, AtkResNode** nodeList) {
+    private unsafe void OnPopulateDetour(AtkEventListener* unitBase, AtkComponentListItemPopulator.ListItemInfo* itemInfo, AtkResNode** nodeList) {
         try {
             var listItemNode = itemInfo->ListItem->Renderer->OwnerNode;
 
+            // Populate can be called for other lists that use the same data layout, we need to ensure we only invoke for the
+            // specific addon that the user of this API wants.
             var parentAddon = RaptureAtkUnitManager.Instance()->GetAddonByNode((AtkResNode*)listItemNode);
             if (parentAddon is null || parentAddon->NameString != AddonName) {
                 onListPopulate!.Original(unitBase, itemInfo, nodeList);
@@ -124,31 +275,58 @@ public unsafe class NativeListController<T, TU> : IDisposable where T : unmanage
                 NodeId = itemInfo->ListItem->Renderer->OwnerNode->NodeId,
             };
 
-            var shouldModifyElement = ShouldModifyElement?.Invoke((T*)unitBase, listItemData) ?? true;
+            // Determine if this element needs to be reset, or needs to be modified.
+            // We want to allow people to reset their elements before the game modifies them again.
+            var shouldModifyElement = false;
 
+            try {
+                shouldModifyElement = ShouldModifyElement?.Invoke((T*)unitBase, listItemData) ?? true;
+            }
+            catch (Exception e) {
+                IPluginLog.Get().Exception(e);
+            }
+
+            // Before Original is called, allow the user of the API to reset their changes.
             if (!shouldModifyElement) {
                 if (ModifiedIndexes.Contains(itemInfo->ListItem->Renderer->OwnerNode->NodeId)) {
-                    ResetElement?.Invoke((T*)unitBase, listItemData);
+
+                    try {
+                        ResetElement?.Invoke((T*)unitBase, listItemData);
+                    }
+                    catch (Exception e) {
+                        IPluginLog.Get().Exception(e);
+                    }
+
                     ModifiedIndexes.Remove(itemInfo->ListItem->Renderer->OwnerNode->NodeId);
                 }
             }
 
             onListPopulate!.Original(unitBase, itemInfo, nodeList);
 
+            // After original is called, apply new changes.
             if (shouldModifyElement) {
-                UpdateElement?.Invoke((T*)unitBase, listItemData);
+
+                try {
+                    UpdateElement?.Invoke((T*)unitBase, listItemData);
+                }
+                catch (Exception e) {
+                    IPluginLog.Get().Exception(e);
+                }
+
                 ModifiedIndexes.Add(itemInfo->ListItem->Renderer->OwnerNode->NodeId);
             }
         }
         catch (Exception e) {
-            Services.Log.Exception(e);
+            IPluginLog.Get().Exception(e);
         }
     }
 
-    private void OnRendererPopulateDetour(AtkEventListener* unitBase, int listItemIndex, AtkResNode** nodeList, AtkComponentListItemRenderer* listItemRenderer) {
+    private unsafe void OnRendererPopulateDetour(AtkEventListener* unitBase, int listItemIndex, AtkResNode** nodeList, AtkComponentListItemRenderer* listItemRenderer) {
         try {
             var listItemNode = listItemRenderer->OwnerNode;
 
+            // Populate can be called for other lists that use the same data layout, we need to ensure we only invoke for the
+            // specific addon that the user of this API wants.
             var parentAddon = RaptureAtkUnitManager.Instance()->GetAddonByNode((AtkResNode*)listItemNode);
             if (parentAddon is null || parentAddon->NameString != AddonName) {
                 onRendererPopulate!.Original(unitBase, listItemIndex, nodeList, listItemRenderer);
@@ -162,32 +340,57 @@ public unsafe class NativeListController<T, TU> : IDisposable where T : unmanage
                 NodeId = listItemRenderer->OwnerNode->NodeId,
             };
 
-            var shouldModifyElement = ShouldModifyElement?.Invoke((T*)unitBase, listItemData) ?? true;
+            // Determine if this element needs to be reset, or needs to be modified.
+            // We want to allow people to reset their elements before the game modifies them again.
+            var shouldModifyElement = false;
 
+            try {
+                shouldModifyElement = ShouldModifyElement?.Invoke((T*)unitBase, listItemData) ?? true;
+            }
+            catch (Exception e) {
+                IPluginLog.Get().Exception(e);
+            }
+
+            // Before Original is called, allow the user of the API to reset their changes.
             if (!shouldModifyElement) {
                 if (ModifiedIndexes.Contains(listItemRenderer->OwnerNode->NodeId)) {
-                    ResetElement?.Invoke((T*)unitBase, listItemData);
+                    try {
+                        ResetElement?.Invoke((T*)unitBase, listItemData);
+                    }
+                    catch (Exception e) {
+                        IPluginLog.Get().Exception(e);
+                    }
+
                     ModifiedIndexes.Remove(listItemRenderer->OwnerNode->NodeId);
                 }
             }
 
             onRendererPopulate!.Original(unitBase, listItemIndex, nodeList, listItemRenderer);
 
+            // After original is called, apply new changes.
             if (shouldModifyElement) {
-                UpdateElement?.Invoke((T*)unitBase, listItemData);
+                try {
+                    UpdateElement?.Invoke((T*)unitBase, listItemData);
+                }
+                catch (Exception e) {
+                    IPluginLog.Get().Exception(e);
+                }
+
                 ModifiedIndexes.Add(listItemRenderer->OwnerNode->NodeId);
             }
         }
         catch (Exception e) {
-            Services.Log.Exception(e);
+            IPluginLog.Get().Exception(e);
         }
     }
 
-    public delegate bool ShouldModifyElementHandler(T* unitBase, TU listItem);
+    private void RemoveNodes() {
+        foreach (var entry in attachedNodes.ToList()) {
+            RemoveNode(entry.Node);
+        }
+    }
 
-    public delegate AtkComponentListItemRenderer* GetPopulatorNodeHandler(T* addon);
-
-    public delegate void UpdateElementHandler(T* unitBase, TU listItem);
-
-    public delegate void ResetElementHandler(T* unitBase, TU listItem);
+    private Hook<AtkComponentListItemPopulator.PopulateDelegate>? onListPopulate;
+    private Hook<AtkComponentListItemPopulator.PopulateWithRendererDelegate>? onRendererPopulate;
+    private readonly List<ListNodeEntry> attachedNodes = [];
 }

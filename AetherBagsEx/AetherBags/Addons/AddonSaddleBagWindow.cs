@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
+using KamiToolKit.Enums;
 
 namespace AetherBags.Addons;
 
@@ -64,7 +65,7 @@ public unsafe class AddonSaddleBagWindow :  InventoryAddonBase
             Position = new Vector2(header.HeaderWidth - SettingsButtonOffset, header.HeaderY),
             Size = new Vector2(28f),
             AddColor = _tintColor,
-            Icon = ButtonIcon.GearCog,
+            Icon = CircleButtonIcon.GearCog,
             OnClick = System.AddonConfigurationWindow.Toggle
         };
         SettingsButtonNode.AttachNode(this);

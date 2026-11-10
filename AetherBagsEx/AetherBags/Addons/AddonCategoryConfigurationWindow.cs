@@ -7,12 +7,14 @@ using AetherBags.Helpers;
 using AetherBags.Inventory;
 using AetherBags.Nodes.Configuration.Category;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 using KamiToolKit.Classes;
 using KamiToolKit.Enums;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 using Lumina.Excel.Sheets;
+using AetherBags.Compat;
+using AetherBags.Compat.Search;
 
 namespace AetherBags.Addons;
 

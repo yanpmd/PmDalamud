@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Numerics;
 using AetherBags.Helpers;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
 using KamiToolKit;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
+using AetherBags.Compat;
 
 namespace AetherBags.Addons;
 

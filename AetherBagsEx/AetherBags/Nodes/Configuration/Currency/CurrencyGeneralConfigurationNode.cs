@@ -7,7 +7,6 @@ using AetherBags.Nodes.Color;
 using AetherBags.Nodes.Configuration.Category;
 using KamiToolKit.Classes;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Node;
 using Lumina.Excel.Sheets;
 
 namespace AetherBags.Nodes.Configuration.Currency;
@@ -22,7 +21,7 @@ public sealed class CurrencyGeneralConfigurationNode : TabbedVerticalListNode
         CurrencySettings config = System.Config.Currency;
 
         Width = 600;
-        ItemVerticalSpacing = 2;
+        ItemSpacing = 2;
 
         LabelTextNode titleNode = new LabelTextNode
         {

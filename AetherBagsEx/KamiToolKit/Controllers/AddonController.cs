@@ -1,21 +1,30 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Plugin.Services;
+using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using KamiToolKit.Dalamud;
+using KamiToolKit.Interfaces;
+using KamiToolKit.Internal.Classes;
+using KamiToolKit.UiOverlay;
 
 namespace KamiToolKit.Controllers;
 
+/// <inheritdoc/>
 public class AddonController : AddonController<AtkUnitBase>;
 
 /// <summary>
-///     This class provides functionality to add-and manage custom elements for any Addon
+/// Helper class intended to make interacting with native addons much easier.
+/// The primary feature is automatic unloading, and reloading when an addon loads/unloads/reloads.
 /// </summary>
-public unsafe class AddonController<T> : IAddonEventController<T>, IDisposable where T : unmanaged {
-    private AtkUnitBase* AddonPointer => Services.GameGui.GetAddonByName<AtkUnitBase>(AddonName);
-    private bool IsEnabled { get; set; }
-    private bool isSetupComplete;
+public class AddonController<T> : IAddonEventController<T>, IAsyncDisposable, IDisposable where T : unmanaged {
 
+    /// <summary>
+    /// The addon name to bind to.
+    /// </summary>
+    /// <exception cref="Exception">Exception when attempting to attach to NamePlate addon, use <see cref="OverlayController"/> instead.</exception>
     public required string AddonName {
         get;
         init {
@@ -26,81 +35,170 @@ public unsafe class AddonController<T> : IAddonEventController<T>, IDisposable w
         }
     }
 
-    public void Enable() {
-        Services.Framework.RunOnFrameworkThread(() => {
-            if (IsEnabled) return;
+    /// <inheritdoc/>
+    public IAddonEventController<T>.AddonControllerEvent? OnSetup { get; init; }
 
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PreRefresh, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PreRequestedUpdate, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PreUpdate, AddonName, OnAddonEvent);
-            Services.AddonLifecycle.RegisterListener(AddonEvent.PostUpdate, AddonName, OnAddonEvent);
+    /// <inheritdoc/>
+    public IAddonEventController<T>.AddonControllerEvent? OnFinalize { get; init; }
 
-            if (AddonPointer is not null) {
-                OnSetup?.Invoke((T*)AddonPointer);
-                isSetupComplete = true;
+    /// <inheritdoc/>
+    public IAddonEventController<T>.AddonControllerEvent? OnPreRefresh { get; init; }
+
+    /// <inheritdoc/>
+    public IAddonEventController<T>.AddonControllerEvent? OnRefresh { get; init; }
+
+    /// <inheritdoc/>
+    public IAddonEventController<T>.AddonControllerEvent? OnUpdate { get; init; }
+
+    /// <inheritdoc/>
+    public IAddonEventController<T>.AddonControllerEvent? OnPreUpdate { get; init; }
+
+    /// <inheritdoc />
+    public IAddonEventController<T>.AddonControllerEvent? OnDraw { get; init; }
+
+    /// <inheritdoc/>
+    public unsafe void Enable() {
+        ThreadSafety.AssertMainThread();
+        if (IsEnabled) return;
+
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonEvent);
+
+        if (OnRefresh is not null || OnPreRefresh is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreRefresh, AddonName, OnAddonEvent);
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreRequestedUpdate, AddonName, OnAddonEvent);
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PostRefresh, AddonName, OnAddonEvent);
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnAddonEvent);
+        }
+
+        if (OnUpdate is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PostUpdate, AddonName, OnAddonEvent);
+        }
+
+        if (OnPreUpdate is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreUpdate, AddonName, OnAddonEvent);
+        }
+
+        if (OnDraw is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreDraw, AddonName, OnAddonEvent);
+        }
+
+        if (AddonPointer is not null) {
+            OnSetup?.Invoke(AddonPointer);
+        }
+
+        IsEnabled = true;
+    }
+
+    /// <inheritdoc/>
+    public async Task EnableAsync() {
+        if (IsEnabled) return;
+
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PostSetup, AddonName, OnAddonEvent);
+        IAddonLifecycle.Get().RegisterListener(AddonEvent.PreFinalize, AddonName, OnAddonEvent);
+
+        if (OnRefresh is not null || OnPreRefresh is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreRefresh, AddonName, OnAddonEvent);
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreRequestedUpdate, AddonName, OnAddonEvent);
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PostRefresh, AddonName, OnAddonEvent);
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PostRequestedUpdate, AddonName, OnAddonEvent);
+        }
+
+        if (OnUpdate is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PostUpdate, AddonName, OnAddonEvent);
+        }
+
+        if (OnPreUpdate is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreUpdate, AddonName, OnAddonEvent);
+        }
+
+        if (OnDraw is not null) {
+            IAddonLifecycle.Get().RegisterListener(AddonEvent.PreDraw, AddonName, OnAddonEvent);
+        }
+
+        await IFramework.Get().Run(() => {
+            unsafe {
+                if (AddonPointer is not null) {
+                    OnSetup?.Invoke(AddonPointer);
+                }
             }
+        });
 
-            IsEnabled = true;
+        IsEnabled = true;
+    }
+
+    /// <inheritdoc/>
+    public unsafe void Disable() {
+        ThreadSafety.AssertMainThread();
+        if (!IsEnabled) return;
+        IsEnabled = false;
+
+        IAddonLifecycle.Get().UnregisterListener(OnAddonEvent);
+
+        if (AddonPointer is not null) {
+            OnFinalize?.Invoke(AddonPointer);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task DisableAsync() {
+        if (!IsEnabled) return;
+        IsEnabled = false;
+
+        IAddonLifecycle.Get().UnregisterListener(OnAddonEvent);
+
+        await IFramework.Get().Run(() => {
+            unsafe {
+                if (AddonPointer is not null) {
+                    OnFinalize?.Invoke(AddonPointer);
+                }
+            }
         });
     }
 
+    /// <inheritdoc/>
     public virtual void Dispose()
         => Disable();
 
-    public void Disable() {
-        Services.Framework.RunOnFrameworkThread(() => {
-            if (!IsEnabled) return;
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+        => await DisableAsync();
 
-            Services.AddonLifecycle.UnregisterListener(OnAddonEvent);
-
-            if (AddonPointer is not null) {
-                OnFinalize?.Invoke((T*)AddonPointer);
-            }
-
-            IsEnabled = false;
-        });
-    }
-
-    private void OnAddonEvent(AddonEvent type, AddonArgs args) {
+    private unsafe void OnAddonEvent(AddonEvent type, AddonArgs args) {
         var addon = (T*)args.Addon.Address;
 
         switch (type) {
             case AddonEvent.PostSetup:
                 OnSetup?.Invoke(addon);
-                isSetupComplete = true;
                 return;
 
             case AddonEvent.PreFinalize:
                 OnFinalize?.Invoke(addon);
-                isSetupComplete = false;
                 return;
 
-            case AddonEvent.PreRefresh or AddonEvent.PreRequestedUpdate when isSetupComplete:
+            case AddonEvent.PreRefresh or AddonEvent.PreRequestedUpdate when args.Addon.IsReady:
                 OnPreRefresh?.Invoke(addon);
                 break;
 
-            case AddonEvent.PostRefresh or AddonEvent.PostRequestedUpdate when isSetupComplete:
+            case AddonEvent.PostRefresh or AddonEvent.PostRequestedUpdate when args.Addon.IsReady:
                 OnRefresh?.Invoke(addon);
                 return;
 
-            case AddonEvent.PreUpdate:
+            case AddonEvent.PreUpdate when args.Addon.IsReady:
                 OnPreUpdate?.Invoke(addon);
                 break;
 
-            case AddonEvent.PostUpdate:
+            case AddonEvent.PostUpdate when args.Addon.IsReady:
                 OnUpdate?.Invoke(addon);
+                return;
+
+            case AddonEvent.PreDraw when args.Addon.IsReady:
+                OnDraw?.Invoke(addon);
                 return;
         }
     }
 
-    public IAddonEventController<T>.AddonControllerEvent? OnSetup { get; init; }
-    public IAddonEventController<T>.AddonControllerEvent? OnFinalize { get; init; }
-    public IAddonEventController<T>.AddonControllerEvent? OnPreRefresh { get; init; }
-    public IAddonEventController<T>.AddonControllerEvent? OnRefresh { get; init; }
-    public IAddonEventController<T>.AddonControllerEvent? OnUpdate { get; init; }
-    public IAddonEventController<T>.AddonControllerEvent? OnPreUpdate { get; init; }
+    private unsafe T* AddonPointer => (T*)RaptureAtkUnitManager.Instance()->GetAddonByName(AddonName);
+
+    private bool IsEnabled { get; set; }
 }

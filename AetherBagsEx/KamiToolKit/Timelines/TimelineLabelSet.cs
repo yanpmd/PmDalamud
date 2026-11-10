@@ -1,34 +1,49 @@
 ﻿using System;
 using System.Collections.Generic;
+using FFXIVClientStructs.FFXIV.Client.System.Memory;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using KamiToolKit.Classes;
 
 namespace KamiToolKit.Timelines;
 
+/// <summary>
+/// Managed adaptor to the native structs. Not intended for external use.
+/// </summary>
 public unsafe class TimelineLabelSet : IDisposable {
 
     private List<TimelineKeyFrame> internalKeyFrames = [];
 
     internal AtkTimelineLabelSet* InternalLabelSet;
 
+    /// <summary>
+    /// Constructs a new <see cref="TimelineLabelSet"/>
+    /// </summary>
     public TimelineLabelSet() {
-        InternalLabelSet = NativeMemoryHelper.UiAlloc<AtkTimelineLabelSet>();
+        InternalLabelSet = IMemorySpace.GetUISpace()->MallocZeroed<AtkTimelineLabelSet>();
 
         InternalLabelSet->StartFrameIdx = 0;
         InternalLabelSet->EndFrameIdx = 0;
         InternalLabelSet->LabelKeyGroup.Type = AtkTimelineKeyGroupType.Label;
     }
 
+    /// <summary>
+    /// Gets or sets start frame id.
+    /// </summary>
     public int StartFrameId {
         get => InternalLabelSet->StartFrameIdx;
         set => InternalLabelSet->StartFrameIdx = (ushort)value;
     }
 
+    /// <summary>
+    /// Gets or sets end frame id.
+    /// </summary>
     public int EndFrameId {
         get => InternalLabelSet->EndFrameIdx;
         set => InternalLabelSet->EndFrameIdx = (ushort)value;
     }
 
+    /// <summary>
+    /// Gets or sets the keyframe label sets.
+    /// </summary>
     public List<TimelineKeyFrame> Labels {
         get => internalKeyFrames;
         set {
@@ -37,8 +52,9 @@ public unsafe class TimelineLabelSet : IDisposable {
         }
     }
 
+    /// <inheritdoc />
     public void Dispose() {
-        NativeMemoryHelper.UiFree(InternalLabelSet);
+        IMemorySpace.Free(InternalLabelSet);
         InternalLabelSet = null;
     }
 
@@ -46,13 +62,13 @@ public unsafe class TimelineLabelSet : IDisposable {
         ref var keyGroup = ref InternalLabelSet->LabelKeyGroup;
 
         // Free existing array, we will completely rebuild it
-        if (keyGroup.KeyFrames is null) {
-            NativeMemoryHelper.UiFree(keyGroup.KeyFrames, keyGroup.KeyFrameCount);
+        if (keyGroup.KeyFrames is not null) {
+            IMemorySpace.Free(keyGroup.KeyFrames);
             keyGroup.KeyFrames = null;
         }
 
         // Allocate new array
-        keyGroup.KeyFrames = NativeMemoryHelper.UiAlloc<AtkTimelineKeyFrame>(internalKeyFrames.Count);
+        keyGroup.KeyFrames = IMemorySpace.GetUISpace()->AllocateZeroedArray<AtkTimelineKeyFrame>(internalKeyFrames.Count);
 
         var index = 0;
         foreach (var keyFrame in internalKeyFrames) {

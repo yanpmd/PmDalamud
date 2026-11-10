@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using KamiToolKit.BaseTypes;
+using KamiToolKit.BaseTypes.ComponentNode;
 using KamiToolKit.Nodes;
-using KamiToolKit.Premade.Addon;
-using KamiToolKit.Premade.Node;
+using AetherBags.Compat.Search;
+using KamiToolKit.Addons;
 
 namespace AetherBags.Nodes.Color;
 
@@ -72,8 +74,30 @@ public class ColorInputRow : HorizontalListNode
         };
     }
 
-    protected override void Dispose(bool disposing, bool isNativeDestructor) {
-        base.Dispose();
+    private bool _isEnabled = true;
+
+    /// <summary>
+    /// Gets or sets whether this row accepts input.
+    /// </summary>
+    /// <remarks>
+    /// Layout nodes no longer expose an enabled state upstream, so this is implemented by forwarding the state to
+    /// the child nodes and dimming the row.
+    /// </remarks>
+    public bool IsEnabled {
+        get => _isEnabled;
+        set {
+            _isEnabled = value;
+
+            _colorPreview.IsEnabled = value;
+
+            // The row itself carries no texture, so dimming it would have no effect. Dim the children instead.
+            _labelTextNode.Alpha = value ? 1.0f : 0.5f;
+            _colorPreview.Alpha = value ? 1.0f : 0.5f;
+        }
+    }
+
+    protected override void Dispose(bool isNativeDestructor) {
+        base.Dispose(isNativeDestructor);
 
         _colorPickerAddon?.Dispose();
         _colorPickerAddon = null;

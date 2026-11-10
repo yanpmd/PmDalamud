@@ -1,5 +1,6 @@
 using System.Numerics;
 using KamiToolKit.Nodes;
+using AetherBags.Compat;
 
 namespace AetherBags.Nodes.Configuration.Currency;
 
