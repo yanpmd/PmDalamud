@@ -80,7 +80,40 @@ public partial class HotbarNode : DragDropNode {
     public unsafe void ClearSlot() {
         Payload.Clear();
         hotbarState->Ctor();
-        hotbarData->Clear();
+        ResetHotbarSlot(hotbarData);
+    }
+
+    /// <summary>
+    /// Resets the content of a hotbar slot.
+    /// </summary>
+    /// <remarks>
+    /// The native clear function of the game expects the slot to be fully initialized, which is not the
+    /// case for slots that are created by hand, so the fields of the slot are reset directly instead.
+    /// </remarks>
+    private static unsafe void ResetHotbarSlot(RaptureHotbarModule.HotbarSlot* slot) {
+        slot->CommandType = RaptureHotbarModule.HotbarSlotType.Empty;
+        slot->CommandId = 0;
+
+        slot->ApparentSlotType = RaptureHotbarModule.HotbarSlotType.Empty;
+        slot->ApparentActionId = 0;
+        slot->ApparentActionModeParam = 0;
+
+        slot->OriginalApparentSlotType = RaptureHotbarModule.HotbarSlotType.Empty;
+        slot->OriginalApparentActionId = 0;
+
+        slot->UsesGeneralDragDropType = false;
+        slot->IsLoaded = false;
+
+        slot->CostType = 0;
+        slot->CostDisplayMode = 0;
+        slot->CostValue = 0;
+
+        slot->IconId = 0;
+
+        slot->RecipeValid = 0;
+        slot->RecipeDataLoaded = false;
+        slot->RecipeItemId = 0;
+        slot->RecipeCraftType = 0;
     }
 
     /// <summary>
@@ -123,7 +156,7 @@ public partial class HotbarNode : DragDropNode {
             Int2 = (int) itemId,
         };
 
-        hotbarData->Clear();
+        ResetHotbarSlot(hotbarData);
         hotbarData->Set(RaptureHotbarModule.HotbarSlotType.Item, itemId);
 
         UpdateSlotAppearance();
@@ -139,7 +172,7 @@ public partial class HotbarNode : DragDropNode {
             Int2 = (int) macroIndex,
         };
 
-        hotbarData->Clear();
+        ResetHotbarSlot(hotbarData);
         hotbarData->Set(RaptureHotbarModule.HotbarSlotType.Macro, macroIndex);
 
         UpdateSlotAppearance();
@@ -200,6 +233,12 @@ public partial class HotbarNode : DragDropNode {
         unsafe {
             hotbarData = IMemorySpace.GetUISpace()->MallocZeroed<RaptureHotbarModule.HotbarSlot>();
             hotbarData->Initialize();
+
+            // The slot carries a native Utf8String that the game expects to be constructed on its own.
+            // The native clear and prepare functions of the slot work on that string pointer, so without
+            // this the game reads uninitialized memory and crashes as soon as a payload is dropped onto
+            // the slot.
+            hotbarData->PopUpHelp.Ctor();
 
             hotbarState = IMemorySpace.GetUISpace()->MallocZeroed<RaptureHotbarModule.HotbarUIIntermediate>();
             hotbarState->Ctor();
@@ -501,7 +540,7 @@ public partial class HotbarNode : DragDropNode {
                 var id = (uint)sorterEntry->Page << 16 | (uint)sorterEntry->Slot & 0xFFFF;
 
                 Payload = payload.Clone();
-                hotbarData->Clear();
+                ResetHotbarSlot(hotbarData);
                 hotbarData->Set(hotbarSlotType, id);
                 return;
 
@@ -512,7 +551,7 @@ public partial class HotbarNode : DragDropNode {
                 }
 
                 Payload = payload.Clone();
-                hotbarData->Clear();
+                ResetHotbarSlot(hotbarData);
                 hotbarData->Set(hotbarSlotType, (uint) payload.ReferenceIndex);
                 return;
 
@@ -523,13 +562,13 @@ public partial class HotbarNode : DragDropNode {
                 }
 
                 Payload = payload.Clone();
-                hotbarData->Clear();
+                ResetHotbarSlot(hotbarData);
                 hotbarData->Set(hotbarSlotType, (uint) payload.ReferenceIndex);
                 return;
 
             default:
                 Payload = payload.Clone();
-                hotbarData->Clear();
+                ResetHotbarSlot(hotbarData);
                 hotbarData->Set(hotbarSlotType, (uint) Payload.Int2);
                 return;
         }

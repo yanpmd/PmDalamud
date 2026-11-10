@@ -137,6 +137,26 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
     }
 
     /// <summary>
+    /// Gets or sets whether the drag and drop manager skips the enabled state check when it
+    /// determines whether this node accepts the payload that is being dragged.
+    /// </summary>
+    /// <remarks>
+    /// Nodes that are built by hand are not necessarily flagged as enabled, and the check would make
+    /// the node an invalid drop target even though it is perfectly usable.
+    /// </remarks>
+    public bool SkipEnabledCheck {
+        get => Component->Flags.HasFlag(DragDropFlag.SkipEnabledCheck);
+        set {
+            if (value) {
+                Component->Flags |= DragDropFlag.SkipEnabledCheck;
+            }
+            else {
+                Component->Flags &= ~DragDropFlag.SkipEnabledCheck;
+            }
+        }
+    }
+
+    /// <summary>
     /// When true, allows left-clicking the item to trigger OnClicked
     /// </summary>
     public bool IsClickable {
@@ -234,6 +254,7 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
         InitializeComponentEvents();
 
         AddEvent(AtkEventType.DragDropBegin, DragDropBeginHandler);
+        AddEvent(AtkEventType.DragDropCanAcceptCheck, DragDropCanAcceptCheckHandler);
         AddEvent(AtkEventType.DragDropInsert, DragDropInsertHandler);
         AddEvent(AtkEventType.DragDropDiscard, DragDropDiscardHandler);
         AddEvent(AtkEventType.DragDropClick, DragDropClickHandler);
@@ -275,6 +296,20 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
         var payload = DragDropPayload.FromDragDropInterface(atkEventData->DragDropData.DragDropInterface);
 
         OnPayloadAccepted?.Invoke(this, payload);
+    }
+
+    /// <summary>
+    /// Answers the question of the drag and drop manager whether this node is willing to accept the
+    /// payload that is currently being dragged.
+    /// </summary>
+    /// <remarks>
+    /// The manager sends this check to every node below the mouse before it decides where the payload
+    /// would land. Nodes that do not answer are treated as invalid drop targets and the drop is
+    /// discarded without any further feedback, which is why this check has to be answered explicitly.
+    /// </remarks>
+    private void DragDropCanAcceptCheckHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
+        atkEvent->State.StateFlags |= AtkEventStateFlags.HasReturnFlags;
+        atkEvent->State.ReturnFlags = 1;
     }
 
     private void DragDropDiscardHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
