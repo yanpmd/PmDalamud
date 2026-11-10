@@ -91,6 +91,13 @@ public sealed class SharedNodePool<T> where T : NodeBase
         }
     }
 
+    /// <summary>
+    /// Forgets every pooled node without disposing it. Used when the addon that
+    /// owns the nodes is already being torn down: their native nodes live inside
+    /// that addon, so touching them from a finalize callback can crash the game.
+    /// </summary>
+    public void Drop() => _pool.Clear();
+
     public void Prewarm(int count)
     {
         if (_factory == null)

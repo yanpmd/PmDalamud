@@ -46,6 +46,14 @@ public static class CategoryBucketManager
     public static bool IsAllaganFilterKey(uint key)
         => (key & AllaganFilterKeyFlag) != 0 && (key & UserCategoryKeyFlag) == 0;
 
+    // Weapons and tools in the main bags are merged into four slot groups instead
+    // of the game's per weapon type categories.
+    private const uint WeaponGroupKeyFlag = 0x0400_0000;
+    private const uint MainHandWeaponKey = WeaponGroupKeyFlag;
+    private const uint OffHandWeaponKey = WeaponGroupKeyFlag | 1;
+    private const uint MainHandToolKey = WeaponGroupKeyFlag | 2;
+    private const uint OffHandToolKey = WeaponGroupKeyFlag | 3;
+
 
     /// <summary>
     /// Resets all buckets for a new refresh cycle.
@@ -172,7 +180,8 @@ public static class CategoryBucketManager
         Dictionary<ulong, ItemInfo> itemInfoByKey,
         Dictionary<uint, CategoryBucket> bucketsByKey,
         HashSet<ulong> claimedKeys,
-        bool userCategoriesEnabled)
+        bool userCategoriesEnabled,
+        bool mergeWeaponSlots = false)
     {
         var disabledGameIds = System.Config.Categories.DisabledGameCategoryIds;
 
@@ -184,7 +193,9 @@ public static class CategoryBucketManager
             if (userCategoriesEnabled && claimedKeys.Contains(itemKey))
                 continue;
 
-            uint categoryKey = info.UiCategory.RowId;
+            uint categoryKey = mergeWeaponSlots && TryGetWeaponGroupKey(info, out uint weaponKey)
+                ? weaponKey
+                : info.UiCategory.RowId;
 
             if (disabledGameIds.Count > 0 && disabledGameIds.Contains(categoryKey))
                 continue;
@@ -209,6 +220,45 @@ public static class CategoryBucketManager
 
             bucketRef!.Items.Add(info);
         }
+    }
+
+    /// <summary>
+    /// Resolves the merged slot group of a weapon or tool: main/off hand and
+    /// weapon/tool. Returns false for everything else so it keeps the game's own
+    /// item UI category.
+    /// </summary>
+    private static bool TryGetWeaponGroupKey(ItemInfo info, out uint key)
+    {
+        bool mainHand = info.IsMainHandSlot;
+        bool offHand = info.IsOffHandSlot;
+
+        if (!mainHand && !offHand)
+        {
+            key = 0;
+            return false;
+        }
+
+        bool tool = info.IsTool;
+
+        key = mainHand
+            ? (tool ? MainHandToolKey : MainHandWeaponKey)
+            : (tool ? OffHandToolKey : OffHandWeaponKey);
+
+        return true;
+    }
+
+    private static bool TryGetWeaponGroupName(uint key, out string name)
+    {
+        name = key switch
+        {
+            MainHandWeaponKey => Localization.Get("BagGroup.MainHand"),
+            OffHandWeaponKey => Localization.Get("BagGroup.OffHand"),
+            MainHandToolKey => Localization.Get("BagGroup.MainHandTool"),
+            OffHandToolKey => Localization.Get("BagGroup.OffHandTool"),
+            _ => string.Empty,
+        };
+
+        return name.Length > 0;
     }
 
     private static readonly Dictionary<uint, CategoryInfo> ArmouryGroupInfoCache = new(capacity: 16);
@@ -590,6 +640,11 @@ public static class CategoryBucketManager
         if (key == 0)
         {
             return CreateMiscCategoryInfo();
+        }
+
+        if (TryGetWeaponGroupName(key, out string weaponGroupName))
+        {
+            return new CategoryInfo { Name = weaponGroupName };
         }
 
         var uiCat = sample.UiCategory.Value;

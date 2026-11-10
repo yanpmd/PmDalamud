@@ -92,6 +92,7 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     protected bool IsSetupComplete;
     private bool _deferredPopulationInProgress;
     private bool _initialPopulationComplete;
+    private bool _compactGateArmed;
     private const int ItemsPerFrame = 40;
 
     protected abstract InventoryStateBase InventoryState { get; }
@@ -229,6 +230,17 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
     {
         if (!IsSetupComplete)
             return;
+
+        // Arm "compact once per open" before the window's opening layout pass. Doing
+        // it in OnSetup is too late: windows refresh their categories before calling
+        // base.OnSetup, so the opening pass would run with a lookahead of 0 and the
+        // real compaction would be postponed to the first layout after setup.
+        var gridNode = CategoriesNode;
+        if (!_compactGateArmed && gridNode is not null)
+        {
+            gridNode.ResetCompactPackingGate();
+            _compactGateArmed = true;
+        }
 
         var config = System.Config.General;
         string searchText = SearchInputNode.SearchString.ExtractText();
@@ -997,9 +1009,6 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         };
         TransferProgressNode.AttachNode(this);
 
-        // Re-arm "compact once per open" so a fresh window compacts again.
-        CategoriesNode?.ResetCompactPackingGate();
-
         // The opening pass already compacts; don't replay a bulk commit that happened
         // while this window was closed.
         _lastSeenBulkCommitVersion = System.LootedItemsTracker.BulkCommitVersion;
@@ -1071,6 +1080,20 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         return focusedAddon.Value->Id == addon->Id || focusedAddon.Value->ParentId == addon->Id;
     }
 
+    /// <summary>
+    /// Pooled nodes are only valid while this addon exists: their native nodes are
+    /// created inside it. Release them here, while the addon is still alive, instead
+    /// of in OnFinalize - by then the native nodes are already gone and disposing
+    /// them crashes the game.
+    /// </summary>
+    protected override void OnHide(AtkUnitBase* addon)
+    {
+        SharedItemNodePool.Clear();
+        SharedCategoryNodePool.Clear();
+
+        base.OnHide(addon);
+    }
+
     protected override void OnFinalize(AtkUnitBase* addon)
     {
         // Reverse P/Invoke boundary: an exception here takes the process down, and
@@ -1098,9 +1121,12 @@ public abstract unsafe class InventoryAddonBase : NativeAddon, IInventoryWindow
         RefreshAutosizeQueued = false;
         _deferredPopulationInProgress = false;
         _initialPopulationComplete = false;
+        _compactGateArmed = false;
 
-        SharedItemNodePool.Clear();
-        SharedCategoryNodePool.Clear();
+        // The addon's native nodes are already destroyed at this point, so the
+        // pooled nodes can only be forgotten, never disposed. See OnHide above.
+        SharedItemNodePool.Drop();
+        SharedCategoryNodePool.Drop();
         CategoryVirtualization.ClearLayout();
 
         base.OnFinalize(addon);

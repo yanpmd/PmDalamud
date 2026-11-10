@@ -110,6 +110,54 @@ public sealed class ItemInfo : IEquatable<ItemInfo>
 
     public uint ClassJobCategoryId => ClassJobCategory.RowId;
 
+    /// <summary>True when the item is equipped in the main hand slot.</summary>
+    public bool IsMainHandSlot
+    {
+        get
+        {
+            if (!HasRow) return false;
+            return _row.EquipSlotCategory.ValueNullable is { } slot && slot.MainHand != 0;
+        }
+    }
+
+    /// <summary>True when the item is equipped in the off hand slot.</summary>
+    public bool IsOffHandSlot
+    {
+        get
+        {
+            if (!HasRow) return false;
+            return _row.EquipSlotCategory.ValueNullable is { } slot && slot.OffHand != 0;
+        }
+    }
+
+    /// <summary>Weapons and tools, i.e. everything that goes into the two hand slots.</summary>
+    public bool IsWeaponOrTool => IsMainHandSlot || IsOffHandSlot;
+
+    /// <summary>
+    /// True for crafting and gathering tools, which share the hand slots with
+    /// combat weapons but are grouped apart in the bag window.
+    /// </summary>
+    public bool IsTool
+    {
+        get
+        {
+            if (!HasRow) return false;
+            if (_row.ClassJobCategory.ValueNullable is not { } row) return false;
+
+            bool crafterOrGatherer = row.CRP || row.BSM || row.ARM || row.GSM || row.LTW || row.WVR
+                                     || row.ALC || row.CUL || row.MIN || row.BTN || row.FSH;
+            if (!crafterOrGatherer) return false;
+
+            bool combat = row.GLA || row.PGL || row.MRD || row.LNC || row.ARC || row.CNJ || row.THM
+                          || row.PLD || row.MNK || row.WAR || row.DRG || row.BRD || row.WHM || row.BLM
+                          || row.ACN || row.SMN || row.SCH || row.ROG || row.NIN || row.MCH || row.DRK
+                          || row.AST || row.SAM || row.RDM || row.BLU || row.GNB || row.DNC || row.RPR
+                          || row.SGE || row.VPR || row.PCT;
+
+            return !combat;
+        }
+    }
+
     /// <summary>Character level this item requires to be equipped (0 = no requirement).</summary>
     public uint LevelEquip => HasRow && _row.LevelEquip > 0 ? (uint)_row.LevelEquip : 0u;
 

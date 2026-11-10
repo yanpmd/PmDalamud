@@ -49,6 +49,12 @@ public class ArmouryState : InventoryStateBase
     }
 
     /// <summary>
+    /// The armoury always groups by class/job or slot, so user-defined categories
+    /// must not pull items out of those buckets.
+    /// </summary>
+    protected override bool SupportsUserCategories => false;
+
+    /// <summary>
     /// Groups by class/job instead of the game's item UI category. Grouping the
     /// armoury by slot would show one giant "legs" pile for every job.
     /// </summary>

@@ -67,6 +67,11 @@
   "Category.Misc": "杂项",
   "Category.Uncategorized": "未分类",
 
+  "BagGroup.MainHand": "主手",
+  "BagGroup.OffHand": "副手",
+  "BagGroup.MainHandTool": "主手工具",
+  "BagGroup.OffHandTool": "副手工具",
+
   "CategoryConfig.Title": "分类",
   "CategoryConfig.PleaseSelect": "请选择要配置的分类。",
   "CategoryConfig.NewCategory": "新建分类 {0}",

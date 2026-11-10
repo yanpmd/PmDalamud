@@ -69,10 +69,16 @@ public abstract class InventoryStateBase
     {
     }
 
+    /// <summary>
+    /// Whether the user's own category rules apply to this state. States with
+    /// their own fixed grouping (e.g. the armoury) opt out.
+    /// </summary>
+    protected virtual bool SupportsUserCategories => true;
+
     protected virtual void ApplyCategories(SystemConfiguration config)
     {
         bool categoriesEnabled = config.Categories.CategoriesEnabled;
-        bool userCategoriesEnabled = config.Categories.UserCategoriesEnabled && categoriesEnabled;
+        bool userCategoriesEnabled = SupportsUserCategories && config.Categories.UserCategoriesEnabled && categoriesEnabled;
         bool gameCategoriesEnabled = config.Categories.GameCategoriesEnabled && categoriesEnabled;
         bool allaganCategoriesEnabled = config.Categories.AllaganToolsCategoriesEnabled && categoriesEnabled;
         bool bisCategoriesEnabled = config.Categories.BisBuddyEnabled && categoriesEnabled;

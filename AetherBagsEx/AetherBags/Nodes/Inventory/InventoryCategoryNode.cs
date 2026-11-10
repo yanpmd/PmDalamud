@@ -425,6 +425,9 @@ public class InventoryCategoryNode : InventoryCategoryNodeBase
         var dragDropType = ExternalCategoryManager.GetDragDropTypeForContainer(item.Container);
 
         node.IconId = item.IconId;
+        // Weapons and tools sit in merged categories, so the job crest is what
+        // tells a Paladin sword from a Warrior axe.
+        node.JobIconId = ArmouryJobGroups.GetJobIconId(data);
         node.Alpha = data.VisualAlpha;
         node.IsDraggable = !data.IsSlotBlocked && !ExternalCategoryManager.IsContainerDragOutLocked(item.Container);
         // Must match emitted type or AtkComponentDragDrop rejects matching payloads from other windows.

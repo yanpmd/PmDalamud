@@ -67,6 +67,11 @@
   "Category.Misc": "Misc",
   "Category.Uncategorized": "Uncategorized",
 
+  "BagGroup.MainHand": "Main Hand",
+  "BagGroup.OffHand": "Off Hand",
+  "BagGroup.MainHandTool": "Main Hand Tool",
+  "BagGroup.OffHandTool": "Off Hand Tool",
+
   "CategoryConfig.Title": "Categories",
   "CategoryConfig.PleaseSelect": "Please select a category to configure.",
   "CategoryConfig.NewCategory": "New Category {0}",

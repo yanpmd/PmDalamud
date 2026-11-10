@@ -29,6 +29,7 @@ public class InventoryDragDropNode : DragDropNode
 
     private readonly TextNode _quantityTextNode;
     private IconImageNode? _badgeNode;
+    private IconImageNode? _jobIconNode;
     private ResNode? _borderContainerNode;
     private ImageNode? _borderNode;
     private BorderStyle _currentBorderStyle;
@@ -196,6 +197,38 @@ public class InventoryDragDropNode : DragDropNode
         if (_badgeNode != null)
         {
             _badgeNode.IsVisible = false;
+        }
+    }
+
+    /// <summary>
+    /// Class/job crest drawn in the top right corner of the slot. Main hand items
+    /// share one category, so this is what tells their jobs apart. 0 hides it.
+    /// </summary>
+    public uint JobIconId
+    {
+        set
+        {
+            if (value == 0)
+            {
+                if (_jobIconNode != null) _jobIconNode.IsVisible = false;
+                return;
+            }
+
+            if (_jobIconNode == null)
+            {
+                _jobIconNode = new IconImageNode
+                {
+                    Size = new Vector2(16, 16),
+                    Position = new Vector2(26, 3),
+                    NodeFlags = NodeFlags.Visible | NodeFlags.Enabled,
+                    WrapMode = WrapMode.Stretch,
+                };
+
+                _jobIconNode.AttachNode(IconNode);
+            }
+
+            _jobIconNode.IconId = value;
+            _jobIconNode.IsVisible = true;
         }
     }
 
@@ -413,6 +446,7 @@ private void ApplyBorder(BorderStyle style)
     public void ResetForReuse()
     {
         ClearDecoration();
+        if (_jobIconNode != null) _jobIconNode.IsVisible = false;
         _currentDecoration = null; // Reset so next ApplyDecoration runs fully
         _currentBorderStyle = BorderStyle.None;
         _isBorderHovered = false;

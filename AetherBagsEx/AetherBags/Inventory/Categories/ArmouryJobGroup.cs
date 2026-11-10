@@ -119,13 +119,15 @@ public static class ArmouryJobGroups
 
     /// <summary>
     /// Beastmaster has no dedicated column in the current sheet schema, so its
-    /// exclusive categories are recognised by name and folded into melee.
+    /// exclusive categories are recognised by name.
     /// </summary>
     private static readonly string[] BeastmasterNameMarkers =
     [
-        "驯兽师",
+        "驯兽",
         "Beastmaster",
     ];
+
+    private const uint BeastmasterJobId = 43;
 
     /// <summary>
     /// Resolves the category bucket key for an armoury item: the job name when the
@@ -153,6 +155,73 @@ public static class ArmouryJobGroups
         BucketKeyByCategoryId[categoryId] = key;
         return key;
     }
+
+    /// <summary>
+    /// Crest icon of the class/job the item belongs to, or 0 when the item is
+    /// shared by several jobs and has no single marker.
+    /// </summary>
+    public static uint GetJobIconId(ItemInfo info)
+    {
+        if (!info.IsWeaponOrTool) return 0;
+
+        uint key = ResolveBucketKey(info);
+        if ((key & GroupKeyFlag) == 0) return 0;
+
+        uint jobId = key & JobIdMask;
+        return jobId == 0 ? 0u : GetJobIconIdForJob(jobId);
+    }
+
+    /// <summary>
+    /// Game icon ids of the class/job crests: base classes use the 623xx range,
+    /// jobs the 624xx range, crafters and gatherers the 625xx range.
+    /// </summary>
+    private static uint GetJobIconIdForJob(uint jobId) => jobId switch
+    {
+        1 => 62301u,   // GLA
+        2 => 62302u,   // PGL
+        3 => 62303u,   // MRD
+        4 => 62304u,   // LNC
+        5 => 62305u,   // ARC
+        6 => 62306u,   // CNJ
+        7 => 62307u,   // THM
+        26 => 62308u,  // ACN
+        29 => 62309u,  // ROG
+        19 => 62401u,  // PLD
+        20 => 62402u,  // MNK
+        21 => 62403u,  // WAR
+        22 => 62404u,  // DRG
+        23 => 62405u,  // BRD
+        24 => 62406u,  // WHM
+        25 => 62407u,  // BLM
+        27 => 62408u,  // SMN
+        28 => 62409u,  // SCH
+        30 => 62410u,  // NIN
+        31 => 62411u,  // MCH
+        32 => 62412u,  // DRK
+        33 => 62413u,  // AST
+        34 => 62414u,  // SAM
+        35 => 62415u,  // RDM
+        36 => 62416u,  // BLU
+        37 => 62417u,  // GNB
+        38 => 62418u,  // DNC
+        39 => 62419u,  // RPR
+        40 => 62420u,  // SGE
+        41 => 62421u,  // VPR
+        42 => 62422u,  // PCT
+        43 => 62423u,  // BST
+        8 => 62502u,   // CRP
+        9 => 62503u,   // BSM
+        10 => 62504u,  // ARM
+        11 => 62505u,  // GSM
+        12 => 62506u,  // LTW
+        13 => 62507u,  // WVR
+        14 => 62508u,  // ALC
+        15 => 62509u,  // CUL
+        16 => 62510u,  // MIN
+        17 => 62511u,  // BTN
+        18 => 62512u,  // FSH
+        _ => 0u,
+    };
 
     /// <summary>Base class id shared by a base class and its job; a job returns its base.</summary>
     private static uint GetJobLine(uint jobId)
@@ -235,13 +304,13 @@ public static class ArmouryJobGroups
             }
         }
 
-        // No known job matched: fall back to the game's own category name so new or
-        // limited jobs never end up in a generic bucket.
+        // No known job matched: Beastmaster has no column in the sheet yet, so it is
+        // recognised by name; anything else keeps the game's own category name so
+        // new or limited jobs never end up in a generic bucket.
         if (totalJobs == 0)
         {
-            string rawName = GetRawCategoryName(categoryId);
-            return IsMeleeOnlyCategory(rawName)
-                ? MakeGroupKey(ArmouryJobGroup.Melee)
+            return IsBeastmasterCategory(categoryId)
+                ? MakeJobKey(ArmouryJobGroup.Melee, BeastmasterJobId)
                 : MakeUnknownCategoryKey(categoryId);
         }
 
@@ -304,14 +373,28 @@ public static class ArmouryJobGroups
         return MakeGroupKey(best);
     }
 
-    private static bool IsMeleeOnlyCategory(string categoryName)
+    /// <summary>
+    /// Beastmaster has no column in the class job category sheet, so its items are
+    /// matched by the full category name (the display name is shortened elsewhere).
+    /// </summary>
+    private static bool IsBeastmasterCategory(uint categoryId)
     {
-        if (string.IsNullOrEmpty(categoryName)) return false;
-
-        foreach (string marker in BeastmasterNameMarkers)
+        try
         {
-            if (categoryName.Contains(marker, StringComparison.OrdinalIgnoreCase))
-                return true;
+            var sheet = Services.DataManager.GetExcelSheet<ClassJobCategory>();
+            if (!sheet.TryGetRow(categoryId, out var row)) return false;
+
+            string name = row.Name.ToString();
+
+            foreach (string marker in BeastmasterNameMarkers)
+            {
+                if (name.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch
+        {
+            // Sheet unavailable, fall through to the unknown category bucket.
         }
 
         return false;
