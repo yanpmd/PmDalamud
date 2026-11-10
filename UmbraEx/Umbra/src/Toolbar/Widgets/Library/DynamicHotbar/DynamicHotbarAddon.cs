@@ -160,7 +160,32 @@ internal sealed unsafe class DynamicHotbarAddon : NativeAddon {
         }
 
         if (changed) OnSlotsChanged?.Invoke();
+
+        ReportDragState();
     }
+
+    /// <summary>
+    /// Reports whether the game is currently dragging something around, which is needed to tell the
+    /// difference between a drag that never reaches the slots and a drag that is not started at all.
+    /// </summary>
+    private void ReportDragState() {
+        var  manager  = AtkStage.Instance()->DragDropManager;
+        bool dragging = manager.IsDragging;
+
+        if (dragging && !_wasDragging) {
+            var dragDrop = manager.DragDrop1;
+
+            Logger.Info(
+                "[DynamicHotbar] a drag operation started: " +
+                $"type={(dragDrop is null ? "unknown" : dragDrop->DragDropType.ToString())} " +
+                $"refIndex={(dragDrop is null ? -1 : dragDrop->DragDropReferenceIndex.ToString())}"
+            );
+        }
+
+        _wasDragging = dragging;
+    }
+
+    private bool _wasDragging;
 
     /// <inheritdoc />
     protected override void OnHide(AtkUnitBase* addon) {
@@ -250,10 +275,6 @@ internal sealed unsafe class DynamicHotbarAddon : NativeAddon {
 
                     // Accept anything the game can drag around: actions, items, macros and crystals.
                     AcceptedType = DragDropType.Everything,
-
-                    // The node is built by hand and therefore not necessarily flagged as enabled, which
-                    // would make the drag and drop manager reject it as a drop target.
-                    SkipEnabledCheck = true,
                 };
                 rowNode.AddNode(slot);
 
