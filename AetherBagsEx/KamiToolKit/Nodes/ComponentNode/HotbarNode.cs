@@ -108,6 +108,63 @@ public partial class HotbarNode : DragDropNode {
         });
     }
 
+    /// <summary>
+    /// Sets this hotbar slot to an inventory item, addressed by its item id.
+    /// </summary>
+    /// <remarks>
+    /// The regular drag and drop path stores the position of the item inside the inventory, which does not
+    /// survive a reload or a rearrangement of the inventory. This overload stores the item id instead, so
+    /// that the slot can be persisted and restored later.
+    /// </remarks>
+    /// <param name="itemId">The item id to place in the slot.</param>
+    public unsafe void SetSlotItem(uint itemId) {
+        Payload = new DragDropPayload {
+            Type = DragDropType.Item,
+            Int2 = (int) itemId,
+        };
+
+        hotbarData->Clear();
+        hotbarData->Set(RaptureHotbarModule.HotbarSlotType.Item, itemId);
+
+        UpdateSlotAppearance();
+    }
+
+    /// <summary>
+    /// Sets this hotbar slot to the specified macro.
+    /// </summary>
+    /// <param name="macroIndex">The index of the macro in the macro list.</param>
+    public unsafe void SetSlotMacro(uint macroIndex) {
+        Payload = new DragDropPayload {
+            Type = DragDropType.Macro,
+            Int2 = (int) macroIndex,
+        };
+
+        hotbarData->Clear();
+        hotbarData->Set(RaptureHotbarModule.HotbarSlotType.Macro, macroIndex);
+
+        UpdateSlotAppearance();
+    }
+
+    /// <summary>
+    /// Gets the content of this slot, or null when the slot is empty.
+    /// </summary>
+    public unsafe HotbarSlotContent? GetSlotContent() {
+        if (!hotbarData->IsValid) return null;
+
+        var type = hotbarData->CommandType;
+
+        // Items that were dragged in are stored by their position inside the inventory, which is not stable
+        // across sessions. The apparent action id holds the item id for every item slot type, so it is used
+        // here to make the content persistable.
+        var id = type is RaptureHotbarModule.HotbarSlotType.Item
+                      or RaptureHotbarModule.HotbarSlotType.InventoryItem
+                      or RaptureHotbarModule.HotbarSlotType.EventItem
+            ? hotbarData->ApparentActionId
+            : hotbarData->CommandId;
+
+        return new HotbarSlotContent(type, id);
+    }
+
     /// <inheritdoc />
     public HotbarNode() {
         KeybindTextNode = new TextNode {
