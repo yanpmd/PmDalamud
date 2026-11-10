@@ -174,6 +174,31 @@ internal sealed unsafe class DynamicHotbarAddon : NativeAddon {
         _knownSlots.Clear();
     }
 
+    /// <summary>
+    /// Attaches logging to a slot so that problems with the native drag and drop can be diagnosed.
+    /// </summary>
+    private static void AttachDiagnostics(HotbarNode slot, int index) {
+        Action<DragDropNode, DragDropPayload>? inner = slot.OnPayloadAccepted;
+
+        slot.OnPayloadAccepted = (node, payload) => {
+            Logger.Info(
+                $"[DynamicHotbar] slot {index} accepted payload: type={payload.Type} int1={payload.Int1} " +
+                $"int2={payload.Int2} ref={payload.ReferenceIndex}"
+            );
+
+            inner?.Invoke(node, payload);
+        };
+
+        slot.CollisionNode.AddEvent(AtkEventType.MouseOver, () => {
+            // Only log the first hover of a slot, otherwise the log is flooded while the mouse moves.
+            if (!_hoveredSlots.Add(index)) return;
+
+            Logger.Info($"[DynamicHotbar] slot {index} hovered");
+        });
+    }
+
+    private static readonly HashSet<int> _hoveredSlots = [];
+
     private void ResizeWindow() {
         Vector2 size = GetWindowSize(_slotCount);
         if (size == Size) return;
@@ -222,8 +247,17 @@ internal sealed unsafe class DynamicHotbarAddon : NativeAddon {
                     IsBackgroundShown = true,
                     IsClickable       = true,
                     IsDraggable       = true,
+
+                    // Accept anything the game can drag around: actions, items, macros and crystals.
+                    AcceptedType = DragDropType.Everything,
+
+                    // The node is built by hand and therefore not necessarily flagged as enabled, which
+                    // would make the drag and drop manager reject it as a drop target.
+                    SkipEnabledCheck = true,
                 };
                 rowNode.AddNode(slot);
+
+                AttachDiagnostics(slot, i);
 
                 _slots.Add(slot);
                 _knownSlots.Add(DynamicHotbarSlot.Empty);
