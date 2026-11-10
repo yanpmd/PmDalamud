@@ -255,6 +255,8 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
 
         AddEvent(AtkEventType.DragDropBegin, DragDropBeginHandler);
         AddEvent(AtkEventType.DragDropCanAcceptCheck, DragDropCanAcceptCheckHandler);
+        AddEvent(AtkEventType.DragDropInsertAttempt, DragDropInsertAttemptHandler);
+        AddEvent(AtkEventType.DragDropEnd, DragDropEndHandler);
         AddEvent(AtkEventType.DragDropInsert, DragDropInsertHandler);
         AddEvent(AtkEventType.DragDropDiscard, DragDropDiscardHandler);
         AddEvent(AtkEventType.DragDropClick, DragDropClickHandler);
@@ -299,17 +301,30 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
     }
 
     /// <summary>
-    /// Answers the question of the drag and drop manager whether this node is willing to accept the
+    /// Observes the question of the drag and drop manager whether this node is willing to accept the
     /// payload that is currently being dragged.
     /// </summary>
     /// <remarks>
-    /// The manager sends this check to every node below the mouse before it decides where the payload
-    /// would land. Nodes that do not answer are treated as invalid drop targets and the drop is
-    /// discarded without any further feedback, which is why this check has to be answered explicitly.
+    /// The native implementation of the drag drop component already answers this question on its own, so
+    /// the return flags of the event are left untouched here. Overriding them from the event handler
+    /// replaces what the native code decided and keeps the drag and drop manager from delivering the
+    /// payload to this node.
     /// </remarks>
     private void DragDropCanAcceptCheckHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
-        atkEvent->State.StateFlags |= AtkEventStateFlags.HasReturnFlags;
-        atkEvent->State.ReturnFlags = 1;
+        IPluginLog.Get().Verbose(
+            $"[DragDropNode] can accept check on {GetType().Name} " +
+            $"[{((nint)ResNode):X}] accepted={AcceptedType} enabled={IsEnabled} visible={IsVisible}"
+        );
+    }
+
+    /// <summary>
+    /// Observes the attempt of the drag and drop manager to insert the dragged payload into this node.
+    /// </summary>
+    private void DragDropInsertAttemptHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
+        IPluginLog.Get().Verbose(
+            $"[DragDropNode] insert attempt on {GetType().Name} " +
+            $"[{((nint)ResNode):X}] accepted={AcceptedType} enabled={IsEnabled} visible={IsVisible}"
+        );
     }
 
     private void DragDropDiscardHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
