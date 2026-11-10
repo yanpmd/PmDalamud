@@ -19,6 +19,7 @@ using Dalamud.IoC;
 using Dalamud.Plugin;
 
 using System.Diagnostics;
+using KamiToolKit;
 using Logger = Umbra.Common.Logger;
 
 namespace Umbra;
@@ -45,6 +46,11 @@ internal sealed class Plugin : IDalamudPlugin
         UmbraDrawing.Initialize(plugin);
         Node.UseThreadedStyleComputation = true;
 
+        // KamiToolKit is used by the dynamic hotbar widget to show a native window with hotbar slots.
+        // The synchronous initializer is used on purpose: awaiting the asynchronous one here would
+        // deadlock, because plugin constructors do not run on the framework thread.
+        KamiToolKitLibrary.Initialize(PluginInterface, "UmbraEx");
+
         ClientState.Login  += OnLogin;
         ClientState.Logout += OnLogout;
 
@@ -63,6 +69,16 @@ internal sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw -= UpdateDevBar;
 
         UmbraDrawing.Dispose();
+
+        // KamiToolKit must be released on the main thread: it unhooks the native close callback and
+        // reclaims the nodes it allocated. Dalamud does not guarantee that plugin disposal happens on
+        // the framework thread, and KamiToolKit skips all cleanup when it is called from anywhere else.
+        if (Dalamud.Utility.ThreadSafety.IsMainThread) {
+            KamiToolKitLibrary.Dispose();
+        }
+        else {
+            DalamudFramework.RunOnFrameworkThread(KamiToolKitLibrary.Dispose);
+        }
     }
 
     private void OnLogin()

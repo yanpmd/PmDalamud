@@ -39,6 +39,9 @@
         "resolved": "3.118.0-preview.1.2",
         "contentHash": "pjcuvrYCJ74gPdz+W327JcwJKyy5QVXOfVXxAKnih+n1d8b6A0m41LNqlOMhUzfbpl4TDnqB19KraMWZqiaVjg=="
       },
+      "kamitoolkit": {
+        "type": "Project"
+      },
       "umbra.common": {
         "type": "Project"
       },
