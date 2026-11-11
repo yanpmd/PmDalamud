@@ -19,10 +19,14 @@ public unsafe partial class NativeAddon {
             IPluginLog.Get().Excessive($"[{thisPtr->NameString}] OnFireCallback");
 
             foreach (var addon in CreatedAddons) {
-                if (addon == thisPtr && close && addon is { RespectCloseAll: true, IsOverlayAddon: false }) {
-                    addon.Close();
-                    return true;
-                }
+                if (addon != thisPtr || !close || addon.IsOverlayAddon) continue;
+
+                // Addons that opt out of the escape handling still have to swallow the event. Passing it on
+                // to the original implementation would let the game close them, after which their owner
+                // would immediately reopen and rebuild them, which shows up as a flicker.
+                if (addon.RespectCloseAll) addon.Close();
+
+                return true;
             }
         }
         catch (Exception e) {

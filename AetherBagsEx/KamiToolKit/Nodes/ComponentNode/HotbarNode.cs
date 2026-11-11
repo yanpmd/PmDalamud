@@ -54,9 +54,30 @@ public partial class HotbarNode : DragDropNode {
     public KeySetting? KeyBind { get; set; }
 
     /// <summary>
+    /// Gets or sets whether this slot polls <see cref="KeyBind"/> on every update and consumes the
+    /// pressed key. Owners that handle key presses themselves can disable this while still keeping
+    /// <see cref="KeyBind"/> set, so the key label continues to be drawn on the slot.
+    /// </summary>
+    public bool HandleKeyBind { get; set; } = true;
+
+    /// <summary>
     /// Gets whether this slot is empty.
     /// </summary>
     public bool IsEmpty => Payload.Type is 0 or DragDropType.Nothing;
+
+    /// <summary>
+    /// Gets the apparent (displayed) action id of this slot.
+    /// </summary>
+    /// <remarks>
+    /// This can differ from the stored command when the game substitutes the action, for example when a
+    /// dancer step turns another weapon skill into the step that is currently available.
+    /// </remarks>
+    public unsafe uint ApparentActionId => hotbarData->ApparentActionId;
+
+    /// <summary>
+    /// Gets the apparent (displayed) slot type of this slot.
+    /// </summary>
+    public unsafe RaptureHotbarModule.HotbarSlotType ApparentSlotType => hotbarData->ApparentSlotType;
 
     /// <summary>
     /// Sets this hotbar slot from the provided payload information.
@@ -125,8 +146,18 @@ public partial class HotbarNode : DragDropNode {
     /// <summary>
     /// Function that is called when the associated <see cref="KeyBind"/> is pressed.
     /// </summary>
-    protected virtual void OnKeybindPressed() {
-        OnHotbarNodeClicked(this);
+    protected virtual void OnKeybindPressed()
+        => OnHotbarNodeClicked(this);
+
+    /// <summary>
+    /// Plays the press animation of this slot.
+    /// </summary>
+    /// <remarks>
+    /// Executing a slot only replays the icon timeline, so this is what gives the slot a visible
+    /// confirmation. It is triggered from the click handler so that both a mouse click and an external
+    /// key binding produce the same feedback.
+    /// </remarks>
+    public void PlayClickFeedback() {
         IconNode.IconExtras.Timeline?.PlayAnimation(3, true);
         lastClickTime = DateTime.UtcNow;
     }
@@ -271,7 +302,15 @@ public partial class HotbarNode : DragDropNode {
     private unsafe void OnHotbarNodeRollOver(DragDropNode thisNode) {
         HideTooltip();
 
-        if (!hotbarData->IsValid) return;
+        if (!hotbarData->IsValid) {
+            // A slot whose content was removed must stop advertising the tooltip of its previous content.
+            // Clearing the text also unregisters the native roll-over handler.
+            TextTooltip   = default;
+            ActionTooltip = 0;
+            ItemTooltip   = 0;
+
+            return;
+        }
 
         TextTooltip = hotbarData->PopUpHelp.AsReadOnlySeString();
 
@@ -352,10 +391,16 @@ public partial class HotbarNode : DragDropNode {
     }
 
     private unsafe void OnHotbarNodeClicked(DragDropNode thisNode) {
+        // Clicking an empty slot must be a no-op: executing an invalid slot still touches the game's
+        // hotbar module and leaves it half-way into a drag session.
+        if (!hotbarData->IsValid) return;
+
         var hotbarModule = RaptureHotbarModule.Instance();
         if (hotbarModule is null) return;
 
         hotbarModule->ExecuteSlot(hotbarData);
+
+        PlayClickFeedback();
     }
 
     private void OnHotbarNodeDiscard(DragDropNode thisNode)
@@ -372,6 +417,7 @@ public partial class HotbarNode : DragDropNode {
     }
 
     private unsafe void TryProcessKeybind() {
+        if (!HandleKeyBind) return;
         if (ICondition.Get().Any(ConditionFlag.OccupiedInQuestEvent)) return;
         if (KeyBind is not { Key: not SeVirtualKey.NO_KEY } keyBind) return;
         if (RaptureAtkModule.Instance()->IsTextInputActive()) return;

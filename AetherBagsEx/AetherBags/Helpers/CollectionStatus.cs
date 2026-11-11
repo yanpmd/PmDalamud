@@ -13,6 +13,13 @@ public static class CollectionStatus
 {
     private const long CacheLifetimeMs = 2000;
 
+    /// <summary>
+    /// Icon id of the green check mark drawn on items the player has already
+    /// collected. It is drawn in the top right corner of the slot, the same
+    /// corner the job crest of a weapon uses.
+    /// </summary>
+    public const uint CollectedIconId = 71112;
+
     private static readonly Dictionary<uint, bool> Cache = new();
     private static long _cacheResetTick;
 

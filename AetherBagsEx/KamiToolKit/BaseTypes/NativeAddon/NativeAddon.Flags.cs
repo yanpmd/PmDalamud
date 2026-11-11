@@ -75,6 +75,43 @@ public unsafe partial class NativeAddon {
     public bool RespectCloseAll { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets whether this addon may take keyboard or gamepad focus.
+    /// </summary>
+    /// <remarks>
+    /// A bar that only displays information should disable this so that clicking it does not move the
+    /// focus away from the game.
+    /// </remarks>
+    public bool DisableFocusability {
+        get;
+        set {
+            field = value;
+            if (InternalAddon is not null) InternalAddon->DisableFocusability = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether this addon takes focus the moment it is shown.
+    /// </summary>
+    public bool DisableFocusOnShow {
+        get;
+        set {
+            field = value;
+            if (InternalAddon is not null) InternalAddon->DisableFocusOnShow = value;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether escape may close this addon while it does not have focus.
+    /// </summary>
+    public bool DisableUnfocusedCloseOnEsc {
+        get;
+        set {
+            field = value;
+            if (InternalAddon is not null) InternalAddon->DisableUnfocusedCloseOnEsc = value;
+        }
+    }
+
+    /// <summary>
     /// Gets or sets whether this addon should ignore AtkUnitBase.GlobalScale.
     /// </summary>
     public bool IgnoreGlobalScale { get; set; } = false;
@@ -87,6 +124,10 @@ public unsafe partial class NativeAddon {
         InternalAddon->DisableHideTransition = DisableCloseTransition;
         InternalAddon->EnableTitleBarContextMenu = EnableContextMenu;
         InternalAddon->DisableUserScaling = DisableScaleContextOption;
+
+        InternalAddon->DisableFocusability        = DisableFocusability || IsOverlayAddon;
+        InternalAddon->DisableFocusOnShow         = DisableFocusOnShow || IsOverlayAddon;
+        InternalAddon->DisableUnfocusedCloseOnEsc = DisableUnfocusedCloseOnEsc;
 
         FlagHelper.UpdateFlag(ref InternalAddon->Flags1A3, 1 << 5, DisableClamping);
 

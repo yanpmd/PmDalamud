@@ -7,7 +7,7 @@ namespace Umbra.Windows.Settings.Modules;
 public class SettingsWindowMarkerSettingsModule : SettingsWindowModule
 {
     public override string Name  => I18N.Translate("Settings.MarkersModule.Name");
-    public override int    Order => 1;
+    public override int    Order => 2;
 
     protected override string UdtResourceName => "umbra.windows.settings.modules.markers_module.xml";
 

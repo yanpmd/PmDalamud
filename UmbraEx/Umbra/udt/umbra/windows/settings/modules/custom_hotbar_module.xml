@@ -1,0 +1,196 @@
+<udt>
+    <![CDATA[
+    @import "globals";
+
+    #main {
+        auto-size: grow;
+
+        & > .list-panel {
+            flow: vertical;
+            auto-size: fit grow;
+            size: 250 0;
+            border-color: "Window.Border";
+            border-width: 0 1 0 0;
+
+            & > .list {
+                flow: vertical;
+                auto-size: grow;
+
+                & > #bar-list {
+                    flow: vertical;
+                    auto-size: grow fit;
+                    gap: 2;
+                    padding: 8;
+                }
+            }
+
+            & > .footer {
+                auto-size: grow fit;
+                padding: 4;
+                border-color: "Window.Border";
+                border-width: 1 0 0 0;
+            }
+        }
+
+        & > .body {
+            flow: vertical;
+            auto-size: grow;
+            margin: 10;
+            background-color: "Window.BackgroundLight";
+            border-radius: 5;
+            drop-shadow: 0 0 5 5;
+
+            & > .config {
+                flow: vertical;
+                auto-size: grow;
+                padding: 12;
+                gap: 8;
+
+                & > #content {
+                    flow: vertical;
+                    auto-size: grow fit;
+                    gap: 6;
+                }
+            }
+        }
+    }
+
+    .bar-button {
+        auto-size: grow fit;
+        size: 0 30;
+        padding: 0 4;
+        gap: 4;
+        background-color: "Window.Background";
+        border-radius: 4;
+        stroke-color: 0;
+        stroke-width: 1;
+        transition-type: ease-out-sine;
+        transition-duration: 150;
+
+        & > .name {
+            anchor: middle-left;
+            auto-size: grow fit;
+            font-size: 13;
+            color: "Window.Text";
+            outline-color: "Window.TextOutline";
+            outline-size: 1;
+            text-overflow: false;
+            word-wrap: false;
+        }
+
+        & > .buttons {
+            anchor: middle-right;
+            gap: 2;
+            opacity: 0;
+            transition-type: ease-out-sine;
+            transition-duration: 150;
+        }
+
+        &.active {
+            background-color: "Window.BackgroundLight";
+
+            & > .name {
+                color: "Window.TextLight";
+            }
+        }
+
+        &.hidden {
+            & > .name {
+                color: "Window.TextMuted";
+            }
+        }
+
+        &:hover {
+            stroke-color: "Window.AccentColor";
+            transition-duration: 1;
+
+            & > .buttons {
+                transition-duration: 1;
+                opacity: 1;
+            }
+        }
+    }
+
+    .separator {
+        auto-size: grow fit;
+        gap: 4;
+        margin: 8 0;
+
+        & > .line {
+            anchor: middle-left;
+            auto-size: grow fit;
+            size: 0 1;
+            background-color: "Window.Border";
+        }
+
+        & > .text {
+            anchor: middle-left;
+            font-size: 11;
+            color: "Window.TextMuted";
+            outline-color: "Window.TextOutline";
+            outline-size: 1;
+        }
+    }
+
+    .slot-row {
+        auto-size: grow fit;
+        padding: 6 8;
+        background-color: "Window.Background";
+        border-radius: 5;
+
+        & > .slot-index {
+            anchor: middle-left;
+            size: 26 0;
+            font-size: 12;
+            color: "Window.TextMuted";
+            outline-color: "Window.TextOutline";
+            outline-size: 1;
+        }
+
+        & > .slot-content {
+            anchor: middle-left;
+            auto-size: grow fit;
+            font-size: 13;
+            color: "Window.Text";
+            outline-color: "Window.TextOutline";
+            outline-size: 1;
+            text-overflow: false;
+            word-wrap: false;
+        }
+
+        & > .buttons {
+            anchor: middle-right;
+        }
+    }
+
+    .hint {
+        font-size: 12;
+        color: "Window.TextMuted";
+        outline-color: "Window.TextOutline";
+        outline-size: 1;
+    }
+    ]]>
+
+    <node id="main">
+        <node class="list-panel">
+            <node class="list scrollbars" overflow="false">
+                <node id="bar-list"/>
+            </node>
+            <node class="footer">
+                <button-node
+                        id="add-bar"
+                        is-ghost="true"
+                        is-small="true"
+                        icon="Plus"
+                        label="_L(Settings.CustomHotbarModule.AddBar)"
+                        style="anchor: middle-center;"
+                />
+            </node>
+        </node>
+        <node class="body">
+            <node class="config scrollbars" overflow="false">
+                <node id="content"/>
+            </node>
+        </node>
+    </node>
+</udt>

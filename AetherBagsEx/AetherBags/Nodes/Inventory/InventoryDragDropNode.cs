@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using AetherBags.Addons;
 using AetherBags.Configuration;
+using AetherBags.Helpers;
 using AetherBags.Inventory;
 using AetherBags.Inventory.Context;
 using AetherBags.Inventory.Items;
@@ -30,12 +31,14 @@ public class InventoryDragDropNode : DragDropNode
     private readonly TextNode _quantityTextNode;
     private IconImageNode? _badgeNode;
     private IconImageNode? _jobIconNode;
+    private IconImageNode? _collectedIconNode;
     private ResNode? _borderContainerNode;
     private ImageNode? _borderNode;
     private BorderStyle _currentBorderStyle;
     private bool _isBorderHovered;
     private bool _isCollected;
     private bool _isCollectable;
+    private uint _jobIconId;
     private ItemDecoration? _currentDecoration;
     private bool _antsAnimationActive;
 
@@ -143,8 +146,10 @@ public class InventoryDragDropNode : DragDropNode
     }
 
     /// <summary>
-    /// Shows the game's native "collected" marker on the icon, used for orchestrion
-    /// rolls, triad cards, mounts and minions the player has already unlocked.
+    /// Marks items the player has already collected (orchestrion rolls, triad
+    /// cards, mounts and minions the player has already unlocked). The green
+    /// check mark is drawn in the top right corner of the slot, the same corner
+    /// the job crest of a weapon uses.
     /// </summary>
     public bool IsCollected
     {
@@ -153,6 +158,7 @@ public class InventoryDragDropNode : DragDropNode
             if (_isCollected == value) return;
             _isCollected = value;
             ApplyIconMarker();
+            ApplyCollectedBadge();
         }
     }
 
@@ -171,7 +177,49 @@ public class InventoryDragDropNode : DragDropNode
         }
     }
 
-    private void ApplyIconMarker() => IconNode.IsGlamoured = _isCollected || _isCollectable;
+    /// <summary>
+    /// The native marker of a collectible is a red cross. Collected items get the
+    /// green check mark instead, so the native marker is only kept for collectibles
+    /// the player has not registered yet.
+    /// </summary>
+    private void ApplyIconMarker() => IconNode.IsGlamoured = _isCollectable && !_isCollected;
+
+    /// <summary>
+    /// Draws the green check mark on top of the item icon, the same way the job
+    /// crest is drawn for weapons.
+    /// </summary>
+    private void ApplyCollectedBadge()
+    {
+        if (!_isCollected)
+        {
+            if (_collectedIconNode != null) _collectedIconNode.IsVisible = false;
+            return;
+        }
+
+        if (_collectedIconNode == null)
+        {
+            _collectedIconNode = new IconImageNode
+            {
+                Size = new Vector2(24, 24),
+                Position = new Vector2(18, 3),
+                NodeFlags = NodeFlags.Visible | NodeFlags.Enabled,
+                FitTexture = true,
+            };
+
+            _collectedIconNode.AttachNode(IconNode);
+        }
+
+        _collectedIconNode.IconId = CollectionStatus.CollectedIconId;
+        _collectedIconNode.Position = CollectedBadgePosition();
+        _collectedIconNode.IsVisible = true;
+    }
+
+    /// <summary>
+    /// The check mark shares the top right corner with the job crest, so it moves
+    /// to the bottom right when a slot shows both.
+    /// </summary>
+    private Vector2 CollectedBadgePosition()
+        => _jobIconId == 0 ? new Vector2(18, 3) : new Vector2(18, 21);
 
     private void ApplyBadge(BadgeInfo badge)
     {
@@ -228,27 +276,32 @@ public class InventoryDragDropNode : DragDropNode
     {
         set
         {
+            _jobIconId = value;
             if (value == 0)
             {
                 if (_jobIconNode != null) _jobIconNode.IsVisible = false;
-                return;
             }
-
-            if (_jobIconNode == null)
+            else
             {
-                _jobIconNode = new IconImageNode
+                if (_jobIconNode == null)
                 {
-                    Size = new Vector2(16, 16),
-                    Position = new Vector2(26, 3),
-                    NodeFlags = NodeFlags.Visible | NodeFlags.Enabled,
-                    WrapMode = WrapMode.Stretch,
-                };
+                    _jobIconNode = new IconImageNode
+                    {
+                        Size = new Vector2(24, 24),
+                        Position = new Vector2(18, 3),
+                        NodeFlags = NodeFlags.Visible | NodeFlags.Enabled,
+                        WrapMode = WrapMode.Stretch,
+                    };
 
-                _jobIconNode.AttachNode(IconNode);
+                    _jobIconNode.AttachNode(IconNode);
+                }
+
+                _jobIconNode.IconId = value;
+                _jobIconNode.IsVisible = true;
             }
 
-            _jobIconNode.IconId = value;
-            _jobIconNode.IsVisible = true;
+            // The collected check mark has to make room for the job crest.
+            if (_collectedIconNode != null) _collectedIconNode.Position = CollectedBadgePosition();
         }
     }
 
@@ -467,6 +520,7 @@ private void ApplyBorder(BorderStyle style)
     {
         ClearDecoration();
         if (_jobIconNode != null) _jobIconNode.IsVisible = false;
+        if (_collectedIconNode != null) _collectedIconNode.IsVisible = false;
         _currentDecoration = null; // Reset so next ApplyDecoration runs fully
         _currentBorderStyle = BorderStyle.None;
         _isBorderHovered = false;
@@ -476,6 +530,7 @@ private void ApplyBorder(BorderStyle style)
         IconNode.IsIconDisabled = false;
         _isCollected = false;
         _isCollectable = false;
+        _jobIconId = 0;
         IconNode.IsGlamoured = false;
         IsDraggable = true;
         IconNode.IconExtras.AntsNode.IsVisible = false;

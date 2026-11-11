@@ -255,7 +255,6 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
 
         AddEvent(AtkEventType.DragDropBegin, DragDropBeginHandler);
         AddEvent(AtkEventType.DragDropCanAcceptCheck, DragDropCanAcceptCheckHandler);
-        AddEvent(AtkEventType.DragDropInsertAttempt, DragDropInsertAttemptHandler);
         AddEvent(AtkEventType.DragDropEnd, DragDropEndHandler);
         AddEvent(AtkEventType.DragDropInsert, DragDropInsertHandler);
         AddEvent(AtkEventType.DragDropDiscard, DragDropDiscardHandler);
@@ -279,6 +278,11 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
     }
 
     private void DragDropBeginHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
+        // A node without a payload has nothing to drag. Starting a session anyway leaves the game with an
+        // active but empty drag: the cursor turns into the drag cursor and the session has to be cancelled
+        // with escape, which shows up as a flicker.
+        if (Payload.Type is DragDropType.Nothing) return;
+
         atkEvent->SetEventIsHandled();
         Payload.ToDragDropInterface(atkEventData->DragDropData.DragDropInterface);
         OnBegin?.Invoke(this);
@@ -311,20 +315,8 @@ public unsafe class DragDropNode : ComponentNode<AtkComponentDragDrop, AtkUldCom
     /// payload to this node.
     /// </remarks>
     private void DragDropCanAcceptCheckHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
-        IPluginLog.Get().Verbose(
-            $"[DragDropNode] can accept check on {GetType().Name} " +
-            $"[{((nint)ResNode):X}] accepted={AcceptedType} enabled={IsEnabled} visible={IsVisible}"
-        );
-    }
-
-    /// <summary>
-    /// Observes the attempt of the drag and drop manager to insert the dragged payload into this node.
-    /// </summary>
-    private void DragDropInsertAttemptHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
-        IPluginLog.Get().Verbose(
-            $"[DragDropNode] insert attempt on {GetType().Name} " +
-            $"[{((nint)ResNode):X}] accepted={AcceptedType} enabled={IsEnabled} visible={IsVisible}"
-        );
+        // Intentionally empty. The handler only exists so the event is registered for this component.
+        // See the remarks above: the answer of the native implementation must not be overridden here.
     }
 
     private void DragDropDiscardHandler(AtkEventListener* thisPtr, AtkEventType eventType, int eventParam, AtkEvent* atkEvent, AtkEventData* atkEventData) {
