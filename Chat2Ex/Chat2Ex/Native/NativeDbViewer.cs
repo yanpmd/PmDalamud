@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using Chat2Ex.Code;
 using Chat2Ex.Resources;
 using Chat2Ex.Util;
@@ -30,7 +30,7 @@ public sealed class NativeDbViewer : NativeAddon
     private ResNode? separatorNode;
     private ScrollingNode<VerticalListNode>? scroll;
     private MessageRenderer? renderer;
-    private ContextMenu? contextMenu;
+    private ContextMenu Menu => Plugin.ChatUi.ContextMenu;
 
     private string searchTerm = string.Empty;
     private bool onlyCurrentCharacter = true;
@@ -43,9 +43,10 @@ public sealed class NativeDbViewer : NativeAddon
         var start = ContentStartPosition;
         var size = ContentSize;
 
-        renderer = new MessageRenderer(Plugin);
-        contextMenu = new ContextMenu();
+        // Closing is handled by the plugin, the game must not run its close callback on this addon.
+        RespectCloseAll = false;
 
+        renderer = new MessageRenderer(Plugin);
         searchNode = new TextInputNode
         {
             Position = start,
@@ -112,8 +113,8 @@ public sealed class NativeDbViewer : NativeAddon
         renderer?.Dispose();
         renderer = null;
 
-        contextMenu?.Dispose();
-        contextMenu = null;
+        // The menu is shared, only clear the game side one.
+        Plugin.ChatUi.ContextMenu.Close();
 
         base.OnFinalize(addon);
     }
@@ -220,25 +221,21 @@ public sealed class NativeDbViewer : NativeAddon
         renderer?.Dispose();
         renderer = null;
 
-        contextMenu?.Dispose();
-        contextMenu = null;
+        Plugin.ChatUi.ContextMenu.Close();
 
         base.Dispose();
     }
 
     private void ShowMenu(Message message)
     {
-        if (contextMenu is null)
-            return;
-
-        contextMenu.Clear();
-        contextMenu.AddItem("Copy", () => NativeCallback.Safe(() =>
+        Menu.Clear();
+        Menu.AddItem("Copy", () => NativeCallback.Safe(() =>
         {
             var text = string.Concat(message.Sender.Concat(message.Content).OfType<TextChunk>().Select(chunk => chunk.Content));
             Dalamud.Bindings.ImGui.ImGui.SetClipboardText(text);
         }, "copying a message"));
 
-        contextMenu.AddItem("Delete from database", () => NativeCallback.Safe(() =>
+        Menu.AddItem("Delete from database", () => NativeCallback.Safe(() =>
         {
             Plugin.MessageManager.Store.DeleteMessage(message.Id);
             needsReload = true;
@@ -246,12 +243,6 @@ public sealed class NativeDbViewer : NativeAddon
 
         // The menu is opened on the next tick and not bound to an owner addon, our window is not a
         // real game addon and binding it crashes the game.
-        Plugin.Framework.RunOnTick(() =>
-        {
-            if (contextMenu is null)
-                return;
-
-            contextMenu.Open(false, true);
-        });
+        Plugin.Framework.RunOnTick(() => NativeCallback.Safe(() => Menu.Open(false, true), "opening the database menu"));
     }
 }

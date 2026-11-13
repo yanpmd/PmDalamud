@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Text;
 using Chat2Ex.Code;
 using Chat2Ex.GameFunctions.Types;
@@ -48,6 +48,13 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
     private readonly Plugin Plugin;
 
+    /// <summary>
+    ///     The native context menu is shared by every chat window and outlives them. The game keeps
+    ///     a pointer to the event interface of an open menu, releasing the menu together with the
+    ///     window that opened it crashes the game as soon as an entry is clicked.
+    /// </summary>
+    private ContextMenu Menu => Plugin.ChatUi.ContextMenu;
+
     private TabBarNode? tabBar;
     private ScrollingNode<VerticalListNode>? messageScroll;
     private TextInputNode? inputNode;
@@ -60,7 +67,6 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     private TextNode? resizeHandleLabel;
     private CollisionNode? emptyHeader;
     private MessageRenderer? renderer;
-    private ContextMenu? contextMenu;
     private NativeTextPrompt? renamePrompt;
 
     // Resize state, the window is resized while the handle is dragged.
@@ -134,7 +140,15 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     {
         renderer = new MessageRenderer(Plugin);
         renderer.RebuildRequested += InvalidateRenderedMessages;
-        contextMenu = new ContextMenu();
+
+        // Closing the window is handled by the chat log, letting the game close it would run the
+        // native close callback on a manually built addon and crash the game.
+        RespectCloseAll = false;
+
+        // The addon is recreated on every open, a drag or resize state left over from the previous
+        // instance would make the window jump on the first mouse move.
+        isDragging = false;
+        isResizing = false;
 
         if (WindowNode is WindowNode windowNode)
         {
@@ -440,13 +454,14 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Starts the drag of the window when the invisible header strip is pressed.
+    ///     Starts the drag of the window when the header of the window is pressed.
     /// </summary>
     private unsafe void OnHeaderMouseDown(AtkEventListener* listener, AtkEventType type, int param, AtkEvent* atkEvent, AtkEventData* data)
     {
         if (data is null || !data->IsLeftClick)
             return;
 
+        // The lock setting disables the drag, the window then stays where it is.
         if (Plugin.Config.LockWindowPosition)
             return;
 
@@ -456,7 +471,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Moves the window while the invisible header strip is dragged.
+    ///     Moves the window while the header is held.
     /// </summary>
     private unsafe void OnHeaderMouseMove(AtkEventListener* listener, AtkEventType type, int param, AtkEvent* atkEvent, AtkEventData* data)
     {
@@ -465,8 +480,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         var delta = data->MousePosition - dragStartMouse;
 
-        // The mouse position of the event is relative to the node that received it, a jump means
-        // that the pointer moved to another node and the position cannot be used.
+        // The mouse position is in screen space, so a jump means the event came from a different
+        // node and cannot be used to move the window.
         if (Math.Abs(delta.X) > 500.0f || Math.Abs(delta.Y) > 500.0f)
             return;
 
@@ -547,18 +562,10 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             if (channelMarker is not null)
                 MessageRenderer.ApplyFontSize(channelMarker);
 
-        // The font size is only a field of a node, the glyph cache has to be rebuilt, or the
-        // text is drawn with the glyphs of the previous size.
-        if (channelNode is not null)
-            MessageRenderer.ApplyFontSize(channelNode);
+            if (resizeHandleLabel is not null)
+                MessageRenderer.ApplyFontSize(resizeHandleLabel);
 
-        if (channelMarker is not null)
-            MessageRenderer.ApplyFontSize(channelMarker);
-
-        if (resizeHandleLabel is not null)
-            MessageRenderer.ApplyFontSize(resizeHandleLabel);
-
-        ApplyInputLayout();
+            ApplyInputLayout();
 
             // Re-truncate the fixed-size channel name for the new font metrics.
             renderedChannel = string.Empty;
@@ -623,6 +630,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
     protected override unsafe void OnFinalize(AtkUnitBase* addon)
     {
+        Plugin.Log.Info($"[Chat2Ex] Finalizing window addon {(addon is null ? 0u : addon->Id)}");
+
         // The native node tree is destroyed with the addon, so drop all node references.
         tabBar = null;
         messageScroll = null;
@@ -640,8 +649,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderer?.Dispose();
         renderer = null;
 
-        contextMenu?.Dispose();
-        contextMenu = null;
+        // Only close the menu, its event interface has to stay alive for the game, see ContextMenu.
+        Plugin.ChatUi.ContextMenu.Close();
 
         base.OnFinalize(addon);
     }
@@ -963,17 +972,11 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     /// </remarks>
     private unsafe void OpenContextMenu()
     {
-        if (contextMenu is null)
-            return;
-
         Plugin.Log.Info($"[Chat2Ex] Opening context menu, addon id: {(InternalAddon is null ? 0u : InternalAddon->Id)}");
 
         Plugin.Framework.RunOnTick(() => NativeCallback.Safe(() =>
         {
-            if (contextMenu is null)
-                return;
-
-            contextMenu.Open(false, true);
+            Menu.Open(false, true);
         }, "opening the context menu"));
     }
 
@@ -982,18 +985,12 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     /// </summary>
     private void ShowChannelMenu()
     {
-        if (contextMenu is null)
-            return;
-
         NativeCallback.Safe(ShowChannelMenuInternal, "opening the channel menu");
     }
 
     private void ShowChannelMenuInternal()
     {
-        if (contextMenu is null)
-            return;
-
-        contextMenu.Clear();
+        Menu.Clear();
 
         var used = TargetTab.CurrentChannel;
         var active = used.UseTempChannel ? used.TempChannel : used.Channel;
@@ -1015,7 +1012,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                      InputChannel.NoviceNetwork, InputChannel.Tell,
                  })
         {
-            AddChannel(contextMenu.AddItem, channel);
+            AddChannel(Menu.AddItem, channel);
         }
 
         var linkshells = new ContextMenuSubItem { Name = "通讯贝 / Linkshells", OnClick = () => { } };
@@ -1024,7 +1021,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                 AddChannel(linkshells.AddItem, channel);
 
         if (linkshells.SubItems.Count > 0)
-            contextMenu.AddItem(linkshells);
+            Menu.AddItem(linkshells);
 
         var crossLinkshells = new ContextMenuSubItem { Name = "跨服通讯贝 / Cross-world LS", OnClick = () => { } };
         foreach (var channel in Enum.GetValues<InputChannel>())
@@ -1032,7 +1029,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                 AddChannel(crossLinkshells.AddItem, channel);
 
         if (crossLinkshells.SubItems.Count > 0)
-            contextMenu.AddItem(crossLinkshells);
+            Menu.AddItem(crossLinkshells);
 
         if (Plugin.ExtraChat.ChannelNames.Count == 0)
         {
@@ -1046,7 +1043,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                 AddChannel(extraChat.AddItem, channel);
 
         if (extraChat.SubItems.Count > 0)
-            contextMenu.AddItem(extraChat);
+            Menu.AddItem(extraChat);
 
         OpenContextMenu();
     }
@@ -1152,20 +1149,17 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
     private void ShowTabMenu()
     {
-        if (contextMenu is null)
-            return;
-
         NativeCallback.Safe(() =>
         {
             var index = Plugin.LastTab;
             if (index < 0 || index >= Plugin.Config.Tabs.Count)
                 return;
 
-            contextMenu.Clear();
-            contextMenu.AddItem(Language.Options_Tabs_Name, () => NativeCallback.Safe(() => OpenRenamePrompt(index), "renaming a tab"));
-            contextMenu.AddItem(Language.ChatLog_Tabs_PopOut, () => NativeCallback.Safe(() => TogglePopOut(index), "popping out a tab"));
-            contextMenu.AddItem(Language.Options_Tabs_NewTab, () => NativeCallback.Safe(AddTab, "adding a tab"));
-            contextMenu.AddItem(Language.ChatLog_Tabs_OpenSettings, () => NativeCallback.Safe(OpenSettingsWindow, "opening the settings window"));
+            Menu.Clear();
+            Menu.AddItem(Language.Options_Tabs_Name, () => NativeCallback.Safe(() => OpenRenamePrompt(index), "renaming a tab"));
+            Menu.AddItem(Language.ChatLog_Tabs_PopOut, () => NativeCallback.Safe(() => TogglePopOut(index), "popping out a tab"));
+            Menu.AddItem(Language.Options_Tabs_NewTab, () => NativeCallback.Safe(AddTab, "adding a tab"));
+            Menu.AddItem(Language.ChatLog_Tabs_OpenSettings, () => NativeCallback.Safe(OpenSettingsWindow, "opening the settings window"));
 
             OpenContextMenu();
         }, "opening the tab menu");
@@ -1297,24 +1291,21 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderer?.Dispose();
         renderer = null;
 
-        contextMenu?.Dispose();
-        contextMenu = null;
+        // The menu is shared and outlives this window, only make sure the game side is cleared.
+        Plugin.ChatUi.ContextMenu.Close();
 
         base.Dispose();
     }
 
     private void ShowMessageMenu(Message message)
     {
-        if (contextMenu is null)
-            return;
-
-        contextMenu.Clear();
-        contextMenu.AddItem(Language.Context_Copy, () => NativeCallback.Safe(() => CopyMessage(message, true), "copying a message"));
+        Menu.Clear();
+        Menu.AddItem(Language.Context_Copy, () => NativeCallback.Safe(() => CopyMessage(message, true), "copying a message"));
 
         if (message.Sender.Count > 0)
-            contextMenu.AddItem(Language.Context_CopyContent, () => NativeCallback.Safe(() => CopyMessage(message, false), "copying a message"));
+            Menu.AddItem(Language.Context_CopyContent, () => NativeCallback.Safe(() => CopyMessage(message, false), "copying a message"));
 
-        contextMenu.AddItem(Language.Context_HideChat, () => NativeCallback.Safe(() => Plugin.ChatLog.CurrentHideState = HideState.User, "hiding the chat"));
+        Menu.AddItem(Language.Context_HideChat, () => NativeCallback.Safe(() => Plugin.ChatLog.CurrentHideState = HideState.User, "hiding the chat"));
 
         OpenContextMenu();
     }
@@ -1353,21 +1344,18 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     /// </summary>
     private void ShowPlayerMenu(Message message, PlayerPayload player)
     {
-        if (contextMenu is null)
-            return;
-
         NativeCallback.Safe(() =>
         {
-            contextMenu.Clear();
+            Menu.Clear();
 
-            NativePlayerMenu.Build(contextMenu, Plugin, message, player, SetChatInput);
+            NativePlayerMenu.Build(Menu, Plugin, message, player, SetChatInput);
 
-            contextMenu.AddItem(Language.Context_Copy, () => NativeCallback.Safe(() => CopyMessage(message, true), "copying a message"));
+            Menu.AddItem(Language.Context_Copy, () => NativeCallback.Safe(() => CopyMessage(message, true), "copying a message"));
 
             if (message.Sender.Count > 0)
-                contextMenu.AddItem(Language.Context_CopyContent, () => NativeCallback.Safe(() => CopyMessage(message, false), "copying a message"));
+                Menu.AddItem(Language.Context_CopyContent, () => NativeCallback.Safe(() => CopyMessage(message, false), "copying a message"));
 
-            contextMenu.AddItem(Language.Context_HideChat, () => NativeCallback.Safe(() => Plugin.ChatLog.CurrentHideState = HideState.User, "hiding the chat"));
+            Menu.AddItem(Language.Context_HideChat, () => NativeCallback.Safe(() => Plugin.ChatLog.CurrentHideState = HideState.User, "hiding the chat"));
 
             OpenContextMenu();
         }, "opening the player menu");

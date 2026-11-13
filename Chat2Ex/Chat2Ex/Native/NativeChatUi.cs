@@ -5,6 +5,7 @@ using Chat2Ex.Util;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Utility;
+using KamiToolKit.ContextMenu;
 
 namespace Chat2Ex.Native;
 
@@ -22,6 +23,14 @@ public sealed class NativeChatUi : IDisposable
     private string previewInput = string.Empty;
     private Message? previewMessage;
     private bool failed;
+
+    /// <summary>
+    ///     The native context menu is shared by every native window and outlives them. The game keeps
+    ///     a pointer to the event interface of an open menu, so the menu must not be released together
+    ///     with the window that opened it: the next click on an entry would call into freed memory.
+    /// </summary>
+    public ContextMenu ContextMenu { get; } = new();
+
 
     public NativeChatUi(Plugin plugin)
     {
@@ -490,6 +499,9 @@ public sealed class NativeChatUi : IDisposable
 
         void CloseAll()
         {
+            // Clear the game side menu first, its entries point at the windows that are closed below.
+            ContextMenu.Close();
+
             foreach (var popout in popoutWindows)
                 CloseWindow(popout);
 
