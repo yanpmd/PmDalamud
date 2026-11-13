@@ -66,7 +66,7 @@
     {
         "Author": "pmyan",
         "Name": "MappyEx",
-        "Description": "在原版 Mappy 基础上完成完整的中英双语适配，并加入永久地图标记、标记分组、vnavmesh 前往/飞向、地图右键导航等功能。分组可自建并统一图标与大小，工具栏单按钮切换显隐。不能与上游 Mappy 同时启用。",
+        "Description": "在原版 Mappy 基础上完成完整的中英双语适配，并加入永久地图标记、标记分组、vnavmesh 前往/飞向、地图右键导航等功能。分组可自建并统一图标与大小，工具栏单按钮切换显隐。不能与上游 Mappy 同时启用。非原创，请瞻仰原仓库实现",
         "Punchline": "A more versatile in-game map, with full Simplified Chinese support.",
         "InternalName": "MappyEx",
         "RepoUrl": "https://github.com/yanpmd/PmDalamud",
@@ -75,6 +75,21 @@
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/MappyEx/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/MappyEx/latest.zip",
         "AssemblyVersion": "3.3.1.1",
+        "ApplicableVersion": "any",
+        "DalamudApiLevel": 15
+    },
+    {
+        "Author": "pmyan",
+        "Name": "Chat2Ex",
+        "Description": "在原版 ChatTwo 基础上改为使用原生同层级的UI。不能与上游 ChatTwo 同时启用。非原创，请瞻仰原仓库实现",
+        "Punchline": "Chat2Ex is a complete rewrite of the in-game chat window as a plugin.\nIt supports:\n\n- Unlimited tabs\n- Tabs that always send to a certain channel\n- More flexible filtering\n- RGB channel colouring\n- Completely variable font size\n- Sidebar tabs\n- Unread counts\n- Emotes\n- Screenshot mode (obfuscate names)",
+        "InternalName": "Chat2Ex",
+        "RepoUrl": "https://github.com/yanpmd/PmDalamud",
+        "DownloadCount": 1,
+        "LastUpdate": 1793992261,
+        "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Chat2Ex/latest.zip",
+        "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Chat2Ex/latest.zip",
+        "AssemblyVersion": "1.41.2.0",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15
     }
