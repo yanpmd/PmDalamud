@@ -34,12 +34,21 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// <summary>
     /// The maximum number of slots this bar can hold.
     /// </summary>
-    public const int MaxSlots = 32;
+    public const int MaxSlots = 120;
 
     /// <summary>
     /// The default number of slots that are shown in one row.
     /// </summary>
     public const int DefaultSlotsPerRow = 10;
+
+    /// <summary>
+    /// The maximum number of slots per row.
+    /// </summary>
+    /// <remarks>
+    /// A row is 44 pixels wide per slot, so values above this would put the bar outside of the screen
+    /// long before the slot limit is reached.
+    /// </remarks>
+    public const int MaxSlotsPerRow = 30;
 
     private const float SlotWidth   = 44.0f;
     private const float SlotHeight  = 48.0f;
@@ -57,9 +66,11 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     private int                    _slotCount      = 8;
     private int                    _slotsPerRow    = DefaultSlotsPerRow;
     private bool                   _locked;
+    private bool                   _hideEmptySlots;
     private bool                   _showBackground = true;
     private bool                   _contentVisible = true;
-    private bool                   _slotsDirty;
+    private bool                   _nodesValid;
+    private readonly HashSet<int>  _dirtySlots = [];
 
     /// <summary>
     /// The id of the bar this window belongs to. It is reported along with slot changes so that a
@@ -70,7 +81,7 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// <summary>
     /// Raised when the content of one of the slots has been changed by the user.
     /// </summary>
-    public event Action<string>? OnSlotsChanged;
+    public event Action<string, int[]>? OnSlotsChanged;
 
     /// <summary>
     /// The number of slots that are currently present in this window.
@@ -82,7 +93,7 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// </summary>
     public static Vector2 GetContentSize(int slotCount, int slotsPerRow = DefaultSlotsPerRow) {
         slotCount   = Math.Clamp(slotCount, 1, MaxSlots);
-        slotsPerRow = Math.Clamp(slotsPerRow, 1, MaxSlots);
+        slotsPerRow = Math.Clamp(slotsPerRow, 1, MaxSlotsPerRow);
 
         int columns = Math.Min(slotCount, slotsPerRow);
         int rows    = (int) Math.Ceiling(slotCount / (double) columns);
@@ -123,7 +134,7 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// Changes how many slots are shown per row.
     /// </summary>
     public void SetSlotsPerRow(int slotsPerRow) {
-        slotsPerRow = Math.Clamp(slotsPerRow, 1, MaxSlots);
+        slotsPerRow = Math.Clamp(slotsPerRow, 1, MaxSlotsPerRow);
 
         if (slotsPerRow == _slotsPerRow) return;
 
@@ -194,11 +205,30 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
 
         _contentVisible = visible;
 
-        if (visible) {
+        ApplyContentVisibility();
+    }
+
+    /// <summary>
+    /// Applies the current visibility to both the addon root and the node that holds the slots.
+    /// </summary>
+    /// <remarks>
+    /// Both nodes have to be kept in sync. Reopening an addon rebuilds the whole node tree, and the
+    /// hidden state is restored on the slot node in <see cref="OnSetup"/>. Restoring only the addon
+    /// root would leave the slots invisible forever, which is what made an auto-hidden bar impossible
+    /// to bring back with the mouse after a reload.
+    /// </remarks>
+    private void ApplyContentVisibility() {
+        // A closed addon has no valid nodes anymore. The desired state stays in _contentVisible and is
+        // applied again as soon as OnSetup has rebuilt the node tree.
+        if (!_nodesValid || InternalAddon is null) return;
+
+        if (_contentVisible) {
             RootNode.AddNodeFlags(NodeFlags.Visible);
+            _rootNode?.AddNodeFlags(NodeFlags.Visible);
         }
         else {
             RootNode.RemoveNodeFlags(NodeFlags.Visible);
+            _rootNode?.RemoveNodeFlags(NodeFlags.Visible);
         }
     }
 
@@ -241,24 +271,34 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     }
 
     /// <summary>
-    /// Reads the current contents of all slots of this window.
+    /// Reads the current content of one slot of this window.
     /// </summary>
-    public List<CustomHotbarSlot> CaptureSlots() {
-        List<CustomHotbarSlot> slots = new(_slots.Count);
+    /// <returns>
+    /// The captured slot, or null when the slot claims to have content but cannot report it. The caller
+    /// must keep the stored value in that case instead of overwriting it.
+    /// </returns>
+    /// <remarks>
+    /// Slots are captured one at a time so that a single unreadable slot can never wipe the whole bar.
+    /// </remarks>
+    public CustomHotbarSlot? CaptureSlot(int index) {
+        if (index < 0 || index >= _slots.Count) return null;
 
-        for (int i = 0; i < _slots.Count; i++) {
-            CustomHotbarSlot slot = new();
+        HotbarNode       node = _slots[index];
+        CustomHotbarSlot slot = index < _pendingSlots.Count ? _pendingSlots[index].Clone() : new CustomHotbarSlot();
 
-            if (i < _pendingSlots.Count) {
-                slot.Hotkey         = _pendingSlots[i].Hotkey;
-                slot.HotkeyModifier = _pendingSlots[i].HotkeyModifier;
-            }
+        if (node.IsEmpty) {
+            slot.ClearContent();
 
-            ReadSlot(_slots[i].GetSlotContent(), slot);
-            slots.Add(slot);
+            return slot;
         }
 
-        return slots;
+        HotbarSlotContent? content = node.GetSlotContent();
+
+        if (content is null) return null;
+
+        ReadSlot(content, slot);
+
+        return slot;
     }
 
     /// <summary>
@@ -277,6 +317,11 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// </remarks>
     public void UpdateSlots() {
         foreach (HotbarNode slot in _slots) {
+            // An empty slot has nothing to render: its icon is cleared by ClearSlot, so the native slot
+            // render is skipped. With up to 120 slots this avoids thousands of native calls per second
+            // for slots that are only placeholders.
+            if (slot.IsEmpty) continue;
+
             slot.Update();
 
             ApplyIconFallback(slot);
@@ -287,11 +332,13 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
         // the slot contents.
         ApplySlotInteraction();
 
-        if (!_slotsDirty) return;
+        if (_dirtySlots.Count == 0) return;
 
-        _slotsDirty = false;
+        int[] dirty = [.. _dirtySlots];
 
-        OnSlotsChanged?.Invoke(BarId);
+        _dirtySlots.Clear();
+
+        OnSlotsChanged?.Invoke(BarId, dirty);
     }
 
     /// <summary>
@@ -328,21 +375,6 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     }
 
     private static readonly Dictionary<uint, uint> ActionIcons = [];
-
-    /// <summary>
-    /// Logs what a slot actually contains, so that a mismatch between the icon, the tooltip and the
-    /// executed command can be traced.
-    /// </summary>
-    private static void LogSlotState(int index, HotbarNode slot) {
-        HotbarSlotContent? content = slot.GetSlotContent();
-
-        Logger.Info(
-            $"[CustomHotbar] slot {index} hovered: " +
-            $"command={(content is null ? "empty" : $"{content.Value.Type}#{content.Value.Id}")} " +
-            $"icon={slot.IconId} " +
-            $"cooldown={slot.IconNode.CooldownPercent:F2}/{slot.IconNode.CooldownSeconds}"
-        );
-    }
 
     /// <summary>
     /// Draws the cooldown radial and the remaining seconds of an action slot when the native slot render
@@ -422,8 +454,11 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
         };
         _rootNode.AttachNode(this);
 
-        // Reopening a bar must not show it again while its display condition is still not met.
-        if (!_contentVisible) _rootNode.RemoveNodeFlags(NodeFlags.Visible);
+        // Reopening a bar must not show it again while its display condition is still not met. This also
+        // re-applies the visible state, so a bar that is hidden at the moment the addon is rebuilt can
+        // still be shown again by SetContentVisible(true).
+        _nodesValid = true;
+        ApplyContentVisibility();
 
         ResizeWindow();
         Rebuild();
@@ -434,13 +469,11 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
 
     /// <inheritdoc />
     protected override void OnHide(AtkUnitBase* addon) {
-        // The game only destroys the node tree when the addon is closed. Logged so that a flicker can be
-        // traced back to an unexpected close instead of a repaint.
-        Logger.Info($"[CustomHotbar] bar '{BarId}' was closed");
-
-        // The nodes are about to be destroyed by the game, so drop all references to them.
+        // The nodes are about to be destroyed by the game, so drop all references to them and stop
+        // writing to them until OnSetup has rebuilt the tree.
+        _nodesValid = false;
         _rootNode   = null;
-        _slotsDirty = false;
+        _dirtySlots.Clear();
         _rows.Clear();
         _slots.Clear();
     }
@@ -542,10 +575,11 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
                     HandleKeyBind = false,
                 };
 
-                // Content changes are reported by the drag and drop events, not by polling the native
-                // slot every frame. KTK's own handler runs first and updates the slot data.
-                slot.OnPayloadAccepted += (_, _) => _slotsDirty = true;
-                slot.OnDiscard        += _ => _slotsDirty = true;
+                // Content changes are reported per slot, so that only the slots that were actually edited
+                // are re-read. KTK's own handler runs first and updates the slot data.
+                int slotIndex = i;
+                slot.OnPayloadAccepted += (_, _) => _dirtySlots.Add(slotIndex);
+                slot.OnDiscard        += _ => _dirtySlots.Add(slotIndex);
 
                 // A bar must never take keyboard or gamepad focus. A focusable collision node lets the
                 // game route the escape key to the addon, which closes and rebuilds it (the flicker).
@@ -557,9 +591,6 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
                 slot.DragDropBackgroundNode.Size     = new Vector2(SlotWidth, SlotHeight);
                 slot.DragDropBackgroundNode.Position = Vector2.Zero;
                 slot.IconNode.Size                   = new Vector2(SlotWidth, SlotHeight);
-
-                int hoverIndex = i;
-                slot.OnRollOver += _ => LogSlotState(hoverIndex, slot);
 
                 rowNode.AddNode(slot);
 
@@ -575,22 +606,65 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
             HotbarNode        slot    = _slots[i];
             CustomHotbarSlot content = i < _pendingSlots.Count ? _pendingSlots[i] : new CustomHotbarSlot();
 
-            switch (content.Kind) {
-                case CustomHotbarSlotKind.Action:
-                    slot.SetAction(content.Id);
-                    break;
+            // An empty slot has to stay empty even when it still carries the native type of a previous
+            // content: older builds left RawType behind when the content was dragged out, and restoring a
+            // type with an id of zero produces a slot the icon component draws as a black box.
+            if (content.Kind is CustomHotbarSlotKind.Empty) {
+                slot.ClearSlot();
+            }
 
-                case CustomHotbarSlotKind.Item:
-                    slot.SetSlotItem(content.Id);
-                    break;
+            // The stored native type decides how a slot is restored. Falling back to the kind would turn an
+            // event item into a regular item, which is looked up in a different sheet and therefore
+            // renders as a black box.
+            else if (content.RawType is not HotbarSlotType.Empty) {
+                switch (content.RawType) {
+                    case HotbarSlotType.Action:
+                        slot.SetAction(content.Id);
+                        break;
 
-                case CustomHotbarSlotKind.Macro:
-                    slot.SetSlotMacro(content.Id);
-                    break;
+                    case HotbarSlotType.Macro:
+                        slot.SetSlotMacro(content.Id);
+                        break;
 
-                default:
-                    slot.ClearSlot();
-                    break;
+                    // While an item is dragged around it is addressed by its inventory slot, which is not
+                    // stable across sessions. Storing it as a plain item is what the game itself does when
+                    // it saves a hotbar.
+                    case HotbarSlotType.InventoryItem:
+                        slot.SetSlotItem(content.Id);
+                        break;
+
+                    default:
+                        slot.SetSlot(content.RawType, content.Id);
+                        break;
+                }
+            }
+            else {
+                // Configurations written before the native type was stored only carry the kind.
+                switch (content.Kind) {
+                    case CustomHotbarSlotKind.Action:
+                        slot.SetAction(content.Id);
+                        break;
+
+                    case CustomHotbarSlotKind.Item:
+                        slot.SetSlotItem(content.Id);
+                        break;
+
+                    case CustomHotbarSlotKind.Macro:
+                        slot.SetSlotMacro(content.Id);
+                        break;
+
+                    case CustomHotbarSlotKind.Crystal:
+                        slot.SetSlot(HotbarSlotType.Crystal, content.Id);
+                        break;
+
+                    case CustomHotbarSlotKind.KeyItem:
+                        slot.SetSlot(HotbarSlotType.KeyItem, content.Id);
+                        break;
+
+                    default:
+                        slot.ClearSlot();
+                        break;
+                }
             }
 
             slot.KeyBind = CreateKeyBind(content.Hotkey, content.HotkeyModifier);
@@ -599,7 +673,22 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
         }
 
         // Applying the stored configuration is not a user edit.
-        _slotsDirty = false;
+        _dirtySlots.Clear();
+
+        ApplySlotInteraction();
+    }
+
+    /// <summary>
+    /// Hides or shows the frame of the slots that have no content yet.
+    /// </summary>
+    /// <remarks>
+    /// An empty slot keeps occupying its place in the layout; only its drag target background is hidden,
+    /// so the bar looks like a group of icons with gaps instead of a grid of empty frames.
+    /// </remarks>
+    public void SetHideEmptySlots(bool hide) {
+        if (hide == _hideEmptySlots) return;
+
+        _hideEmptySlots = hide;
 
         ApplySlotInteraction();
     }
@@ -620,10 +709,13 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     private void ApplySlotInteraction() {
         for (int i = 0; i < _slots.Count; i++) {
             HotbarNode slot    = _slots[i];
-            bool       isEmpty = slot.GetSlotContent() is null;
+            bool       isEmpty = slot.IsEmpty;
 
             bool clickable = !isEmpty;
             if (slot.IsClickable != clickable) slot.IsClickable = clickable;
+
+            bool showFrame = !_hideEmptySlots || !isEmpty;
+            if (slot.DragDropBackgroundNode.IsVisible != showFrame) slot.DragDropBackgroundNode.IsVisible = showFrame;
 
             bool draggable = !_locked;
             if (slot.IsDraggable != draggable) slot.IsDraggable = draggable;
@@ -650,36 +742,30 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// </summary>
     private static void ReadSlot(HotbarSlotContent? content, CustomHotbarSlot target) {
         if (content is null) {
-            target.Kind = CustomHotbarSlotKind.Empty;
-            target.Id   = 0;
+            target.Kind    = CustomHotbarSlotKind.Empty;
+            target.RawType = HotbarSlotType.Empty;
+            target.Id      = 0;
 
             return;
         }
 
         HotbarSlotContent value = content.Value;
 
-        switch (value.Type) {
-            case HotbarSlotType.Action:
-                target.Kind = CustomHotbarSlotKind.Action;
-                target.Id   = value.Id;
-                break;
+        target.RawType = value.Type;
+        target.Id      = value.Id;
 
-            case HotbarSlotType.Item:
-            case HotbarSlotType.InventoryItem:
-            case HotbarSlotType.EventItem:
-                target.Kind = CustomHotbarSlotKind.Item;
-                target.Id   = value.Id;
-                break;
+        target.Kind = value.Type switch {
+            HotbarSlotType.Action => CustomHotbarSlotKind.Action,
+            HotbarSlotType.Item
+                or HotbarSlotType.InventoryItem
+                or HotbarSlotType.EventItem => CustomHotbarSlotKind.Item,
+            HotbarSlotType.Crystal => CustomHotbarSlotKind.Crystal,
+            HotbarSlotType.KeyItem => CustomHotbarSlotKind.KeyItem,
+            HotbarSlotType.Macro   => CustomHotbarSlotKind.Macro,
 
-            case HotbarSlotType.Macro:
-                target.Kind = CustomHotbarSlotKind.Macro;
-                target.Id   = value.Id;
-                break;
-
-            default:
-                target.Kind = CustomHotbarSlotKind.Empty;
-                target.Id   = 0;
-                break;
-        }
+            // Anything else (main commands, general actions, mounts, ...) is kept verbatim through
+            // RawType instead of being dropped as empty.
+            _ => CustomHotbarSlotKind.Other,
+        };
     }
 }

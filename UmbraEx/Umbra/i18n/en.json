@@ -1712,7 +1712,6 @@
   "Settings.CustomHotbarModule.Name": "Custom Hotbar",
   "Settings.CustomHotbarModule.Layout": "Layout",
   "Settings.CustomHotbarModule.SlotCount.Name": "Number of slots",
-  "Settings.CustomHotbarModule.SlotCount.Description": "The number of slots in the bar. The slots are laid out in rows of ten.",
   "Settings.CustomHotbarModule.XPosition.Name": "Horizontal position",
   "Settings.CustomHotbarModule.XPosition.Description": "The horizontal offset of the bar relative to its horizontal anchor.",
   "Settings.CustomHotbarModule.YPosition.Name": "Vertical position",
@@ -1752,5 +1751,8 @@
   "Settings.CustomHotbarModule.SlotsPerRow.Name": "Slots per row",
   "Settings.CustomHotbarModule.SlotsPerRow.Description": "How many slots are shown in one row. Use this to spread the bar over multiple rows.",
   "Settings.CustomHotbarModule.Locked.Name": "Lock the layout",
-  "Settings.CustomHotbarModule.Locked.Description": "While locked, actions, items and macros can still be dropped into empty slots, but existing contents can no longer be moved to another slot or dragged out of the bar."
+  "Settings.CustomHotbarModule.Locked.Description": "While locked, actions, items and macros can still be dropped into empty slots, but existing contents can no longer be moved to another slot or dragged out of the bar.",
+  "Settings.CustomHotbarModule.HideEmptySlots.Name": "Hide empty slots",
+  "Settings.CustomHotbarModule.HideEmptySlots.Description": "Hides the frame of slots that have no content yet. They still occupy their place in the layout, so the bar keeps its shape.",
+  "Settings.CustomHotbarModule.SlotCount.Description": "The number of slots in the bar. Use \"Slots per row\" to control how they are arranged."
 }

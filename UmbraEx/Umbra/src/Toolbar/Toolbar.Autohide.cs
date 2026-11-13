@@ -72,6 +72,12 @@ internal partial class Toolbar
         float nodeWidth  = RightPanel.Bounds.PaddingRect.X2 - LeftPanel.Bounds.PaddingRect.X1;
         float nodeHeight = _toolbarNode.Height;
 
+        // On the first frame after a reload the node tree has not been rendered yet, so all bounds
+        // are zero. A zero-sized hit rectangle can never contain the cursor, which would immediately
+        // auto-hide a freshly rebuilt toolbar and leave only the collapsed edge strip to bring it
+        // back. Keep it visible until real geometry is available.
+        if (nodeWidth <= 0 || nodeHeight <= 0) return true;
+
         float y = ToolbarYPosition - (IsTopAligned ? 0 : nodeHeight);
         float x = LeftPanel.Bounds.PaddingRect.X1;
 

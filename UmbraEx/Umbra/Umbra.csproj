@@ -37,7 +37,7 @@
         <ProjectReference Include="..\Umbra.Common\Umbra.Common.csproj" />
         <ProjectReference Include="..\Umbra.Game\Umbra.Game.csproj" />
         <ProjectReference Include="..\drawing\Una.Drawing\Una.Drawing.csproj" />
-        <ProjectReference Include="..\..\AetherBagsEx\KamiToolKit\KamiToolKit.csproj" />
+        <ProjectReference Include="..\..\..\KamiToolKit\KamiToolKit.csproj" />
     </ItemGroup>
 
     <ItemGroup>

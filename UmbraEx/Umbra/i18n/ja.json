@@ -1619,7 +1619,6 @@
   "Settings.CustomHotbarModule.Name": "カスタムホットバー",
   "Settings.CustomHotbarModule.Layout": "レイアウト",
   "Settings.CustomHotbarModule.SlotCount.Name": "スロット数",
-  "Settings.CustomHotbarModule.SlotCount.Description": "バーのスロット数です。スロットは10個ずつ横一列に配置されます。",
   "Settings.CustomHotbarModule.XPosition.Name": "水平位置",
   "Settings.CustomHotbarModule.XPosition.Description": "水平の基準位置からのバーの水平オフセットです。",
   "Settings.CustomHotbarModule.YPosition.Name": "垂直位置",
@@ -1659,5 +1658,8 @@
   "Settings.CustomHotbarModule.SlotsPerRow.Name": "1行あたりのスロット数",
   "Settings.CustomHotbarModule.SlotsPerRow.Description": "1行に表示するスロット数です。バーを複数行に分割するのに使います。",
   "Settings.CustomHotbarModule.Locked.Name": "レイアウトを固定する",
-  "Settings.CustomHotbarModule.Locked.Description": "固定中でも空のスロットにはアクション・アイテム・マクロをドロップできますが、既にある内容を別のスロットへ移動したり、バーの外へドラッグして取り出したりはできなくなります。"
+  "Settings.CustomHotbarModule.Locked.Description": "固定中でも空のスロットにはアクション・アイテム・マクロをドロップできますが、既にある内容を別のスロットへ移動したり、バーの外へドラッグして取り出したりはできなくなります。",
+  "Settings.CustomHotbarModule.HideEmptySlots.Name": "空のスロットを隠す",
+  "Settings.CustomHotbarModule.HideEmptySlots.Description": "まだ内容のないスロットの枠を非表示にします。レイアウト上の位置はそのまま確保されるため、バーの形は変わりません。",
+  "Settings.CustomHotbarModule.SlotCount.Description": "バーのスロット数です。「1行あたりのスロット数」で並べ方を指定できます。"
 }

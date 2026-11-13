@@ -4,6 +4,7 @@ using Umbra.Conditions.Builtin;
 using Umbra.CustomHotbar;
 using ActionSheet = Lumina.Excel.Sheets.Action;
 using ItemSheet = Lumina.Excel.Sheets.Item;
+using KeyItemSheet = Lumina.Excel.Sheets.EventItem;
 
 namespace Umbra.Windows.Settings.Modules;
 
@@ -271,7 +272,7 @@ internal sealed class SettingsWindowCustomHotbarModule : SettingsWindowModule {
             "ctrl-slots-per-row",
             config.SlotsPerRow,
             1,
-            CustomHotbarAddon.MaxSlots,
+            CustomHotbarAddon.MaxSlotsPerRow,
             I18N.Translate("Settings.CustomHotbarModule.SlotsPerRow.Name"),
             I18N.Translate("Settings.CustomHotbarModule.SlotsPerRow.Description"),
             0
@@ -400,6 +401,20 @@ internal sealed class SettingsWindowCustomHotbarModule : SettingsWindowModule {
 
         _content.AppendChild(autoHide);
 
+        CheckboxNode hideEmptySlots = new(
+            "ctrl-hide-empty-slots",
+            config.HideEmptySlots,
+            I18N.Translate("Settings.CustomHotbarModule.HideEmptySlots.Name"),
+            I18N.Translate("Settings.CustomHotbarModule.HideEmptySlots.Description")
+        );
+
+        hideEmptySlots.OnValueChanged += value => {
+            config.HideEmptySlots = value;
+            Manager.Persist();
+        };
+
+        _content.AppendChild(hideEmptySlots);
+
         _content.AppendChild(CreateSeparator(I18N.Translate("Settings.CustomHotbarModule.Visibility")));
 
         _content.AppendChild(
@@ -455,7 +470,8 @@ internal sealed class SettingsWindowCustomHotbarModule : SettingsWindowModule {
                     : action.Value.Name.ExtractText();
             }
 
-            case CustomHotbarSlotKind.Item: {
+            case CustomHotbarSlotKind.Item:
+            case CustomHotbarSlotKind.Crystal: {
                 var item = Framework.Service<IDataManager>().GetExcelSheet<ItemSheet>().FindRow(slot.Id);
 
                 return item is null
@@ -463,8 +479,26 @@ internal sealed class SettingsWindowCustomHotbarModule : SettingsWindowModule {
                     : item.Value.Name.ExtractText();
             }
 
+            case CustomHotbarSlotKind.KeyItem: {
+                var keyItem = Framework.Service<IDataManager>().GetExcelSheet<KeyItemSheet>().FindRow(slot.Id);
+
+                return keyItem is null
+                    ? I18N.Translate("Settings.CustomHotbarModule.UnknownItem")
+                    : keyItem.Value.Name.ExtractText();
+            }
+
             case CustomHotbarSlotKind.Macro:
                 return I18N.Translate("Settings.CustomHotbarModule.Macro", slot.Id + 1);
+
+            case CustomHotbarSlotKind.Other: {
+                // Main commands, general actions, mounts and the like have no dedicated sheet lookup here,
+                // so the native type and id are shown instead of pretending the slot is empty.
+                var item = Framework.Service<IDataManager>().GetExcelSheet<ItemSheet>().FindRow(slot.Id);
+
+                return item is null
+                    ? $"{slot.RawType}#{slot.Id}"
+                    : item.Value.Name.ExtractText();
+            }
 
             default:
                 return I18N.Translate("Settings.CustomHotbarModule.EmptySlot");

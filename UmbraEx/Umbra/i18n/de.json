@@ -1619,7 +1619,6 @@
   "Settings.CustomHotbarModule.Name": "Benutzerdefinierte Hotbar",
   "Settings.CustomHotbarModule.Layout": "Layout",
   "Settings.CustomHotbarModule.SlotCount.Name": "Anzahl der Plätze",
-  "Settings.CustomHotbarModule.SlotCount.Description": "Die Anzahl der Plätze in der Leiste. Die Plätze werden in Reihen zu je zehn angeordnet.",
   "Settings.CustomHotbarModule.XPosition.Name": "Horizontale Position",
   "Settings.CustomHotbarModule.XPosition.Description": "Der horizontale Versatz der Leiste relativ zu ihrem horizontalen Ankerpunkt.",
   "Settings.CustomHotbarModule.YPosition.Name": "Vertikale Position",
@@ -1659,5 +1658,8 @@
   "Settings.CustomHotbarModule.SlotsPerRow.Name": "Plätze pro Reihe",
   "Settings.CustomHotbarModule.SlotsPerRow.Description": "Wie viele Plätze in einer Reihe angezeigt werden. Damit lässt sich die Leiste auf mehrere Reihen verteilen.",
   "Settings.CustomHotbarModule.Locked.Name": "Layout sperren",
-  "Settings.CustomHotbarModule.Locked.Description": "Solange gesperrt, können Fähigkeiten, Gegenstände und Makros weiterhin in leere Plätze gezogen werden, aber vorhandene Inhalte lassen sich nicht mehr auf einen anderen Platz verschieben oder aus der Leiste herausziehen."
+  "Settings.CustomHotbarModule.Locked.Description": "Solange gesperrt, können Fähigkeiten, Gegenstände und Makros weiterhin in leere Plätze gezogen werden, aber vorhandene Inhalte lassen sich nicht mehr auf einen anderen Platz verschieben oder aus der Leiste herausziehen.",
+  "Settings.CustomHotbarModule.HideEmptySlots.Name": "Leere Plätze ausblenden",
+  "Settings.CustomHotbarModule.HideEmptySlots.Description": "Blendet den Rahmen von Plätzen ohne Inhalt aus. Sie behalten ihren Platz im Layout, damit die Leiste ihre Form behält.",
+  "Settings.CustomHotbarModule.SlotCount.Description": "Die Anzahl der Plätze in der Leiste. Mit „Plätze pro Reihe“ legst du fest, wie sie angeordnet werden."
 }

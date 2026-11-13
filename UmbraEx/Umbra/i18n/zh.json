@@ -1712,7 +1712,6 @@
   "Settings.CustomHotbarModule.Name": "自定义快捷键栏",
   "Settings.CustomHotbarModule.Layout": "布局",
   "Settings.CustomHotbarModule.SlotCount.Name": "槽位数量",
-  "Settings.CustomHotbarModule.SlotCount.Description": "快捷栏中的槽位数量。槽位每行排列十个。",
   "Settings.CustomHotbarModule.XPosition.Name": "水平位置",
   "Settings.CustomHotbarModule.XPosition.Description": "快捷栏相对于水平锚点的水平偏移量。",
   "Settings.CustomHotbarModule.YPosition.Name": "垂直位置",
@@ -1752,5 +1751,8 @@
   "Settings.CustomHotbarModule.SlotsPerRow.Name": "每行槽位数",
   "Settings.CustomHotbarModule.SlotsPerRow.Description": "一行显示多少个槽位。用它可以把快捷栏分成多行。",
   "Settings.CustomHotbarModule.Locked.Name": "锁定布局",
-  "Settings.CustomHotbarModule.Locked.Description": "锁定后仍可把技能、物品和宏拖入空槽位，但已有内容不能再移动到其它槽位，也不能拖出快捷栏。"
+  "Settings.CustomHotbarModule.Locked.Description": "锁定后仍可把技能、物品和宏拖入空槽位，但已有内容不能再移动到其它槽位，也不能拖出快捷栏。",
+  "Settings.CustomHotbarModule.HideEmptySlots.Name": "隐藏空白栏位",
+  "Settings.CustomHotbarModule.HideEmptySlots.Description": "隐藏尚未放入内容的槽位底框。槽位依旧占据原来的位置，快捷栏的整体形状不变。",
+  "Settings.CustomHotbarModule.SlotCount.Description": "快捷栏中的槽位数量。用「每行槽位数」控制排列方式。"
 }

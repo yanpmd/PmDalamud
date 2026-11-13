@@ -57,6 +57,15 @@ public class CustomHotbarConfig {
     public bool IsLocked { get; set; }
 
     /// <summary>
+    /// Whether the frame of empty slots is hidden.
+    /// </summary>
+    /// <remarks>
+    /// Empty slots keep occupying their place in the layout either way; only their drag target background
+    /// is hidden, so the bar shows icons with gaps instead of a grid of empty frames.
+    /// </remarks>
+    public bool HideEmptySlots { get; set; }
+
+    /// <summary>
     /// The horizontal offset of the bar, in UI units, relative to the horizontal anchor.
     /// </summary>
     public int XPos { get; set; }
@@ -100,10 +109,16 @@ public class CustomHotbarConfig {
         Slots ??= [];
 
         SlotCount   = Math.Clamp(SlotCount, 1, CustomHotbarAddon.MaxSlots);
-        SlotsPerRow = Math.Clamp(SlotsPerRow, 1, CustomHotbarAddon.MaxSlots);
+        SlotsPerRow = Math.Clamp(SlotsPerRow, 1, CustomHotbarAddon.MaxSlotsPerRow);
 
         while (Slots.Count < SlotCount) {
             Slots.Add(new CustomHotbarSlot());
+        }
+
+        // Repairs configurations written by builds that cleared the kind but kept the native type when a
+        // slot was emptied. Such a slot is restored with an id of zero and renders as a black box.
+        foreach (CustomHotbarSlot slot in Slots) {
+            if (slot.Kind is CustomHotbarSlotKind.Empty) slot.ClearContent();
         }
 
         while (Slots.Count > CustomHotbarAddon.MaxSlots) {
@@ -127,6 +142,7 @@ public class CustomHotbarConfig {
         SlotCount      = other.SlotCount;
         SlotsPerRow    = other.SlotsPerRow;
         IsLocked       = other.IsLocked;
+        HideEmptySlots = other.HideEmptySlots;
         XPos           = other.XPos;
         YPos           = other.YPos;
         XAlign         = other.XAlign;
@@ -155,6 +171,7 @@ public class CustomHotbarConfig {
             SlotCount      = SlotCount,
             SlotsPerRow    = SlotsPerRow,
             IsLocked       = IsLocked,
+            HideEmptySlots = HideEmptySlots,
             XPos           = XPos,
             YPos           = YPos,
             XAlign         = XAlign,

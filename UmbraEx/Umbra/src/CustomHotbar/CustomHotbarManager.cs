@@ -28,6 +28,9 @@ namespace Umbra.CustomHotbar;
 internal sealed unsafe class CustomHotbarManager : IDisposable {
     private const string CvarName = "CustomHotbar.Data";
 
+    // Number of frames a freshly positioned bar stays visible before auto-hide is allowed to kick in.
+    private const int PositionGraceFrameCount = 10;
+
     // An empty value means that this feature has never been configured before. A configured but empty
     // list is stored as "[]", which lets the user delete every bar without them coming back on reload.
     [ConfigVariable(CvarName)] private static string CustomHotbarData { get; set; } = "";
@@ -320,10 +323,13 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
 
         addon.SetSlotsPerRow(config.SlotsPerRow);
         addon.SetLocked(config.IsLocked);
+        addon.SetHideEmptySlots(config.HideEmptySlots);
         addon.SetShowBackground(config.ShowBackground);
         addon.UpdateSlots();
 
         UpdatePosition(config, runtime);
+
+        if (runtime.PositionGraceFrames > 0) runtime.PositionGraceFrames--;
 
         bool visible = ConditionSetManager.IsMatchSafe(config.ConditionSetId);
 
@@ -489,6 +495,11 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
         // changed or when the game moved the window somewhere else on its own.
         if (runtime.HasPosition && position == runtime.Position && addon.WindowPosition == position) return;
 
+        // The game can still report its default (centered) position for a few frames after a reload.
+        // Keep the bar visible until the geometry has settled, so auto-hide never locks it away with
+        // a hover area that does not match where the bar actually ended up.
+        if (!runtime.HasPosition) runtime.PositionGraceFrames = PositionGraceFrameCount;
+
         runtime.HasPosition = true;
         runtime.Position    = position;
 
@@ -499,8 +510,13 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
     /// Returns true when the mouse cursor is close enough to the bar to show it again.
     /// </summary>
     private static bool IsCursorNearBar(CustomHotbarConfig config, Runtime runtime) {
-        // The bar has no known position yet, so it cannot be hidden for being "far away".
-        if (!runtime.HasPosition) return true;
+        CustomHotbarAddon? addon = runtime.Addon;
+
+        // Without a usable window or a settled position there is no reliable hit area. Hiding the bar
+        // on such a frame would leave no way for the cursor to bring it back after a reload.
+        if (addon is null || !addon.IsOpen || !runtime.HasPosition || runtime.PositionGraceFrames > 0) {
+            return true;
+        }
 
         ImGuiViewportPtr viewport = ImGui.GetMainViewport();
 
@@ -522,36 +538,58 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
 
         Vector2 barSize = CustomHotbarAddon.GetContentSize(config.SlotCount, config.SlotsPerRow);
 
+        // Use the position the game actually reports instead of the requested one. When the game moves
+        // the window on its own the two differ, and a hover area built from the target would sit
+        // somewhere the bar is not, making it impossible to unhide.
+        Vector2 position = addon.WindowPosition;
+
         const float margin = 32.0f;
 
-        return mouseInUi.X >= runtime.Position.X - margin
-            && mouseInUi.X <= runtime.Position.X + barSize.X + margin
-            && mouseInUi.Y >= runtime.Position.Y - margin
-            && mouseInUi.Y <= runtime.Position.Y + barSize.Y + margin;
+        return mouseInUi.X >= position.X - margin
+            && mouseInUi.X <= position.X + barSize.X + margin
+            && mouseInUi.Y >= position.Y - margin
+            && mouseInUi.Y <= position.Y + barSize.Y + margin;
     }
 
     /// <summary>
-    /// Called when the user has changed the content of one of the slots of a bar.
+    /// Called when the user has changed the content of specific slots of a bar.
     /// </summary>
-    private void OnAddonSlotsChanged(string barId) {
+    /// <remarks>
+    /// Only the slots that were actually edited are re-read. Reading the whole bar at once made a single
+    /// unreadable slot wipe every other slot along with it.
+    /// </remarks>
+    private void OnAddonSlotsChanged(string barId, int[] indices) {
         CustomHotbarConfig? config = GetConfig(barId);
 
         if (config is null) return;
         if (!_runtimes.TryGetValue(barId, out Runtime? runtime) || runtime.Addon is null) return;
 
-        List<CustomHotbarSlot> captured = runtime.Addon.CaptureSlots();
+        var changed = false;
 
-        // Escape also produces a discard event. Only a real content change may be persisted, otherwise
-        // every cancelled drag would rewrite the config and rebuild the settings window.
-        if (HasSameContents(config.Slots, captured)) return;
+        foreach (int index in indices) {
+            if (index < 0 || index >= config.Slots.Count) continue;
 
-        config.Slots.Clear();
+            CustomHotbarSlot? captured = runtime.Addon.CaptureSlot(index);
 
-        foreach (CustomHotbarSlot slot in captured) {
-            config.Slots.Add(slot);
+            // A slot that claims to have content but cannot report it keeps what is stored, instead of
+            // being overwritten with an empty value.
+            if (captured is null) {
+                Logger.Warning($"[CustomHotbar] could not read slot {index} of bar '{barId}', keeping stored value");
+
+                continue;
+            }
+
+            CustomHotbarSlot stored = config.Slots[index];
+
+            if (stored.Kind == captured.Kind && stored.Id == captured.Id && stored.RawType == captured.RawType) continue;
+
+            stored.Kind    = captured.Kind;
+            stored.RawType = captured.RawType;
+            stored.Id      = captured.Id;
+            changed        = true;
         }
 
-        config.Normalize();
+        if (!changed) return;
 
         // The live nodes already contain the new content, so they must not be written to again.
         runtime.Addon.SyncSlots(config.Slots);
@@ -559,25 +597,6 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
         Persist();
 
         OnSlotsChanged?.Invoke(barId);
-    }
-
-    /// <summary>
-    /// Compares the stored slot contents with the live ones, ignoring key bindings which are owned by
-    /// the manager.
-    /// </summary>
-    private static bool HasSameContents(IReadOnlyList<CustomHotbarSlot> stored, IReadOnlyList<CustomHotbarSlot> live) {
-        int count = Math.Max(stored.Count, live.Count);
-
-        for (int i = 0; i < count; i++) {
-            CustomHotbarSlotKind a = i < stored.Count ? stored[i].Kind : CustomHotbarSlotKind.Empty;
-            uint                b = i < stored.Count ? stored[i].Id : 0;
-            CustomHotbarSlotKind c = i < live.Count ? live[i].Kind : CustomHotbarSlotKind.Empty;
-            uint                d = i < live.Count ? live[i].Id : 0;
-
-            if (a != c || b != d) return false;
-        }
-
-        return true;
     }
 
     /// <summary>
@@ -602,9 +621,12 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
             _configs.Add(config);
         }
 
-        // Write the fresh default back, and migrate the single-object format used by the first version
-        // of this feature to the new array format with stable ids.
-        if (isFresh || isLegacy) Persist();
+        // Write the result back when it differs from what was stored: a fresh install gets its default
+        // bar, the single-object format of the first version is migrated, and repairs applied by
+        // Normalize() (such as leftover native types on emptied slots) become permanent.
+        string normalized = JsonConvert.SerializeObject(_configs);
+
+        if (isFresh || isLegacy || normalized != raw) Persist();
     }
 
     /// <summary>
@@ -657,6 +679,10 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
             CustomHotbarConfig? existing = _configs.FirstOrDefault(config => config.Id == incoming.Id);
 
             if (existing is null) {
+                // Keeps the slot list in sync with the slot count when the stored data is older than the
+                // configured layout.
+                incoming.Normalize();
+
                 _configs.Add(incoming);
             }
             else {
@@ -729,6 +755,7 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
         public CustomHotbarAddon? Addon;
         public bool              ReopenPending;
         public bool              HasPosition;
+        public int               PositionGraceFrames;
         public bool              VisibilityInitialized;
         public bool              StableVisible  = true;
         public bool              PendingVisible = true;

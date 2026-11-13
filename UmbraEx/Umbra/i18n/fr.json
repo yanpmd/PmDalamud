@@ -1619,7 +1619,6 @@
   "Settings.CustomHotbarModule.Name": "Barre de raccourcis personnalisée",
   "Settings.CustomHotbarModule.Layout": "Disposition",
   "Settings.CustomHotbarModule.SlotCount.Name": "Nombre d'emplacements",
-  "Settings.CustomHotbarModule.SlotCount.Description": "Le nombre d'emplacements de la barre. Les emplacements sont disposés par rangées de dix.",
   "Settings.CustomHotbarModule.XPosition.Name": "Position horizontale",
   "Settings.CustomHotbarModule.XPosition.Description": "Le décalage horizontal de la barre par rapport à son ancrage horizontal.",
   "Settings.CustomHotbarModule.YPosition.Name": "Position verticale",
@@ -1659,5 +1658,8 @@
   "Settings.CustomHotbarModule.SlotsPerRow.Name": "Emplacements par ligne",
   "Settings.CustomHotbarModule.SlotsPerRow.Description": "Nombre d'emplacements affichés sur une ligne. Permet de répartir la barre sur plusieurs lignes.",
   "Settings.CustomHotbarModule.Locked.Name": "Verrouiller la disposition",
-  "Settings.CustomHotbarModule.Locked.Description": "Une fois verrouillés, les actions, objets et macros peuvent toujours être déposés dans les emplacements vides, mais le contenu existant ne peut plus être déplacé vers un autre emplacement ni retiré de la barre."
+  "Settings.CustomHotbarModule.Locked.Description": "Une fois verrouillés, les actions, objets et macros peuvent toujours être déposés dans les emplacements vides, mais le contenu existant ne peut plus être déplacé vers un autre emplacement ni retiré de la barre.",
+  "Settings.CustomHotbarModule.HideEmptySlots.Name": "Masquer les emplacements vides",
+  "Settings.CustomHotbarModule.HideEmptySlots.Description": "Masque le cadre des emplacements encore vides. Ils conservent leur place dans la disposition, la barre garde donc sa forme.",
+  "Settings.CustomHotbarModule.SlotCount.Description": "Le nombre d'emplacements de la barre. Utilisez « Emplacements par ligne » pour définir leur disposition."
 }

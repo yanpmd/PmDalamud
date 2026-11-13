@@ -60,7 +60,13 @@ public unsafe class ContextMenu : IDisposable {
     /// <summary>
     /// Opens a menu with the currently configured context menu entries.
     /// </summary>
-    public void Open() {
+    /// <param name="bindToOwner">
+    /// Whether the game binds the menu to <see cref="AgentContext.OwnerAddon" />. Binding needs a
+    /// valid owner addon, otherwise the game closes the menu again right away. Set this to
+    /// <c>false</c> for menus that are not owned by a real game addon.
+    /// </param>
+    /// <param name="closeExisting">Whether an already opened menu is closed first.</param>
+    public void Open(bool bindToOwner = true, bool closeExisting = true) {
         var agentContextMenu = AgentContext.Instance();
 
         agentContextMenu->ClearMenu();
@@ -69,7 +75,9 @@ public unsafe class ContextMenu : IDisposable {
         mainMenuSubMenus = [];
         subMenuEntries = [];
 
-        foreach (var (index, item) in OrderedItems.Index()) {
+        // The game keeps the entry texts in a fixed size buffer, more items than that would
+        // overflow it.
+        foreach (var (index, item) in OrderedItems.Index().Take(MaxItems)) {
             if (item is ContextMenuSubItem subItem) {
                 mainMenuSubMenus.Add(index, subItem);
                 agentContextMenu->AddMenuItem(item.Name, contextMenuEventInterface, index, !item.IsEnabled, submenu: true);
@@ -80,7 +88,7 @@ public unsafe class ContextMenu : IDisposable {
             }
         }
 
-        agentContextMenu->OpenContextMenu();
+        agentContextMenu->OpenContextMenu(bindToOwner, closeExisting);
     }
 
     /// <summary>
@@ -178,6 +186,9 @@ public unsafe class ContextMenu : IDisposable {
 
     // Prevent the return entry from colliding with submenu items
     private const int SubMenuIndexOffset = 1000;
+
+    // The game stores the entry texts in a fixed size buffer of twenty entries.
+    private const int MaxItems = 20;
 
     private List<ContextMenuItem> Items { get; set; } = [];
     private IOrderedEnumerable<ContextMenuItem> OrderedItems => Items.OrderBy(item => item.DisplayPriority);
