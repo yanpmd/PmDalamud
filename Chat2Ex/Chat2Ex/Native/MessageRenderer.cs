@@ -475,9 +475,12 @@ public sealed unsafe class MessageRenderer : IDisposable
         return ColourUtil.RgbaToVector4(type.DefaultColor() ?? 0);
     }
 
+    private static readonly CultureInfo TwentyFourHourCulture = CultureInfo.CreateSpecificCulture("de-DE");
+
     private string FormatTimestamp(Message message)
     {
-        var culture = !Plugin.Config.Use24HourClock ? null : CultureInfo.CreateSpecificCulture("de-DE");
+        // Creating a CultureInfo for every rendered message was a hot allocation on rebuild frames.
+        var culture = Plugin.Config.Use24HourClock ? TwentyFourHourCulture : null;
         return message.Date.ToLocalTime().ToString("t", culture);
     }
 
@@ -525,19 +528,33 @@ public sealed unsafe class MessageRenderer : IDisposable
         pending = null;
     }
 
+    private readonly Dictionary<string, float> measureCache = new(StringComparer.Ordinal);
+    private const int MeasureCacheLimit = 4096;
+
     private float Measure(string text)
     {
         // The measuring node has to follow font size changes, otherwise wrapping and the timestamp
-        // indent are computed with stale metrics.
+        // indent are computed with stale metrics. Cached widths are only valid for one font size.
         if (measureNode.FontSize != FontSize)
         {
             measureNode.FontSize = FontSize;
             ApplyFontSize(measureNode);
             measureNode.LineSpacing = LineSpacing;
+            measureCache.Clear();
         }
 
+        if (measureCache.TryGetValue(text, out var cached))
+            return cached;
+
         measureNode.String = text;
-        return measureNode.GetTextDrawSize(false).X;
+        var width = measureNode.GetTextDrawSize(false).X;
+
+        // Chat text is unbounded; keep the cache from growing without limit.
+        if (measureCache.Count >= MeasureCacheLimit)
+            measureCache.Clear();
+
+        measureCache[text] = width;
+        return width;
     }
 
     /// <summary>
@@ -638,7 +655,9 @@ public sealed unsafe class MessageRenderer : IDisposable
         hoveredChunk = null;
 
         if (Plugin.Config.NativeItemTooltips)
-            Plugin.Framework.RunOnTick(GameFunctions.GameFunctions.CloseItemTooltip);
+            Plugin.Framework.RunOnTick(() => NativeCallback.Safe(
+                GameFunctions.GameFunctions.CloseItemTooltip,
+                "closing an item tooltip"));
     }
 
     /// <summary>
@@ -653,7 +672,9 @@ public sealed unsafe class MessageRenderer : IDisposable
         pendingTooltipCloseAt = 0;
 
         if (Plugin.Config.NativeItemTooltips)
-            Plugin.Framework.RunOnTick(GameFunctions.GameFunctions.CloseItemTooltip);
+            Plugin.Framework.RunOnTick(() => NativeCallback.Safe(
+                GameFunctions.GameFunctions.CloseItemTooltip,
+                "closing an item tooltip"));
     }
 
     public void Dispose()
@@ -674,6 +695,7 @@ public sealed unsafe class MessageRenderer : IDisposable
         private readonly Message message;
         private readonly Action<Message, Chunk?, LinkAction> onAction;
         private readonly StringBuilder line = new();
+        private float lineWidth;
 
         private Vector4? color;
         private float x;
@@ -738,6 +760,7 @@ public sealed unsafe class MessageRenderer : IDisposable
                 return;
 
             line.Append(text);
+            lineWidth += renderer.Measure(text);
         }
 
         /// <summary>
@@ -863,12 +886,15 @@ public sealed unsafe class MessageRenderer : IDisposable
                     continue;
                 }
 
-                var candidate = line.ToString() + token;
+                var tokenWidth = renderer.Measure(token);
 
-                if (line.Length > 0 && x + renderer.Measure(candidate) > width)
+                // Incremental width: the old code rebuilt "line.ToString() + token" and re-measured
+                // the entire accumulated line for every token, which was O(n^2) per row.
+                if (line.Length > 0 && x + lineWidth + tokenWidth > width)
                     FlushLine();
 
                 line.Append(token);
+                lineWidth += tokenWidth;
             }
         }
 
@@ -939,6 +965,7 @@ public sealed unsafe class MessageRenderer : IDisposable
 
             var content = line.ToString();
             line.Clear();
+            lineWidth = 0.0f;
 
             var textWidth = renderer.Measure(content);
 
@@ -970,6 +997,7 @@ public sealed unsafe class MessageRenderer : IDisposable
 
             var content = line.ToString();
             line.Clear();
+            lineWidth = 0.0f;
 
             var node = new TextNode
             {

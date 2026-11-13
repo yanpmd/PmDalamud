@@ -300,13 +300,21 @@ public unsafe class KeybindManager : IDisposable {
         Plugin = plugin;
         Plugin.GameInteropProvider.InitializeFromAttributes(this);
 
-        // Handle keybinds from the game on every tick.
-        Plugin.Framework.Update += HandleKeybinds;
+        // Handle keybinds from the game on every tick. Framework.Update is a game callback, so it
+        // must not let a managed exception escape.
+        tickHandler = HandleKeybindsSafely;
+        Plugin.Framework.Update += tickHandler;
     }
+
+    private void HandleKeybindsSafely(IFramework framework)
+        => Chat2Ex.Native.NativeCallback.Safe(() => HandleKeybinds(KeyboardSource.Game), "handling keybinds");
+
+    private IFramework.OnUpdateDelegate? tickHandler;
 
     public void Dispose()
     {
-        Plugin.Framework.Update -= HandleKeybinds;
+        if (tickHandler is not null)
+            Plugin.Framework.Update -= tickHandler;
     }
 
     private void UpdateKeybinds()
@@ -383,8 +391,10 @@ public unsafe class KeybindManager : IDisposable {
         if (Plugin.InKeyboundBrawler)
             return;
 
-        // Vanilla text input has focus
-        if (RaptureAtkModule.Instance()->AtkModule.IsTextInputActive())
+        // Vanilla text input has focus. RaptureAtkModule is null while the game resets its UI on
+        // login/zone changes, and this runs on every Framework.Update tick.
+        var raptureAtkModule = RaptureAtkModule.Instance();
+        if (raptureAtkModule != null && raptureAtkModule->AtkModule.IsTextInputActive())
         {
             VanillaTextInputHasFocus = true;
             return;
@@ -418,27 +428,30 @@ public unsafe class KeybindManager : IDisposable {
             return;
         }
 
-        // Only process the active combo with the most modifiers.
+        // Only process the active combo with the most modifiers. The local function is declared once
+        // outside the loop: declaring it inside used to allocate a closure on every one of the ~62
+        // iterations, on every framework tick.
         var currentBest = (VirtualKey.NO_KEY, "", 0);
+
+        void Consider(VirtualKey vk, ModifierFlag modifier, string toIntercept)
+        {
+            if (!ComboPressed(source, vk, modifier, modifierState: modifierState, modifiersOnly: modifiersOnly))
+                return;
+
+            var bits = BitOperations.PopCount((uint) modifier);
+            if (bits < currentBest.Item3)
+                return;
+
+            currentBest = (vk, toIntercept, bits);
+        }
+
         foreach (var (toIntercept, keybind) in Keybinds)
         {
             if (toIntercept is "CMD_CHAT" or "CMD_COMMAND" && (ignoreChatOpen || DirectChat))
                 continue;
 
-            void Intercept(VirtualKey vk, ModifierFlag modifier)
-            {
-                if (!ComboPressed(source, vk, modifier, modifierState: modifierState, modifiersOnly: modifiersOnly))
-                    return;
-
-                var bits = BitOperations.PopCount((uint) modifier);
-                if (bits < currentBest.Item3)
-                    return;
-
-                currentBest = (vk, toIntercept, bits);
-            }
-
-            Intercept(keybind.Key1, keybind.Modifier1);
-            Intercept(keybind.Key2, keybind.Modifier2);
+            Consider(keybind.Key1, keybind.Modifier1, toIntercept);
+            Consider(keybind.Key2, keybind.Modifier2, toIntercept);
         }
 
         if (currentBest.Item1 == VirtualKey.NO_KEY)
@@ -463,7 +476,9 @@ public unsafe class KeybindManager : IDisposable {
     {
         var outData = new FFXIVClientStructs.FFXIV.Client.System.Input.Keybind();
         var idString = Utf8String.FromString(id);
-        UIInputData.Instance()->GetKeybindByName(idString, &outData);
+        var inputData = UIInputData.Instance();
+        if (inputData != null)
+            inputData->GetKeybindByName(idString, &outData);
         idString->Dtor(true);
 
         var key1 = outData.KeySettings[0];

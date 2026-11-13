@@ -107,9 +107,6 @@ public sealed class NativeTextPrompt : NativeAddon
     /// </summary>
     private void CloseDeferred()
     {
-        Plugin.Framework.RunOnTick(() =>
-        {
-            Dispose();
-        });
+        Plugin.Framework.RunOnTick(() => NativeCallback.Safe(Dispose, "closing a text prompt"));
     }
 }

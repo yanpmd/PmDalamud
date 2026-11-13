@@ -8,6 +8,8 @@ namespace Chat2Ex.Http;
 
 public class Processing
 {
+    private static readonly CultureInfo TwentyFourHourCulture = CultureInfo.CreateSpecificCulture("es-ES");
+
     private readonly HostContext HostContext;
 
     public Processing(HostContext hostContext)
@@ -32,7 +34,7 @@ public class Processing
         var response = new MessageResponse
         {
             Id = message.Id,
-            Timestamp = message.Date.ToLocalTime().ToString("t", !Plugin.Config.Use24HourClock ? null : CultureInfo.CreateSpecificCulture("es-ES"))
+            Timestamp = message.Date.ToLocalTime().ToString("t", Plugin.Config.Use24HourClock ? TwentyFourHourCulture : null)
         };
 
         var sender = message.Sender.Select(ProcessChunk);

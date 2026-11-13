@@ -9,7 +9,7 @@
     <PropertyGroup>
         <Authors>Una</Authors>
         <Company>Una-XIV</Company>
-        <Version>3.1.18.6</Version>
+        <Version>3.1.18.7</Version>
         <Description>Umbra UI</Description>
         <Copyright>(C)2025, by Una</Copyright>
         <PackageProjectUrl>https://github.com/una-xiv/umbra</PackageProjectUrl>
@@ -37,7 +37,7 @@
         <ProjectReference Include="..\Umbra.Common\Umbra.Common.csproj" />
         <ProjectReference Include="..\Umbra.Game\Umbra.Game.csproj" />
         <ProjectReference Include="..\drawing\Una.Drawing\Una.Drawing.csproj" />
-        <ProjectReference Include="..\..\..\KamiToolKit\KamiToolKit.csproj" />
+        <ProjectReference Include="..\..\KamiToolKit\KamiToolKit.csproj" />
     </ItemGroup>
 
     <ItemGroup>

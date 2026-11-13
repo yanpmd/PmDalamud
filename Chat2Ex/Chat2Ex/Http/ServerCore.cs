@@ -29,10 +29,25 @@ public class ServerCore : IAsyncDisposable
         await HostContext.DisposeAsync();
     }
 
+    private Action? frameworkUpdateCore;
+
+    /// <summary>
+    ///     Framework.Update is a game callback; keep the delegate cached so the guard does not
+    ///     allocate on every tick.
+    /// </summary>
     private void FrameworkUpdate(IFramework _)
+        => Chat2Ex.Native.NativeCallback.Safe(frameworkUpdateCore ??= FrameworkUpdateCore, "updating web server state");
+
+    private void FrameworkUpdateCore()
     {
-        foreach (var (idx, tab) in Plugin.Config.Tabs.Index())
+        // Web disabled: nothing to do, and Tabs.Index() used to allocate an iterator every frame.
+        if (!HostContext.IsActive)
+            return;
+
+        var tabs = Plugin.Config.Tabs;
+        for (var idx = 0; idx < tabs.Count; idx++)
         {
+            var tab = tabs[idx];
             if (tab.Unread == tab.LastSendUnread)
                 continue;
 
@@ -48,8 +63,10 @@ public class ServerCore : IAsyncDisposable
         // This takes long, so keep it outside the next frame
         var messages = await HostContext.Processing.GetAllMessages();
 
-        // Using the bulk message event to clear everything on the client side that may still exist
-        await Plugin.Framework.RunOnTick(() =>
+        // Using the bulk message event to clear everything on the client side that may still exist.
+        // The try/catch around a RunOnTick call only covers queuing; the lambda itself needs a guard
+        // or an exception thrown inside the framework tick terminates the process.
+        await Plugin.Framework.RunOnTick(() => Chat2Ex.Native.NativeCallback.Safe(() =>
         {
             sse.OutboundQueue.Enqueue(new BulkMessagesEvent(messages));
 
@@ -58,7 +75,7 @@ public class ServerCore : IAsyncDisposable
 
             sse.OutboundQueue.Enqueue(new ChatTabSwitchedEvent(HostContext.Processing.GetCurrentTab()));
             sse.OutboundQueue.Enqueue(new ChatTabListEvent(HostContext.Processing.GetAllTabs()));
-        });
+        }, "preparing a new web client"));
     }
 
     public void SendNewMessage(Message message)
@@ -68,12 +85,12 @@ public class ServerCore : IAsyncDisposable
 
         try
         {
-            Plugin.Framework.RunOnTick(() =>
+            Plugin.Framework.RunOnTick(() => Chat2Ex.Native.NativeCallback.Safe(() =>
             {
                 var bundledResponse = new NewMessageEvent(HostContext.Processing.ReadMessageContent(message));
                 foreach (var eventServer in HostContext.EventConnections)
                     eventServer.OutboundQueue.Enqueue(bundledResponse);
-            });
+            }, "sending a new message over SSE"));
         }
         catch (Exception ex)
         {
@@ -88,11 +105,11 @@ public class ServerCore : IAsyncDisposable
 
         try
         {
-            Plugin.Framework.RunOnTick(() =>
+            Plugin.Framework.RunOnTick(() => Chat2Ex.Native.NativeCallback.Safe(() =>
             {
                 foreach (var eventServer in HostContext.EventConnections)
                     eventServer.OutboundQueue.Enqueue(new BulkMessagesEvent(new Messages(HostContext.Processing.ReadMessageList().Result)));
-            });
+            }, "sending the message list over SSE"));
         }
         catch (Exception ex)
         {
@@ -107,12 +124,12 @@ public class ServerCore : IAsyncDisposable
 
         try
         {
-            Plugin.Framework.RunOnTick(() =>
+            Plugin.Framework.RunOnTick(() => Chat2Ex.Native.NativeCallback.Safe(() =>
             {
                 var bundledResponse = new SwitchChannelEvent(new SwitchChannel(HostContext.Processing.ReadChannelName(channelName)));
                 foreach (var eventServer in HostContext.EventConnections)
                     eventServer.OutboundQueue.Enqueue(bundledResponse);
-            });
+            }, "sending a channel switch over SSE"));
         }
         catch (Exception ex)
         {
@@ -127,12 +144,12 @@ public class ServerCore : IAsyncDisposable
 
         try
         {
-            Plugin.Framework.RunOnTick(() =>
+            Plugin.Framework.RunOnTick(() => Chat2Ex.Native.NativeCallback.Safe(() =>
             {
                 var bundledResponse = new ChannelListEvent(HostContext.Processing.GetValidChannels());
                 foreach (var eventServer in HostContext.EventConnections)
                     eventServer.OutboundQueue.Enqueue(bundledResponse);
-            });
+            }, "sending the channel list over SSE"));
         }
         catch (Exception ex)
         {
@@ -147,10 +164,19 @@ public class ServerCore : IAsyncDisposable
 
         try
         {
+            // async void lambdas cannot be guarded by an Action wrapper, so the try/catch has to be
+            // inside; otherwise an exception from PrepareNewClient terminates the process.
             Plugin.Framework.RunOnTick(async () =>
             {
-                foreach (var eventServer in HostContext.EventConnections)
-                    await HostContext.Core.PrepareNewClient(eventServer);
+                try
+                {
+                    foreach (var eventServer in HostContext.EventConnections)
+                        await HostContext.Core.PrepareNewClient(eventServer);
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.Error(ex, "Preparing all clients after login failed.");
+                }
             });
         }
         catch (Exception ex)

@@ -81,7 +81,13 @@ public unsafe class GameFunctions : IDisposable
 
     private static T* GetAddon<T>(string name) where T : unmanaged
     {
-        var addon = RaptureAtkModule.Instance()->RaptureAtkUnitManager.GetAddonByName(name);
+        // The game tears down the UI on login/zone changes; RaptureAtkModule is null in that window.
+        // This is called from Framework.Update every tick, so a null dereference here kills the process.
+        var raptureAtkModule = RaptureAtkModule.Instance();
+        if (raptureAtkModule == null)
+            return null;
+
+        var addon = raptureAtkModule->RaptureAtkUnitManager.GetAddonByName(name);
         return addon != null && addon->IsReady ? (T*)addon : null;
     }
 
@@ -113,8 +119,7 @@ public unsafe class GameFunctions : IDisposable
         var agent = AgentItemDetail.Instance();
         var addon = GetAddon<AtkUnitBase>("ItemDetail");
 
-        // atkStage ain't gonna be null or we have bigger problems
-        if (agent == null || addon == null)
+        if (atkStage == null || agent == null || addon == null)
             return;
 
         if (!Plugin.ClientState.IsLoggedIn)
@@ -309,13 +314,22 @@ public unsafe class GameFunctions : IDisposable
 
     private nint ResolveTextCommandPlaceholderDetour(nint a1, byte* placeholderText, byte a3, byte a4)
     {
-        var placeholder = MemoryHelper.ReadStringNullTerminated((nint) placeholderText);
-        if (ReplacementName == null || placeholder != Placeholder)
+        try
+        {
+            var placeholder = MemoryHelper.ReadStringNullTerminated((nint) placeholderText);
+            if (ReplacementName == null || placeholder != Placeholder)
+                return ResolveTextCommandPlaceholderHook!.Original(a1, placeholderText, a3, a4);
+
+            MemoryHelper.WriteString(PlaceholderNamePtr, ReplacementName);
+            ReplacementName = null;
+
+            return PlaceholderNamePtr;
+        }
+        catch (Exception ex)
+        {
+            // Game-thread detour: never let a managed exception cross the ReversePInvoke boundary.
+            Chat2Ex.Native.NativeCallback.LogError(ex, "error in ResolveTextCommandPlaceholder detour");
             return ResolveTextCommandPlaceholderHook!.Original(a1, placeholderText, a3, a4);
-
-        MemoryHelper.WriteString(PlaceholderNamePtr, ReplacementName);
-        ReplacementName = null;
-
-        return PlaceholderNamePtr;
+        }
     }
 }

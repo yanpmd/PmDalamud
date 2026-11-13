@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
     <PropertyGroup>
-        <Version>1.41.2</Version>
+        <Version>1.41.3</Version>
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\AetherBagsEx\KamiToolKit\KamiToolKit.csproj" />
+        <ProjectReference Include="..\..\KamiToolKit\KamiToolKit.csproj" />
     </ItemGroup>
 
     <ItemGroup>

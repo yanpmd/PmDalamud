@@ -23,6 +23,7 @@ public sealed class NativeChatUi : IDisposable
     private string previewInput = string.Empty;
     private Message? previewMessage;
     private bool failed;
+    private bool disposed;
 
     /// <summary>
     ///     The native context menu is shared by every native window and outlives them. The game keeps
@@ -134,6 +135,12 @@ public sealed class NativeChatUi : IDisposable
     public Vector2? MainWindowSize => window?.LastWindowSize;
 
     /// <summary>
+    ///     Applies the configured main window size to the live window, so a settings change takes
+    ///     effect immediately instead of only after the plugin is reloaded.
+    /// </summary>
+    public void ApplyMainWindowSize(Vector2 size) => window?.SetConfiguredSize(size);
+
+    /// <summary>
     ///     Shows the slash command help popup next to the chat window.
     /// </summary>
     public void ShowCommandHelp(Lumina.Text.ReadOnly.ReadOnlySeString description)
@@ -213,8 +220,20 @@ public sealed class NativeChatUi : IDisposable
             try
             {
                 window = CreateWindow(-1, "Chat2Ex_Main", ConfiguredMainWindowSize);
-                window.Open();
-                window.SetVisible(!Plugin.ChatLog.IsHidden);
+
+                // Opening allocates a native addon and re-enters the game's addon lifecycle
+                // (refresh/show callbacks). Doing that from UiBuilder.Draw is what produced the
+                // OnAddonRefresh -> NativeAddon.Open() -> Show re-entrancy crash, so defer it.
+                // The window object is kept; later frames simply see an addon that is not open yet.
+                var created = window;
+                Plugin.Framework.RunOnTick(() =>
+                {
+                    // The window may have been replaced or disposed while the tick was queued.
+                    if (disposed || !ReferenceEquals(window, created))
+                        return;
+
+                    NativeCallback.Safe(created.Open, "opening the native chat window");
+                });
             }
             catch (Exception ex)
             {
@@ -330,6 +349,9 @@ public sealed class NativeChatUi : IDisposable
         return message;
     }
 
+    // Reused buffer for stale pop-out indices, so the per-frame sweep allocates nothing.
+    private readonly List<int> stalePopouts = [];
+
     private void UpdatePopouts()
     {
         if (window is null)
@@ -337,11 +359,19 @@ public sealed class NativeChatUi : IDisposable
 
         var tabs = Plugin.Config.Tabs;
 
-        foreach (var index in popouts.Keys.ToArray())
+        // Keys.ToArray() allocated a new array every frame; the dictionary also cannot be modified
+        // while being enumerated, so collect the removals first and apply them afterwards.
+        stalePopouts.Clear();
+        foreach (var index in popouts.Keys)
         {
             if (index < tabs.Count && tabs[index].PopOut)
                 continue;
 
+            stalePopouts.Add(index);
+        }
+
+        foreach (var index in stalePopouts)
+        {
             CloseWindow(popouts[index]);
             popouts.Remove(index);
         }
@@ -361,7 +391,21 @@ public sealed class NativeChatUi : IDisposable
                 try
                 {
                     popout = CreateWindow(i, $"Chat2Ex_Popout{i}", new Vector2(400.0f, 300.0f));
-                    popout.Open();
+
+                    // Same re-entrancy reason as the main window: defer Open to the next tick.
+                    var created = popout;
+                    var popoutIndex = i;
+                    Plugin.Framework.RunOnTick(() =>
+                    {
+                        // Copy the loop index: a for-loop variable is shared by all closures and
+                        // would already hold its final value when this tick executes.
+                        if (disposed
+                            || !popouts.TryGetValue(popoutIndex, out var current)
+                            || !ReferenceEquals(current, created))
+                            return;
+
+                        NativeCallback.Safe(created.Open, "opening a native popout window");
+                    });
                 }
                 catch (Exception ex)
                 {
@@ -482,6 +526,8 @@ public sealed class NativeChatUi : IDisposable
 
     public void Dispose()
     {
+        disposed = true;
+
         Plugin.Commands.Register("/clearlog2").Execute -= ClearLog;
         Plugin.ClientState.Login -= OnLogin;
 
@@ -513,6 +559,11 @@ public sealed class NativeChatUi : IDisposable
 
             if (main is not null)
                 CloseWindow(main);
+
+            // All menu entries have been removed from AgentContext above and no window is left that
+            // could open a new one, so the native event interface can be released now. Leaving it
+            // alive keeps a delegate pointing into this plugin's assembly load context after unload.
+            NativeCallback.Safe(ContextMenu.Dispose, "disposing the shared context menu");
         }
 
         if (ThreadSafety.IsMainThread)

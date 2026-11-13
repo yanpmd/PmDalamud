@@ -53,6 +53,7 @@ public static class EmoteCache
     private static readonly Dictionary<string, EmoteBase> EmoteImages = new();
 
     public static string[] SortedCodeArray = [];
+    private static readonly HashSet<string> CodeSet = new(StringComparer.Ordinal);
 
     public static async Task LoadData()
     {
@@ -69,6 +70,8 @@ public static class EmoteCache
             AddEmotes(jsonString);
 
             SortedCodeArray = Cache.Keys.Order().ToArray();
+            // Exists() is called for nearly every word of every message; a linear array scan was O(n).
+            CodeSet.UnionWith(SortedCodeArray);
             State = LoadingState.Done;
         }
         catch (Exception ex)
@@ -111,7 +114,7 @@ public static class EmoteCache
 
     public static bool Exists(string code)
     {
-        return State is LoadingState.Done && SortedCodeArray.Contains(code);
+        return State is LoadingState.Done && CodeSet.Contains(code);
     }
 
     public static EmoteBase? GetEmote(string code)

@@ -120,14 +120,12 @@ public static class NativePayloadHandler
             return;
         }
 
-        try
-        {
-            // Running the handler instantly leads to a game freeze, so it has to be deferred.
-            Plugin.Framework.RunOnTick(() => handler(link.CommandId, new SeString(payloads)));
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, "Error executing the Dalamud link handler");
-        }
+        // Running the handler instantly leads to a game freeze, so it has to be deferred. The
+        // try/catch below only covers queuing the task, not running it: an exception thrown by the
+        // handler inside the framework tick is not caught by Dalamud and terminates the process
+        // (CLR error 0x12345679), which is exactly what happened when clicking a chat link.
+        Plugin.Framework.RunOnTick(() => NativeCallback.Safe(
+            () => handler(link.CommandId, new SeString(payloads)),
+            "handling a Dalamud link"));
     }
 }

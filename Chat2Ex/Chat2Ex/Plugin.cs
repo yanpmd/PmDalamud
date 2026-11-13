@@ -169,8 +169,10 @@ public sealed class Plugin : IDalamudPlugin
 
             // KamiToolKit must be initialized before any native node is created. This cannot be awaited
             // from the plugin constructor (it hops to the framework thread), so the native UI waits for
-            // KamiToolKitReady instead.
-            _ = InitializeKamiToolKitAsync();
+            // KamiToolKitReady instead. Keep the task so Dispose can tell whether initialization ever
+            // started and always tear down the hooks it installed.
+            kamiToolKitInitStarted = true;
+            kamiToolKitInitTask = InitializeKamiToolKitAsync();
         }
         catch (Exception ex)
         {
@@ -188,12 +190,16 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         disposing = true;
+        NativeCallback.ClearDeferred();
+
+        if (kamiToolKitInitTask is { IsCompleted: false })
+            Log.Warning("KamiToolKit initialization was still in flight during disposal");
 
         Interface.LanguageChanged -= LanguageChanged;
         Interface.UiBuilder.Draw -= Draw;
         Interface.UiBuilder.OpenMainUi -= OpenMainUi;
         Framework.Update -= FrameworkUpdate;
-        GameFunctions.GameFunctions.SetChatInteractable(true);
+        NativeCallback.Safe(() => GameFunctions.GameFunctions.SetChatInteractable(true), "restoring chat interactability");
 
         ChatUi?.Dispose();
         NativeSettings?.Dispose();
@@ -210,22 +216,40 @@ public sealed class Plugin : IDalamudPlugin
         EmoteCache.Dispose();
         ServerCore?.DisposeAsync().AsTask().Wait();
 
-        if (KamiToolKitReady)
+        // Always tear down KTK, even when initialization was still in flight or failed.
+        // InitializeAsync installs a process-wide FireCallback hook before it completes; leaving
+        // that hook (and its delegate into this plugin's assembly load context) behind crashes the
+        // game on the next plugin reload. Gating this on KamiToolKitReady was the original bug.
+        if (kamiToolKitInitStarted)
         {
+            void DisposeKtk() => NativeCallback.Safe(KamiToolKitLibrary.Dispose, "disposing KamiToolKit");
+
             if (Dalamud.Utility.ThreadSafety.IsMainThread)
-                KamiToolKitLibrary.Dispose();
+                DisposeKtk();
             else
-                Framework.RunOnFrameworkThread(KamiToolKitLibrary.Dispose);
+                Framework.RunOnFrameworkThread(DisposeKtk);
         }
     }
 
     /// <summary>
-///     Entry point for Dalamud's main UI, opens the chat window and focuses the chat input.
-/// </summary>
-private void OpenMainUi() => ChatUi?.OpenMainWindow();
+    ///     Entry point for Dalamud's main UI, opens the chat window and focuses the chat input.
+    /// </summary>
+    private void OpenMainUi() => NativeCallback.Safe(() => ChatUi?.OpenMainWindow(), "opening the main UI");
 
-private void Draw()
+    /// <summary>
+    ///     Runs on every UiBuilder.Draw. This is a game callback: an exception here is not caught by
+    ///     Dalamud and terminates the process, so the whole body stays behind NativeCallback.Safe.
+    /// </summary>
+    private void Draw() => NativeCallback.Safe(drawCore ??= DrawCore, "drawing the chat UI");
+
+    private Action? drawCore;
+
+    private void DrawCore()
     {
+        // Drain deferred UI actions (addon creation requested from context menu callbacks) once the
+        // game has finished unwinding the menu's FireCallback / hide chain.
+        NativeCallback.TickDeferred();
+
         ChatLog.BeginFrame();
 
         if (Config.HideInLoadingScreens && Condition[ConditionFlag.BetweenAreas])
@@ -248,6 +272,8 @@ private void Draw()
     }
 
     private bool disposing;
+    private bool kamiToolKitInitStarted;
+    private Task? kamiToolKitInitTask;
 
     private async Task InitializeKamiToolKitAsync()
     {
@@ -269,14 +295,14 @@ private void Draw()
         Interface.SavePluginConfig(Config);
     }
 
-    public void LanguageChanged(string langCode)
+    public void LanguageChanged(string langCode) => NativeCallback.Safe(() =>
     {
         var info = Config.LanguageOverride is LanguageOverride.None
             ? new CultureInfo(langCode)
             : new CultureInfo(Config.LanguageOverride.Code());
 
         Language.Culture = info;
-    }
+    }, "changing the language");
 
     private static readonly string[] ChatAddonNames =
     [
@@ -287,7 +313,16 @@ private void Draw()
         "ChatLogPanel_3",
     ];
 
+    /// <summary>
+    ///     Framework.Update is also a game callback. Keep the delegate cached so the guard itself
+    ///     does not allocate on every tick.
+    /// </summary>
     private void FrameworkUpdate(IFramework framework)
+        => NativeCallback.Safe(frameworkUpdateCore ??= FrameworkUpdateCore, "updating framework state");
+
+    private Action? frameworkUpdateCore;
+
+    private void FrameworkUpdateCore()
     {
         if (DeferredSaveFrames >= 0 && DeferredSaveFrames-- == 0)
             SaveConfig();
@@ -303,5 +338,23 @@ private void Draw()
     public static bool InBattle => Condition[ConditionFlag.InCombat];
     public static bool GposeActive => Condition[ConditionFlag.WatchingCutscene];
     public static bool CutsceneActive => Condition[ConditionFlag.OccupiedInCutSceneEvent] || Condition[ConditionFlag.WatchingCutscene78];
-    public static bool InKeyboundBrawler => Sheets.TerritorySheet.TryGetRow(ClientState.TerritoryType, out var territoryType) && territoryType.TerritoryIntendedUse.RowId == (uint)TerritoryIntendedUse.KeyboundBrawler;
+
+    // M1: this used to run a Lumina sheet lookup on every frame from both Draw and the keybind handler.
+    private static uint cachedBrawlerTerritory = uint.MaxValue;
+    private static bool cachedBrawlerResult;
+
+    public static bool InKeyboundBrawler
+    {
+        get
+        {
+            var territory = ClientState.TerritoryType;
+            if (territory == cachedBrawlerTerritory)
+                return cachedBrawlerResult;
+
+            cachedBrawlerTerritory = territory;
+            cachedBrawlerResult = Sheets.TerritorySheet.TryGetRow(territory, out var territoryType)
+                && territoryType.TerritoryIntendedUse.RowId == (uint) TerritoryIntendedUse.KeyboundBrawler;
+            return cachedBrawlerResult;
+        }
+    }
 }

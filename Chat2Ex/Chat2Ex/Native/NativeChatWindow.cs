@@ -83,11 +83,24 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     // Change tracking so we only rebuild when needed.
     private int renderedTabIndex = -1;
     private int renderedTabCount = -1;
-    private string renderedTabListSignature = string.Empty;
+    private int renderedTabListSignature;
+
+    // Cheap comparison inputs for the channel label, so idle frames never build the label string.
+    // Stored as object to keep this file independent of the chunk/target type namespaces.
+    private InputChannel renderedChannelType = InputChannel.Invalid;
+    private object? renderedChannelName;
+    private int renderedChannelNameCount = -1;
+    private object? renderedChannelTarget;
+    private int renderedChannelTab = -1;
     private string renderedTabName = string.Empty;
     private int renderedMessageCount = -1;
-    private Guid renderedFirstMessageId = Guid.Empty;
     private Guid renderedLastMessageId = Guid.Empty;
+    private long renderedMessageVersion = -1;
+
+    // The rendered window is a bounded ring: renderedRows mirrors the row nodes currently in the
+    // list, so a new message can be appended and the oldest row trimmed without rebuilding anything.
+    private readonly List<NodeBase> renderedRows = [];
+    private bool renderStateValid;
     private uint renderedFontSize;
     private bool renderedLockPosition;
     private string renderedInput = string.Empty;
@@ -102,6 +115,11 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     private Tab? pendingTab;
     private string renderedChannel = string.Empty;
     private float renderedAlpha = -1.0f;
+
+    // Set in OnFinalize and cleared again in OnSetup. Between those two points the game has
+    // destroyed the native node tree but InternalAddon is still non-null; touching RootNode in
+    // that window is a use-after-free that no managed try/catch can catch.
+    private bool isFinalized;
 
     public NativeChatWindow(Plugin plugin, int tabIndex = -1)
     {
@@ -138,6 +156,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
     protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> atkValueSpan)
     {
+        // The addon is re-allocated on every Open; the previous node tree is gone by now.
+        isFinalized = false;
+
         renderer = new MessageRenderer(Plugin);
         renderer.RebuildRequested += InvalidateRenderedMessages;
 
@@ -204,7 +225,10 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             {
                 Size = new Vector2(TabMenuButtonWidth, TabBarHeight),
                 String = "...",
-                OnClick = ShowTabMenu,
+                // Directly opens settings. The former context menu is gone: opening an addon from
+                // one of its items ran inside the game's FireCallback(close)/hide chain and crashed.
+                // Tab rename / new tab / pop-out all live in the settings window's Tabs page.
+                OnClick = OpenSettingsWindow,
             };
             tabMenuButton.AttachNode(this);
         }
@@ -417,6 +441,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             return;
 
         Size = new Vector2(width, height);
+        WindowNode?.Size = Size;
 
         var position = new Vector2(
             resizeStartPos.X + (resizeStartSize.X - width),
@@ -427,6 +452,30 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         ApplyLayout();
 
         // The message rows are laid out for the current width, so they have to be rebuilt.
+        InvalidateRenderedMessages();
+    }
+
+    /// <summary>
+    ///     Applies a size coming from the configuration (as opposed to a drag resize) to the live
+    ///     window. Keeps the native addon, its window node and the content layout in sync, so a
+    ///     settings change takes effect without reloading the plugin.
+    /// </summary>
+    public unsafe void SetConfiguredSize(Vector2 size)
+    {
+        if (isFinalized || InternalAddon is null || !IsMainWindow)
+            return;
+
+        var width = Math.Clamp(size.X, MinWindowWidth, MaxWindowWidth);
+        var height = Math.Clamp(size.Y, MinWindowHeight, MaxWindowHeight);
+
+        if (Math.Abs(width - Size.X) < 0.5f && Math.Abs(height - Size.Y) < 0.5f)
+            return;
+
+        Size = new Vector2(width, height);
+        WindowNode?.Size = Size;
+
+        ApplyLayout();
+        UpdateWindowBounds();
         InvalidateRenderedMessages();
     }
 
@@ -624,12 +673,27 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderedTabIndex = -1;
         renderedTabName = string.Empty;
         renderedMessageCount = -1;
-        renderedFirstMessageId = Guid.Empty;
+        renderedMessageVersion = -1;
         renderedLastMessageId = Guid.Empty;
+        renderStateValid = false;
+        pendingTab = null;
+        pendingMessages.Clear();
     }
 
     protected override unsafe void OnFinalize(AtkUnitBase* addon)
     {
+        // From here on the game is destroying the node tree, but InternalAddon stays non-null until
+        // the destructor runs. Block any further managed access to the nodes in that window.
+        isFinalized = true;
+
+        // The game disposes the row nodes itself. Clear our ring so a later rebuild never tries
+        // to remove an already freed node.
+        renderedRows.Clear();
+        pendingMessages.Clear();
+        pendingTab = null;
+        renderStateValid = false;
+        renderedLastMessageId = Guid.Empty;
+
         Plugin.Log.Info($"[Chat2Ex] Finalizing window addon {(addon is null ? 0u : addon->Id)}");
 
         // The native node tree is destroyed with the addon, so drop all node references.
@@ -660,7 +724,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     /// </summary>
     public unsafe void SetVisible(bool visible)
     {
-        if (InternalAddon is null)
+        // OnFinalize already destroyed the node tree; InternalAddon is only cleared later in the
+        // native destructor. Accessing RootNode in between is a use-after-free.
+        if (isFinalized || InternalAddon is null)
             return;
 
         if (InternalAddon->IsVisible == visible)
@@ -731,49 +797,61 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         var tab = TargetTab;
         var tabIndex = IsMainWindow ? Plugin.LastTab : TabIndex;
         var tabName = tab.Name;
+        var version = tab.Messages.Version;
 
-        int messageCount;
-        var firstMessageId = Guid.Empty;
-        var lastMessageId = Guid.Empty;
-        using (var messages = tab.Messages.GetReadOnly())
-        {
-            messageCount = messages.Count;
-            if (messageCount > 0)
-            {
-                firstMessageId = messages[0].Id;
-                lastMessageId = messages[messageCount - 1].Id;
-            }
-        }
+        // A rebuild/append batch is still being drained over several frames; let it finish first.
+        if (pendingTab is not null)
+            return false;
 
+        // Cheap version check: on an idle frame this returns without taking the message-list lock
+        // or allocating anything. Only a real change reaches the snapshot below.
         if (tabIndex == renderedTabIndex
             && tabName == renderedTabName
-            && messageCount == renderedMessageCount
-            && firstMessageId == renderedFirstMessageId
-            && lastMessageId == renderedLastMessageId)
+            && version == renderedMessageVersion
+            && renderStateValid)
             return false;
 
         var tabChanged = tabIndex != renderedTabIndex || tabName != renderedTabName;
-        var previousCount = renderedMessageCount;
 
         renderedTabIndex = tabIndex;
         renderedTabName = tabName;
-        renderedMessageCount = messageCount;
-        renderedFirstMessageId = firstMessageId;
-        renderedLastMessageId = lastMessageId;
+        renderedMessageVersion = version;
 
-        // Common case: only new messages arrived and the list is not at its cap yet, so existing
-        // rows can be kept. Rebuilding everything would destroy and recreate hundreds of nodes.
-        if (!tabChanged
-            && previousCount >= 0
-            && messageCount > previousCount
-            && messageCount <= MaxRenderedMessages
-            && pendingTab is null)
+        using (var messages = tab.Messages.GetReadOnly())
         {
-            AppendMessages(tab, previousCount, messageCount);
-        }
-        else
-        {
-            RebuildMessages(tab);
+            var count = messages.Count;
+            var lastId = count > 0 ? messages[count - 1].Id : Guid.Empty;
+            renderedMessageCount = count;
+
+            if (tabChanged || !renderStateValid || lastId == Guid.Empty
+                || renderedLastMessageId == Guid.Empty)
+            {
+                RebuildMessages(tab, messages, count);
+            }
+            else if (lastId != renderedLastMessageId)
+            {
+                // Walk backwards from the tail to find the last message we already rendered. Only
+                // the messages after it are new. Bounded by the render cap so this stays O(cap).
+                var start = count;
+                var maxBack = Math.Min(count, MaxRenderedMessages);
+                for (var i = 1; i <= maxBack; i++)
+                {
+                    if (messages[count - i].Id != renderedLastMessageId)
+                        continue;
+
+                    start = count - i + 1;
+                    break;
+                }
+
+                // The anchor is gone (list cleared, re-sorted or heavily pruned): fall back to a
+                // full rebuild rather than showing a wrong window.
+                if (start == count)
+                    RebuildMessages(tab, messages, count);
+                else
+                    QueueAppendMessages(tab, messages, start, count);
+            }
+
+            renderedLastMessageId = lastId;
         }
 
         LastActivityTime = Environment.TickCount64;
@@ -782,31 +860,25 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Appends newly arrived messages without touching the already rendered rows.
+    ///     Queues newly arrived messages for incremental rendering. Existing rows are kept; only
+    ///     when the ring overflows are the oldest rows removed.
     /// </summary>
-    private void AppendMessages(Tab tab, int fromIndex, int toIndex)
+    private void QueueAppendMessages(Tab tab, IReadOnlyList<Message> messages, int start, int count)
     {
         if (messageScroll is null || renderer is null)
             return;
 
-        var list = messageScroll.ContentNode;
-        var width = Math.Max(80.0f, list.Width - 12.0f); // keep clear of the scroll bar
+        pendingMessages.Clear();
+        pendingMessageIndex = 0;
+        pendingTab = tab;
 
-        var batch = new List<KamiToolKit.BaseTypes.NodeBase>();
+        // A burst (login, filter change) may contain far more messages than can be shown. Only the
+        // last cap messages matter, and building them all in one frame would stall the game.
+        var first = Math.Max(start, count - MaxRenderedMessages);
+        for (var i = first; i < count; i++)
+            pendingMessages.Add(messages[i]);
 
-        using (var messages = tab.Messages.GetReadOnly())
-        {
-            for (var i = Math.Max(0, fromIndex); i < toIndex && i < messages.Count; i++)
-                batch.Add(renderer.Build(messages[i], tab, width, HandleLinkAction));
-        }
-
-        if (batch.Count == 0)
-            return;
-
-        list.AddNode(batch);
-        list.RecalculateLayout();
-        messageScroll.RecalculateSizes();
-        messageScroll.ScrollToEnd();
+        ProcessPendingMessages();
     }
 
     /// <summary>
@@ -868,6 +940,24 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         var used = TargetTab.CurrentChannel;
         var channel = used.UseTempChannel ? used.TempChannel : used.Channel;
+        var name = used.Name;
+
+        // Building the label allocates two StringBuilders and may query the game for linkshell
+        // names, so skip it entirely on idle frames by comparing the cheap inputs first.
+        if (channel == renderedChannelType
+            && ReferenceEquals(name, renderedChannelName)
+            && renderedChannelNameCount == name.Count
+            && ReferenceEquals(used.TellTarget, renderedChannelTarget)
+            && Plugin.LastTab == renderedChannelTab
+            && renderedChannel.Length > 0)
+            return;
+
+        renderedChannelType = channel;
+        renderedChannelName = name;
+        renderedChannelNameCount = name.Count;
+        renderedChannelTarget = used.TellTarget;
+        renderedChannelTab = Plugin.LastTab;
+
         var label = ChannelLabel(used, channel);
 
         if (label == renderedChannel)
@@ -1075,9 +1165,21 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             return;
 
         var tabs = Plugin.Config.Tabs;
-        var signature = string.Join('\u0000', tabs.Select((tab, index) =>
-            $"{tab.Name}#{(tab.PopOut ? 1 : 0)}#{GetUnreadSuffix(tab, index)}"));
 
+        // Incremental hash instead of joining interpolated strings: idle frames allocate nothing.
+        // Count, selected tab, names, pop-out flags and unread counts all feed the signature.
+        var hash = new HashCode();
+        hash.Add(tabs.Count);
+        hash.Add(Plugin.LastTab);
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            var tab = tabs[i];
+            hash.Add(tab.Name);
+            hash.Add(tab.PopOut);
+            hash.Add(i == Plugin.LastTab || tab.UnreadMode == UnreadMode.None || tab.Unread == 0 ? 0 : tab.Unread);
+        }
+
+        var signature = hash.ToHashCode();
         if (tabs.Count == renderedTabCount && signature == renderedTabListSignature)
             return;
 
@@ -1138,7 +1240,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         if (tabBar is not null)
         {
-            renderedTabListSignature = string.Empty;
+            // Force a rebuild on the next frame. -1 can never equal Tabs.Count, so this is
+        // collision-free (unlike a sentinel hash value).
+        renderedTabCount = -1;
             tabBar.SelectTab($"{tab.Name}{GetUnreadSuffix(tab, index)}");
         }
 
@@ -1147,29 +1251,14 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         LastActivityTime = Environment.TickCount64;
     }
 
-    private void ShowTabMenu()
-    {
-        NativeCallback.Safe(() =>
-        {
-            var index = Plugin.LastTab;
-            if (index < 0 || index >= Plugin.Config.Tabs.Count)
-                return;
-
-            Menu.Clear();
-            Menu.AddItem(Language.Options_Tabs_Name, () => NativeCallback.Safe(() => OpenRenamePrompt(index), "renaming a tab"));
-            Menu.AddItem(Language.ChatLog_Tabs_PopOut, () => NativeCallback.Safe(() => TogglePopOut(index), "popping out a tab"));
-            Menu.AddItem(Language.Options_Tabs_NewTab, () => NativeCallback.Safe(AddTab, "adding a tab"));
-            Menu.AddItem(Language.ChatLog_Tabs_OpenSettings, () => NativeCallback.Safe(OpenSettingsWindow, "opening the settings window"));
-
-            OpenContextMenu();
-        }, "opening the tab menu");
-    }
-
     /// <summary>
-    ///     The settings window is an addon, so it must not be created from inside a UI event callback.
+    ///     Opens the settings window. The top-right button used to open a native context menu whose
+    ///     "open settings" item ran inside the game's FireCallback(close)/addon-hide chain; creating
+    ///     an addon there mutates the addon list while the game is hiding one and crashes
+    ///     (C0000005 in AtkUnitBase::Hide). Clicking the button directly and deferring several
+    ///     frames avoids that chain entirely.
     /// </summary>
-    private void OpenSettingsWindow() =>
-        Plugin.Framework.RunOnTick(() => NativeCallback.Safe(() => Plugin.NativeSettings.Open(), "opening the settings window"));
+    private void OpenSettingsWindow() => NativeCallback.Defer(() => Plugin.NativeSettings.Open());
 
     private void TogglePopOut(int index)
     {
@@ -1177,7 +1266,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             return;
 
         Plugin.Config.Tabs[index].PopOut = !Plugin.Config.Tabs[index].PopOut;
-        renderedTabListSignature = string.Empty;
+        // Force a rebuild on the next frame. -1 can never equal Tabs.Count, so this is
+        // collision-free (unlike a sentinel hash value).
+        renderedTabCount = -1;
     }
 
     private void AddTab()
@@ -1186,7 +1277,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         Plugin.LastTab = Plugin.Config.Tabs.Count - 1;
         Plugin.Config.Tabs[Plugin.LastTab].Unread = 0;
 
-        renderedTabListSignature = string.Empty;
+        // Force a rebuild on the next frame. -1 can never equal Tabs.Count, so this is
+        // collision-free (unlike a sentinel hash value).
+        renderedTabCount = -1;
         renderedTabIndex = -1;
     }
 
@@ -1205,7 +1298,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                 return;
 
             tab.Name = result;
-            renderedTabListSignature = string.Empty;
+            // Force a rebuild on the next frame. -1 can never equal Tabs.Count, so this is
+        // collision-free (unlike a sentinel hash value).
+        renderedTabCount = -1;
         })
         {
             InternalName = "Chat2Ex_RenameTab",
@@ -1220,35 +1315,35 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renamePrompt = prompt;
     }
 
-    private void RebuildMessages(Tab tab)
+    private void RebuildMessages(Tab tab, IReadOnlyList<Message> messages, int count)
     {
         if (messageScroll is null || renderer is null)
             return;
 
         var list = messageScroll.ContentNode;
-        list.Clear();
 
-        // MaxLinesToRender is reused as the amount of messages that can be visible at once.
-        // The native renderer creates several nodes per message, so keep this bounded.
-        var maxMessages = MaxRenderedMessages;
+        // Drop our references before the native list disposes the nodes.
+        renderedRows.Clear();
+        list.Clear();
 
         pendingMessages.Clear();
         pendingMessageIndex = 0;
         pendingTab = tab;
+        renderStateValid = true;
 
-        using (var messages = tab.Messages.GetReadOnly())
-        {
-            var start = Math.Max(0, messages.Count - maxMessages);
-            for (var i = start; i < messages.Count; i++)
-                pendingMessages.Add(messages[i]);
-        }
+        // MaxLinesToRender is reused as the amount of messages that can be visible at once.
+        // The native renderer creates several nodes per message, so keep this bounded.
+        var start = Math.Max(0, count - MaxRenderedMessages);
+        for (var i = start; i < count; i++)
+            pendingMessages.Add(messages[i]);
 
         ProcessPendingMessages();
     }
 
     /// <summary>
-    ///     Adds a limited batch of messages to the list each frame, avoiding a long hitch when a large
-    ///     history has to be rebuilt.
+    ///     Adds a limited batch of rows each frame, avoiding a long hitch when a large history has
+    ///     to be rebuilt. Rebuild and incremental append share this queue; the difference is only
+    ///     whether the old rows were cleared first.
     /// </summary>
     private void ProcessPendingMessages()
     {
@@ -1260,7 +1355,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         var list = messageScroll.ContentNode;
         var width = Math.Max(80.0f, list.Width - 12.0f); // keep clear of the scroll bar
 
-        var batch = new List<KamiToolKit.BaseTypes.NodeBase>(messagesPerFrame);
+        var batch = new List<NodeBase>(messagesPerFrame);
 
         while (pendingMessageIndex < pendingMessages.Count && batch.Count < messagesPerFrame)
         {
@@ -1274,8 +1369,21 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             return;
         }
 
+        // AddNode(IEnumerable) already recalculates the layout once; the extra explicit
+        // RecalculateLayout() that used to follow here was redundant work on every batch.
         list.AddNode(batch);
-        list.RecalculateLayout();
+        foreach (var node in batch)
+            renderedRows.Add(node);
+
+        // Ring trim: keep at most MaxRenderedMessages rows, disposing only the oldest ones.
+        var overflow = renderedRows.Count - MaxRenderedMessages;
+        if (overflow > 0)
+        {
+            var stale = renderedRows.GetRange(0, overflow);
+            renderedRows.RemoveRange(0, overflow);
+            list.RemoveNode(stale);
+        }
+
         messageScroll.RecalculateSizes();
         messageScroll.ScrollToEnd();
 
@@ -1287,6 +1395,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     {
         pendingMessages.Clear();
         pendingTab = null;
+        renderedRows.Clear();
+        renderStateValid = false;
 
         renderer?.Dispose();
         renderer = null;

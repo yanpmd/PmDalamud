@@ -137,9 +137,10 @@ public class MessageStore : IDisposable
     {
         Connection.Close();
         Connection.Dispose();
-        // Closing the connection doesn't immediately release the file.
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
+        // Do not force a GC here. KamiToolKit's NativeAddon has a finalizer that queues
+        // DisposeAsync on a worker thread; forcing a collection during plugin unload races that
+        // finalizer against the main-thread disposal of the addon tree and can crash the game.
+        // The connection pool is disabled, so Close/Dispose already releases the file handle.
     }
 
     private SqliteConnection Connect()

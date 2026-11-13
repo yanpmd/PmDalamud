@@ -320,6 +320,53 @@ public sealed class NativeSettingsWindow : NativeAddon
 
     private void BuildDisplayTab(SettingsList list)
     {
+        AddDescription(list,
+            "聊天窗口大小；也可直接拖拽窗口右上角的调整柄。修改后点「保存」立即生效。 / Chat window size; you can also drag the resize handle in the top-right corner. Press Save to apply.");
+
+        // Bounds match NativeChatWindow's resize limits (MinWindowWidth..MaxWindowWidth / Height).
+        AddIntOption(list,
+            "窗口宽度 / Window width",
+            null,
+            () => (int)mutable.ChatWindowSize.X,
+            value => mutable.ChatWindowSize = new Vector2(value, mutable.ChatWindowSize.Y),
+            320,
+            1920);
+
+        AddIntOption(list,
+            "窗口高度 / Window height",
+            null,
+            () => (int)mutable.ChatWindowSize.Y,
+            value => mutable.ChatWindowSize = new Vector2(mutable.ChatWindowSize.X, value),
+            160,
+            1600);
+
+        AddFloatOption(list,
+            Language.Options_WindowOpacity_Name,
+            null,
+            () => mutable.WindowAlpha,
+            value => mutable.WindowAlpha = value,
+            0.0f,
+            100.0f);
+
+        AddFloatOption(list,
+            "聊天背景透明度 / Background opacity",
+            null,
+            () => mutable.ChatBackgroundOpacity,
+            value => mutable.ChatBackgroundOpacity = value,
+            0.0f,
+            100.0f);
+
+        // Window position/lock used to live in the Chat Log page; keep all window appearance and
+        // geometry options together on the Display page.
+        AddOption(list,
+            Language.Options_LockWindowPosition_Name,
+            Language.Options_LockWindowPosition_Description,
+            () => mutable.LockWindowPosition,
+            value => mutable.LockWindowPosition = value);
+
+        if (!mutable.LockWindowPosition)
+            AddPositionOption(list);
+
         AddOption(list,
             Language.Options_HideChat_Name,
             Language.Options_HideChat_Description,
@@ -436,22 +483,6 @@ public sealed class NativeSettingsWindow : NativeAddon
             () => mutable.NativeItemTooltips,
             value => mutable.NativeItemTooltips = value);
 
-        AddFloatOption(list,
-            Language.Options_WindowOpacity_Name,
-            null,
-            () => mutable.WindowAlpha,
-            value => mutable.WindowAlpha = value,
-            0.0f,
-            100.0f);
-
-        AddFloatOption(list,
-            "聊天背景透明度 / Background opacity",
-            null,
-            () => mutable.ChatBackgroundOpacity,
-            value => mutable.ChatBackgroundOpacity = value,
-            0.0f,
-            100.0f);
-
         AddIntOption(list,
             Language.Options_MaxLinesToShow_Name,
             Language.Options_MaxLinesToShow_Description,
@@ -472,15 +503,6 @@ public sealed class NativeSettingsWindow : NativeAddon
 
         if (keybindCapture is not null)
             AddDescription(list, Language.Keybind_EscToClear);
-
-        AddOption(list,
-            Language.Options_LockWindowPosition_Name,
-            Language.Options_LockWindowPosition_Description,
-            () => mutable.LockWindowPosition,
-            value => mutable.LockWindowPosition = value);
-
-        if (!mutable.LockWindowPosition)
-            AddPositionOption(list);
     }
 
     private void AddFloatOption(SettingsList list, string label, string? description, Func<float> get, Action<float> set, float min, float max)
@@ -890,7 +912,7 @@ public sealed class NativeSettingsWindow : NativeAddon
         {
             Size = new Vector2(nameWidth, 26.0f),
             String = type.Name(),
-            OnClick = () => OpenColorPicker(type, current),
+            OnClick = () => NativeCallback.Defer(() => OpenColorPicker(type, current)),
         });
 
         row.AddNode(new TextButtonNode
@@ -990,7 +1012,7 @@ public sealed class NativeSettingsWindow : NativeAddon
                 editingTabIndex = mutable.Tabs.Count - 1;
                 needsContentRebuild = true;
             }),
-            (Language.Options_Tabs_Name, () => OpenRenamePrompt(editingTabIndex)));
+            (Language.Options_Tabs_Name, () => NativeCallback.Defer(() => OpenRenamePrompt(editingTabIndex))));
 
         AddButtonRow(list,
             (Language.ChatLog_Tabs_MoveUp, () => MoveTab(-1)),
@@ -1489,6 +1511,10 @@ public sealed class NativeSettingsWindow : NativeAddon
         Plugin.Config.UpdateFrom(mutable, true);
         Plugin.DeferredSaveFrames = 60;
 
+        // ChatWindowSize used to only be read when the window was created, so changing it in the
+        // settings had no visible effect on the already open chat window.
+        Plugin.ChatUi.ApplyMainWindowSize(Plugin.Config.ChatWindowSize);
+
         Plugin.MessageManager.ClearAllTabs();
         Plugin.MessageManager.FilterAllTabsAsync();
 
@@ -1512,12 +1538,12 @@ public sealed class NativeSettingsWindow : NativeAddon
     {
         // Never dispose the addon from inside one of its own button callbacks: the game is still
         // processing the click and would dereference the freed node tree. Defer to the next tick.
-        Plugin.Framework.RunOnTick(() =>
+        Plugin.Framework.RunOnTick(() => NativeCallback.Safe(() =>
         {
             // Dispose so KamiToolKit stops tracking this addon, otherwise it gets flagged on unload.
             Dispose();
             onRequestClose();
-        });
+        }, "closing the settings window"));
     }
 
     public override void Dispose()

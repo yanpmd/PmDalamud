@@ -36,6 +36,7 @@ public class MessageManager : IAsyncDisposable
     // URLs) as well as inserting the message into the database.
     private Queue<PendingMessage> PendingSync { get; } = [];
     private ConcurrentQueue<PendingMessage> PendingAsync { get; } = [];
+    private readonly SemaphoreSlim pendingSignal = new(0);
     private readonly Thread PendingMessageThread;
     private readonly CancellationTokenSource PendingThreadCancellationToken = new();
 
@@ -96,6 +97,9 @@ public class MessageManager : IAsyncDisposable
         Plugin.ChatGui.ChatMessageUnhandled -= ChatMessage;
 
         await PendingThreadCancellationToken.CancelAsync();
+        // Wake the worker even if it is between Wait calls; the semaphore is intentionally not
+        // disposed (its managed wait path owns no OS handle) so a late Release cannot throw.
+        pendingSignal.Release();
         var timeout = 10_000; // 10s
         while (timeout > 0)
         {
@@ -120,22 +124,49 @@ public class MessageManager : IAsyncDisposable
         LastContentId = 0;
     }
 
+    private Action? onFrameworkUpdateCore;
+
+    /// <summary>
+    ///     Framework.Update is a game callback: an exception here is not caught by Dalamud. Keep the
+    ///     delegate cached so the guard itself does not allocate on every tick.
+    /// </summary>
     private void OnFrameworkUpdate(IFramework framework)
+        => Chat2Ex.Native.NativeCallback.Safe(onFrameworkUpdateCore ??= OnFrameworkUpdateCore, "updating message manager state");
+
+    private void OnFrameworkUpdateCore()
     {
         var contentId = Plugin.PlayerState.ContentId;
         if (contentId != 0)
             LastContentId = contentId;
 
-        // Drain the PendingSync queue into the PendingAsync queue.
+        // Drain the PendingSync queue into the PendingAsync queue and wake the worker once per batch.
+        var drained = 0;
         while (PendingSync.TryDequeue(out var pending))
+        {
             PendingAsync.Enqueue(pending);
+            drained++;
+        }
+
+        if (drained > 0)
+            pendingSignal.Release(drained);
     }
 
     private void ProcessPendingMessages(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
-            if (PendingAsync.TryDequeue(out var pendingMessage))
+            // Block instead of Thread.Sleep(1): the old loop woke the worker 1000 times per second
+            // even when no message had arrived.
+            try
+            {
+                pendingSignal.Wait(token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            while (!token.IsCancellationRequested && PendingAsync.TryDequeue(out var pendingMessage))
             {
                 try
                 {
@@ -145,10 +176,6 @@ public class MessageManager : IAsyncDisposable
                 {
                     Plugin.Log.Error(ex, "Error processing pending message");
                 }
-            }
-            else
-            {
-                Thread.Sleep(1);
             }
         }
     }
@@ -213,6 +240,21 @@ public class MessageManager : IAsyncDisposable
 
     public (SeString? Sender, SeString? Message) LastMessage = (null, null);
     private void ChatMessage(IChatMessage message)
+    {
+        // ChatGui callbacks also run on the game's thread; an escaping exception would terminate
+        // the process. GlobalParametersCache.Refresh() touches native globals that can be null
+        // while the game is resetting its UI.
+        try
+        {
+            ChatMessageCore(message);
+        }
+        catch (Exception ex)
+        {
+            Chat2Ex.Native.NativeCallback.LogError(ex, "handling a chat message");
+        }
+    }
+
+    private void ChatMessageCore(IChatMessage message)
     {
         LastMessage = (message.Sender, message.Message);
 

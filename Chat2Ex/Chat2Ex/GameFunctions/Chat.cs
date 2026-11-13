@@ -160,6 +160,21 @@ public sealed unsafe class Chat : IDisposable
 
     private byte ChatLogRefreshDetour(nint log, ushort eventId, AtkValue* value)
     {
+        try
+        {
+            return ChatLogRefreshDetourCore(log, eventId, value);
+        }
+        catch (Exception ex)
+        {
+            // Game-thread detour: fall back to the original implementation instead of letting the
+            // exception travel back through the ReversePInvoke boundary and terminate the game.
+            Chat2Ex.Native.NativeCallback.LogError(ex, "error in ChatLogRefresh detour");
+            return ChatLogRefreshHook!.Original(log, eventId, value);
+        }
+    }
+
+    private byte ChatLogRefreshDetourCore(nint log, ushort eventId, AtkValue* value)
+    {
         if (Plugin.CurrentTab.InputDisabled)
             return ChatLogRefreshHook!.Original(log, eventId, value);
 
@@ -174,7 +189,9 @@ public sealed unsafe class Chat : IDisposable
         {
             // FIXME: this whole system sucks
             // FIXME v2: I hate everything about this, but it works
-            Plugin.Framework.RunOnTick(() =>
+            // RunOnTick still executes on the game's main thread; only the inner Activated call used
+            // to be guarded, so an exception from MemoryHelper/encoding could still kill the game.
+            Plugin.Framework.RunOnTick(() => Chat2Ex.Native.NativeCallback.Safe(() =>
             {
                 string? input = null;
 
@@ -187,15 +204,8 @@ public sealed unsafe class Chat : IDisposable
                 if (c != '\0' && !char.IsControl(c))
                     input = c.ToString();
 
-                try
-                {
-                    Plugin.ChatLog.Activated(new ChatActivatedArgs(new ChannelSwitchInfo(null)) { Input = input });
-                }
-                catch (Exception ex)
-                {
-                    Plugin.Log.Error(ex, "Error in chat Activated event");
-                }
-            });
+                Plugin.ChatLog.Activated(new ChatActivatedArgs(new ChannelSwitchInfo(null)) { Input = input });
+            }, "handling a typed character"));
         }
 
         string? addIfNotPresent = null;
@@ -231,54 +241,72 @@ public sealed unsafe class Chat : IDisposable
 
     private CStringPointer ChangeChannelNameDetour(AgentChatLog* agent)
     {
+        // The original must run even if our own handling fails. This is a game-thread detour: an
+        // uncaught managed exception travels back through the ReversePInvoke boundary and kills the game.
         var ret = ChangeChannelNameHook!.Original(agent);
-        if (agent == null)
-            return ret;
 
-        var channel = (uint) RaptureShellModule.Instance()->ChatType;
-        if (channel is 17 or 18)
-            channel = (uint) InputChannel.Tell;
-
-        var name = SeString.Parse(agent->ChannelLabel);
-        if (name.Payloads.Count == 0)
-            name = null;
-
-        if (name == null)
-            return ret;
-
-        var nameChunks = ChunkUtil.ToChunks(name, ChunkSource.None, null).ToList();
-        if (nameChunks.Count > 0 && nameChunks[0] is TextChunk text)
-            text.Content = text.Content.TrimStart('\uE01E').TrimStart();
-
-        string? playerName = null;
-        ushort worldId = 0;
-        if (channel == (uint) InputChannel.Tell)
+        try
         {
-            playerName = SeString.Parse(agent->TellPlayerName).TextValue;
-            worldId = agent->TellWorldId;
-            Plugin.Log.Debug($"Detected tell target '{playerName}'@{worldId}");
+            if (agent == null)
+                return ret;
+
+            var shell = RaptureShellModule.Instance();
+            if (shell == null)
+                return ret;
+
+            var channel = (uint) shell->ChatType;
+            if (channel is 17 or 18)
+                channel = (uint) InputChannel.Tell;
+
+            var name = SeString.Parse(agent->ChannelLabel);
+            if (name.Payloads.Count == 0)
+                name = null;
+
+            if (name == null)
+                return ret;
+
+            var nameChunks = ChunkUtil.ToChunks(name, ChunkSource.None, null).ToList();
+            if (nameChunks.Count > 0 && nameChunks[0] is TextChunk text)
+                text.Content = text.Content.TrimStart('\uE01E').TrimStart();
+
+            string? playerName = null;
+            ushort worldId = 0;
+            if (channel == (uint) InputChannel.Tell)
+            {
+                playerName = SeString.Parse(agent->TellPlayerName).TextValue;
+                worldId = agent->TellWorldId;
+                Plugin.Log.Debug($"Detected tell target '{playerName}'@{worldId}");
+            }
+
+            Plugin.CurrentTab.CurrentChannel = new UsedChannel
+            {
+                Channel = (InputChannel) channel,
+                Name = nameChunks,
+                TellTarget = playerName != null ? new TellTarget(playerName, worldId, 0, 0) : null
+            };
         }
-
-        Plugin.CurrentTab.CurrentChannel = new UsedChannel
+        catch (Exception ex)
         {
-            Channel = (InputChannel) channel,
-            Name = nameChunks,
-            TellTarget = playerName != null ? new TellTarget(playerName, worldId, 0, 0) : null
-        };
+            Chat2Ex.Native.NativeCallback.LogError(ex, "error in ChangeChannelName detour");
+        }
 
         return ret;
     }
 
     private void ReplyInSelectedChatModeDetour(RaptureShellModule* agent)
     {
-        var replyMode = AgentChatLog.Instance()->ReplyChannel;
-        if (replyMode == -2)
+        try
         {
-            ReplyInSelectedChatModeHook!.Original(agent);
-            return;
+            // AgentChatLog is null while the UI is being reset (login / zone change).
+            var chatLog = AgentChatLog.Instance();
+            if (chatLog != null && chatLog->ReplyChannel != -2)
+                SetChannelWithExtraChat((InputChannel) chatLog->ReplyChannel);
+        }
+        catch (Exception ex)
+        {
+            Chat2Ex.Native.NativeCallback.LogError(ex, "error in ReplyInSelectedChatMode detour");
         }
 
-        SetChannelWithExtraChat((InputChannel) replyMode);
         ReplyInSelectedChatModeHook!.Original(agent);
     }
 

@@ -335,6 +335,13 @@ public class Tab
         private readonly List<Message> Messages;
         private readonly HashSet<Guid> TrackedMessageIds;
 
+        /// <summary>
+        /// Bumped on every content change. The native UI compares this on each frame instead of
+        /// taking the lock and scanning the whole list to detect new messages.
+        /// </summary>
+        public long Version => Interlocked.Read(ref version);
+        private long version;
+
         public MessageList()
         {
             Messages = [];
@@ -385,6 +392,7 @@ public class Tab
 
             Messages.Add(message);
             TrackedMessageIds.Add(message.Id);
+            Interlocked.Increment(ref version);
         }
 
         public void Clear()
@@ -394,6 +402,7 @@ public class Tab
             {
                 Messages.Clear();
                 TrackedMessageIds.Clear();
+                Interlocked.Increment(ref version);
             }
             finally
             {
@@ -404,15 +413,21 @@ public class Tab
         private void SortLocked()
         {
             Messages.Sort((a, b) => a.Date.CompareTo(b.Date));
+            Interlocked.Increment(ref version);
         }
 
         private void PruneMaxLocked(int max)
         {
+            var removed = false;
             while (Messages.Count > max)
             {
                 TrackedMessageIds.Remove(Messages[0].Id);
                 Messages.RemoveAt(0);
+                removed = true;
             }
+
+            if (removed)
+                Interlocked.Increment(ref version);
         }
 
         /// <summary>
