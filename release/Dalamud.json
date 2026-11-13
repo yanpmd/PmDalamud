@@ -10,7 +10,7 @@
         "LastUpdate": 1794405301,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/AetherBagsEx/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/AetherBagsEx/latest.zip",
-        "AssemblyVersion": "2.0.0.14",
+        "AssemblyVersion": "2.0.0.15",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/AetherBagsEx/images/icon.png"
@@ -58,7 +58,7 @@
         "LastUpdate": 1794582436,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/UmbraEx/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/UmbraEx/latest.zip",
-        "AssemblyVersion": "3.1.18.6",
+        "AssemblyVersion": "3.1.18.7",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15,
         "IconUrl": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/UmbraEx/Umbra/images/logo.png"
@@ -89,7 +89,7 @@
         "LastUpdate": 1793992261,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Chat2Ex/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Chat2Ex/latest.zip",
-        "AssemblyVersion": "1.41.2.0",
+        "AssemblyVersion": "1.41.3.0",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15
     }
