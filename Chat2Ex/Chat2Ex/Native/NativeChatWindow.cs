@@ -8,7 +8,6 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.BaseTypes;
-using KamiToolKit.ContextMenu;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
 using Lumina.Text.ReadOnly;
@@ -49,11 +48,10 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     private readonly Plugin Plugin;
 
     /// <summary>
-    ///     The native context menu is shared by every chat window and outlives them. The game keeps
-    ///     a pointer to the event interface of an open menu, releasing the menu together with the
-    ///     window that opened it crashes the game as soon as an entry is clicked.
+    ///     Shared ImGui menu. Native callbacks only queue a request; the popup is opened on the next
+    ///     UiBuilder.Draw, so no addon is created inside a FireCallback / hide chain.
     /// </summary>
-    private ContextMenu Menu => Plugin.ChatUi.ContextMenu;
+    private ImGuiMenu Menu => Plugin.Menu;
 
     private TabBarNode? tabBar;
     private ScrollingNode<VerticalListNode>? messageScroll;
@@ -67,7 +65,6 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     private TextNode? resizeHandleLabel;
     private CollisionNode? emptyHeader;
     private MessageRenderer? renderer;
-    private NativeTextPrompt? renamePrompt;
 
     // Resize state, the window is resized while the handle is dragged.
     private bool isResizing;
@@ -111,6 +108,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
     // Messages are added to the list over multiple frames so large histories do not stall the game.
     private readonly List<Message> pendingMessages = [];
+    private readonly List<int> pendingRepeatCounts = [];
     private int pendingMessageIndex;
     private Tab? pendingTab;
     private string renderedChannel = string.Empty;
@@ -678,6 +676,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderStateValid = false;
         pendingTab = null;
         pendingMessages.Clear();
+        pendingRepeatCounts.Clear();
     }
 
     protected override unsafe void OnFinalize(AtkUnitBase* addon)
@@ -690,6 +689,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         // to remove an already freed node.
         renderedRows.Clear();
         pendingMessages.Clear();
+        pendingRepeatCounts.Clear();
         pendingTab = null;
         renderStateValid = false;
         renderedLastMessageId = Guid.Empty;
@@ -704,7 +704,6 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         channelMarker = null;
         channelMarkerHitbox = null;
         tabMenuButton = null;
-        renamePrompt = null;
         backgroundTexture = null;
         resizeHandle = null;
         resizeHandleLabel = null;
@@ -713,8 +712,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderer?.Dispose();
         renderer = null;
 
-        // Only close the menu, its event interface has to stay alive for the game, see ContextMenu.
-        Plugin.ChatUi.ContextMenu.Close();
+        Plugin.Menu.Close();
+        Plugin.ChatLog.InputHandler.PayloadHandler.Close();
 
         base.OnFinalize(addon);
     }
@@ -868,17 +867,40 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         if (messageScroll is null || renderer is null)
             return;
 
-        pendingMessages.Clear();
-        pendingMessageIndex = 0;
         pendingTab = tab;
 
         // A burst (login, filter change) may contain far more messages than can be shown. Only the
         // last cap messages matter, and building them all in one frame would stall the game.
-        var first = Math.Max(start, count - MaxRenderedMessages);
-        for (var i = first; i < count; i++)
-            pendingMessages.Add(messages[i]);
-
+        FillPendingMessages(messages, start, count);
         ProcessPendingMessages();
+    }
+
+    /// <summary>
+    ///     Fills the render queue, folding consecutive identical messages into a single row with an
+    ///     (Nx) counter when CollapseDuplicateMessages is enabled. Message.Hash already accounts for
+    ///     CollapseKeepUniqueLinks.
+    /// </summary>
+    private void FillPendingMessages(IReadOnlyList<Message> messages, int start, int count)
+    {
+        pendingMessages.Clear();
+        pendingRepeatCounts.Clear();
+        pendingMessageIndex = 0;
+
+        var first = Math.Max(start, count - MaxRenderedMessages);
+        var collapse = Plugin.Config.CollapseDuplicateMessages;
+
+        for (var i = first; i < count; i++)
+        {
+            var message = messages[i];
+            if (collapse && pendingMessages.Count > 0 && pendingMessages[^1].Hash == message.Hash)
+            {
+                pendingRepeatCounts[^1]++;
+                continue;
+            }
+
+            pendingMessages.Add(message);
+            pendingRepeatCounts.Add(1);
+        }
     }
 
     /// <summary>
@@ -1052,23 +1074,10 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Opens this window's native context menu.
+    ///     Queues the ImGui menu. The popup is opened from UiBuilder.Draw on the next frame, which
+    ///     keeps all ImGui calls out of the game's input-event / FireCallback chain.
     /// </summary>
-    /// <remarks>
-    ///     The menu is opened on the next tick: opening an addon while the game is still processing
-    ///     its input events makes the game close the menu again in the same frame. The menu is also
-    ///     not bound to an owner addon, our window is not a real game addon and binding it crashes
-    ///     the game.
-    /// </remarks>
-    private unsafe void OpenContextMenu()
-    {
-        Plugin.Log.Info($"[Chat2Ex] Opening context menu, addon id: {(InternalAddon is null ? 0u : InternalAddon->Id)}");
-
-        Plugin.Framework.RunOnTick(() => NativeCallback.Safe(() =>
-        {
-            Menu.Open(false, true);
-        }, "opening the context menu"));
-    }
+    private void OpenContextMenu() => Menu.Request();
 
     /// <summary>
     ///     Opens the native channel picker when the input prefix is clicked.
@@ -1080,18 +1089,23 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
     private void ShowChannelMenuInternal()
     {
-        Menu.Clear();
+        var menu = Plugin.Menu;
+        menu.Clear();
 
         var used = TargetTab.CurrentChannel;
         var active = used.UseTempChannel ? used.TempChannel : used.Channel;
 
-        void AddChannel(Action<ReadOnlySeString, Action> add, InputChannel channel)
+        void AddChannel(List<ImGuiMenu.Item> list, InputChannel channel)
         {
             if (!Chat2Ex.GameFunctions.Chat.IsChannelOrExistingLinkshell(channel))
                 return;
 
             var name = ChannelDisplayName(channel);
-            add(channel == active ? $"> {name}" : name, () => NativeCallback.Safe(() => SwitchInputChannel(channel), "switching the input channel"));
+            list.Add(new ImGuiMenu.Item
+            {
+                Name = channel == active ? $"> {name}" : name,
+                OnClick = () => NativeCallback.Safe(() => SwitchInputChannel(channel), "switching the input channel"),
+            });
         }
 
         foreach (var channel in new[]
@@ -1101,39 +1115,34 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                      InputChannel.FreeCompany, InputChannel.PvpTeam,
                      InputChannel.NoviceNetwork, InputChannel.Tell,
                  })
-        {
-            AddChannel(Menu.AddItem, channel);
-        }
+            AddChannel(menu.Items, channel);
 
-        var linkshells = new ContextMenuSubItem { Name = "通讯贝 / Linkshells", OnClick = () => { } };
+        var linkshells = new ImGuiMenu.Item { Name = "通讯贝 / Linkshells" };
         foreach (var channel in Enum.GetValues<InputChannel>())
             if (channel is >= InputChannel.Linkshell1 and <= InputChannel.Linkshell8)
-                AddChannel(linkshells.AddItem, channel);
+                AddChannel(linkshells.Children, channel);
 
-        if (linkshells.SubItems.Count > 0)
-            Menu.AddItem(linkshells);
+        if (linkshells.Children.Count > 0)
+            menu.Items.Add(linkshells);
 
-        var crossLinkshells = new ContextMenuSubItem { Name = "跨服通讯贝 / Cross-world LS", OnClick = () => { } };
+        var crossLinkshells = new ImGuiMenu.Item { Name = "跨服通讯贝 / Cross-world LS" };
         foreach (var channel in Enum.GetValues<InputChannel>())
             if (channel is >= InputChannel.CrossLinkshell1 and <= InputChannel.CrossLinkshell8)
-                AddChannel(crossLinkshells.AddItem, channel);
+                AddChannel(crossLinkshells.Children, channel);
 
-        if (crossLinkshells.SubItems.Count > 0)
-            Menu.AddItem(crossLinkshells);
+        if (crossLinkshells.Children.Count > 0)
+            menu.Items.Add(crossLinkshells);
 
-        if (Plugin.ExtraChat.ChannelNames.Count == 0)
+        if (Plugin.ExtraChat.ChannelNames.Count > 0)
         {
-            OpenContextMenu();
-            return;
+            var extraChat = new ImGuiMenu.Item { Name = "ExtraChat 频道" };
+            foreach (var channel in Enum.GetValues<InputChannel>())
+                if (channel is >= InputChannel.ExtraChatLinkshell1 and <= InputChannel.ExtraChatLinkshell8)
+                    AddChannel(extraChat.Children, channel);
+
+            if (extraChat.Children.Count > 0)
+                menu.Items.Add(extraChat);
         }
-
-        var extraChat = new ContextMenuSubItem { Name = "ExtraChat 频道", OnClick = () => { } };
-        foreach (var channel in Enum.GetValues<InputChannel>())
-            if (channel is >= InputChannel.ExtraChatLinkshell1 and <= InputChannel.ExtraChatLinkshell8)
-                AddChannel(extraChat.AddItem, channel);
-
-        if (extraChat.SubItems.Count > 0)
-            Menu.AddItem(extraChat);
 
         OpenContextMenu();
     }
@@ -1258,7 +1267,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     ///     (C0000005 in AtkUnitBase::Hide). Clicking the button directly and deferring several
     ///     frames avoids that chain entirely.
     /// </summary>
-    private void OpenSettingsWindow() => NativeCallback.Defer(() => Plugin.NativeSettings.Open());
+    private void OpenSettingsWindow()
+        => NativeCallback.Defer(() => Plugin.SettingsWindow.IsOpen = true);
 
     private void TogglePopOut(int index)
     {
@@ -1283,38 +1293,6 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderedTabIndex = -1;
     }
 
-    private void OpenRenamePrompt(int index)
-    {
-        if (renamePrompt is not null || index < 0 || index >= Plugin.Config.Tabs.Count)
-            return;
-
-        var tab = Plugin.Config.Tabs[index];
-
-        var prompt = new NativeTextPrompt(Plugin, tab.Name, result =>
-        {
-            renamePrompt = null;
-
-            if (result is null)
-                return;
-
-            tab.Name = result;
-            // Force a rebuild on the next frame. -1 can never equal Tabs.Count, so this is
-        // collision-free (unlike a sentinel hash value).
-        renderedTabCount = -1;
-        })
-        {
-            InternalName = "Chat2Ex_RenameTab",
-            Title = Language.Options_Tabs_Name,
-            Size = new Vector2(320.0f, 120.0f),
-            DepthLayer = 13,
-            DisableClose = true,
-            DisableClamping = true,
-        };
-
-        prompt.Open();
-        renamePrompt = prompt;
-    }
-
     private void RebuildMessages(Tab tab, IReadOnlyList<Message> messages, int count)
     {
         if (messageScroll is null || renderer is null)
@@ -1326,16 +1304,13 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderedRows.Clear();
         list.Clear();
 
-        pendingMessages.Clear();
-        pendingMessageIndex = 0;
         pendingTab = tab;
         renderStateValid = true;
+        renderer.ResetMessageSequence();
 
         // MaxLinesToRender is reused as the amount of messages that can be visible at once.
         // The native renderer creates several nodes per message, so keep this bounded.
-        var start = Math.Max(0, count - MaxRenderedMessages);
-        for (var i = start; i < count; i++)
-            pendingMessages.Add(messages[i]);
+        FillPendingMessages(messages, 0, count);
 
         ProcessPendingMessages();
     }
@@ -1359,7 +1334,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         while (pendingMessageIndex < pendingMessages.Count && batch.Count < messagesPerFrame)
         {
-            batch.Add(renderer.Build(pendingMessages[pendingMessageIndex], pendingTab, width, HandleLinkAction));
+            var index = pendingMessageIndex;
+            var repeat = index < pendingRepeatCounts.Count ? pendingRepeatCounts[index] : 1;
+            batch.Add(renderer.Build(pendingMessages[index], pendingTab, width, HandleLinkAction, repeat));
             pendingMessageIndex++;
         }
 
@@ -1394,6 +1371,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     public override void Dispose()
     {
         pendingMessages.Clear();
+        pendingRepeatCounts.Clear();
         pendingTab = null;
         renderedRows.Clear();
         renderStateValid = false;
@@ -1401,23 +1379,16 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         renderer?.Dispose();
         renderer = null;
 
-        // The menu is shared and outlives this window, only make sure the game side is cleared.
-        Plugin.ChatUi.ContextMenu.Close();
+        // Menus are ImGui popups now; just drop any queued request for this window.
+        Plugin.Menu.Close();
+        Plugin.ChatLog.InputHandler.PayloadHandler.Close();
 
         base.Dispose();
     }
 
     private void ShowMessageMenu(Message message)
     {
-        Menu.Clear();
-        Menu.AddItem(Language.Context_Copy, () => NativeCallback.Safe(() => CopyMessage(message, true), "copying a message"));
-
-        if (message.Sender.Count > 0)
-            Menu.AddItem(Language.Context_CopyContent, () => NativeCallback.Safe(() => CopyMessage(message, false), "copying a message"));
-
-        Menu.AddItem(Language.Context_HideChat, () => NativeCallback.Safe(() => Plugin.ChatLog.CurrentHideState = HideState.User, "hiding the chat"));
-
-        OpenContextMenu();
+        Plugin.ChatLog.InputHandler.PayloadHandler.RequestMessage(message);
     }
 
     /// <summary>
@@ -1438,10 +1409,10 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                 return;
         }
 
-        // Player links get their own menu, like the game does for player names.
+        // Player links get the full player menu from the shared ImGui payload handler.
         if (chunk?.Link is PlayerPayload player)
         {
-            ShowPlayerMenu(message, player);
+            ShowPlayerMenu(message, chunk, player);
             return;
         }
 
@@ -1450,25 +1421,12 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Shows the player related context menu for a player link.
+    ///     Queues the ImGui player context menu for a player link.
     /// </summary>
-    private void ShowPlayerMenu(Message message, PlayerPayload player)
+    private void ShowPlayerMenu(Message message, Chunk chunk, PlayerPayload player)
     {
-        NativeCallback.Safe(() =>
-        {
-            Menu.Clear();
-
-            NativePlayerMenu.Build(Menu, Plugin, message, player, SetChatInput);
-
-            Menu.AddItem(Language.Context_Copy, () => NativeCallback.Safe(() => CopyMessage(message, true), "copying a message"));
-
-            if (message.Sender.Count > 0)
-                Menu.AddItem(Language.Context_CopyContent, () => NativeCallback.Safe(() => CopyMessage(message, false), "copying a message"));
-
-            Menu.AddItem(Language.Context_HideChat, () => NativeCallback.Safe(() => Plugin.ChatLog.CurrentHideState = HideState.User, "hiding the chat"));
-
-            OpenContextMenu();
-        }, "opening the player menu");
+        chunk.Message ??= message;
+        Plugin.ChatLog.InputHandler.PayloadHandler.Request(chunk, player);
     }
 
     /// <summary>
@@ -1546,7 +1504,53 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             UpdateCommandHelp(input);
         }
 
+        UpdateAutoComplete(input);
         LastActivityTime = Environment.TickCount64;
+    }
+
+    /// <summary>
+    ///     The native text input has no completion callback, so an unfinished &lt;at:... token is
+    ///     detected here and the ImGui candidate list is updated. SortAutoTranslate decides the
+    ///     ordering of the candidates.
+    /// </summary>
+    private void UpdateAutoComplete(string input)
+    {
+        var marker = input.LastIndexOf('<');
+        if (marker < 0 || input[marker..].Contains('>'))
+        {
+            Plugin.AutoComplete.Hide();
+            return;
+        }
+
+        var prefix = input[(marker + 1)..];
+        if (prefix.StartsWith("at:", StringComparison.OrdinalIgnoreCase))
+            prefix = prefix[3..];
+
+        Plugin.AutoComplete.Show(prefix, replacement => ApplyAutoComplete(marker, replacement));
+    }
+
+    private void ApplyAutoComplete(int marker, string replacement)
+    {
+        var input = IsMainWindow
+            ? Plugin.ChatLog.ChatInput
+            : inputNode is null ? string.Empty : inputNode.String.ToString();
+
+        var end = input.IndexOf('>', marker);
+        end = end < 0 ? input.Length : end + 1;
+
+        var next = input[..marker] + replacement + input[end..];
+
+        if (IsMainWindow)
+        {
+            Plugin.ChatLog.ChatInput = next;
+            renderedInput = next;
+            Plugin.ChatLog.Activate = true;
+        }
+        else if (inputNode is not null)
+        {
+            inputNode.String = next;
+            inputNode.SetFocus();
+        }
     }
 
     /// <summary>

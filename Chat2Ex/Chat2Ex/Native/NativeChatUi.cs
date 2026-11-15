@@ -5,7 +5,6 @@ using Chat2Ex.Util;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Utility;
-using KamiToolKit.ContextMenu;
 
 namespace Chat2Ex.Native;
 
@@ -24,14 +23,6 @@ public sealed class NativeChatUi : IDisposable
     private Message? previewMessage;
     private bool failed;
     private bool disposed;
-
-    /// <summary>
-    ///     The native context menu is shared by every native window and outlives them. The game keeps
-    ///     a pointer to the event interface of an open menu, so the menu must not be released together
-    ///     with the window that opened it: the next click on an entry would call into freed memory.
-    /// </summary>
-    public ContextMenu ContextMenu { get; } = new();
-
 
     public NativeChatUi(Plugin plugin)
     {
@@ -58,7 +49,27 @@ public sealed class NativeChatUi : IDisposable
             popout.MarkActivity();
     }
 
-    private void ClearLog(string command, string args) => Plugin.MessageManager.ClearAllTabs();
+    private void ClearLog(string command, string args)
+    {
+        switch (args.Trim().ToLowerInvariant())
+        {
+            case "all":
+                Plugin.MessageManager.ClearAllTabs();
+                break;
+            case "help":
+                Plugin.ChatGui.Print("- /clearlog2: clears the active tab's log");
+                Plugin.ChatGui.Print("- /clearlog2 all: clears all tabs' logs and the global history");
+                Plugin.ChatGui.Print("- /clearlog2 help: shows this help");
+                break;
+            default:
+                if (Plugin.LastTab > -1 && Plugin.LastTab < Plugin.Config.Tabs.Count)
+                {
+                    Plugin.Config.Tabs[Plugin.LastTab].Clear();
+                    InvalidateAll();
+                }
+                break;
+        }
+    }
 
     public void Update()
     {
@@ -545,8 +556,8 @@ public sealed class NativeChatUi : IDisposable
 
         void CloseAll()
         {
-            // Clear the game side menu first, its entries point at the windows that are closed below.
-            ContextMenu.Close();
+            Plugin.Menu.Close();
+            Plugin.ChatLog.InputHandler.PayloadHandler.Close();
 
             foreach (var popout in popoutWindows)
                 CloseWindow(popout);
@@ -559,16 +570,11 @@ public sealed class NativeChatUi : IDisposable
 
             if (main is not null)
                 CloseWindow(main);
-
-            // All menu entries have been removed from AgentContext above and no window is left that
-            // could open a new one, so the native event interface can be released now. Leaving it
-            // alive keeps a delegate pointing into this plugin's assembly load context after unload.
-            NativeCallback.Safe(ContextMenu.Dispose, "disposing the shared context menu");
         }
 
-        if (ThreadSafety.IsMainThread)
-            CloseAll();
-        else
-            Plugin.Framework.RunOnFrameworkThread(CloseAll);
+        // Never defer this to a later framework tick. The plugin assembly is unloaded as soon as
+        // Dispose returns, and a queued delegate -- or an addon still tracked by KTK's process-wide
+        // FireCallback hook -- would then point into a dead AssemblyLoadContext.
+        NativeCallback.Safe(CloseAll, "closing native chat windows");
     }
 }

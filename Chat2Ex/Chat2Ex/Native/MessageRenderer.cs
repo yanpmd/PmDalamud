@@ -51,7 +51,7 @@ public sealed unsafe class MessageRenderer : IDisposable
     ///     Row height per rendered line. Kept clearly above the glyph height so larger font sizes do
     ///     not make consecutive rows overlap.
     /// </summary>
-    public float LineHeight => FontSize * 1.5f;
+    public float LineHeight => FontSize * (Plugin.Config.MoreCompactPretty && Plugin.Config.PrettierTimestamps ? 1.25f : 1.5f);
 
     private static readonly Vector4 TimestampColor = new(0.62f, 0.62f, 0.62f, 1.0f);
 
@@ -90,6 +90,13 @@ public sealed unsafe class MessageRenderer : IDisposable
     public Action? RebuildRequested;
 
     /// <summary>
+    ///     Timestamp of the previously rendered message, used by HideSameTimestamps.
+    /// </summary>
+    private string? lastTimestamp;
+
+    public void ResetMessageSequence() => lastTimestamp = null;
+
+    /// <summary>
     ///     Looks up the texture that holds the game icons. The lookup only happens once, the texture
     ///     itself is loaded by the game when the node is created.
     /// </summary>
@@ -98,10 +105,10 @@ public sealed unsafe class MessageRenderer : IDisposable
         path = string.Empty;
         size = Vector2.Zero;
 
+        // Keep probing until the texture shows up: Dalamud exposes game files asynchronously, so a
+        // failed first lookup must not be cached forever.
         if (!iconTextureResolved)
         {
-            iconTextureResolved = true;
-
             var found = new List<string>();
 
             foreach (var candidate in IconTexturePaths)
@@ -115,8 +122,11 @@ public sealed unsafe class MessageRenderer : IDisposable
                     iconTexturePath = candidate;
             }
 
-            Plugin.Log.Information(
-                $"[Chat2Ex] icon textures: {(found.Count == 0 ? "<none>" : string.Join(", ", found))}");
+            if (iconTexturePath is not null)
+            {
+                iconTextureResolved = true;
+                Plugin.Log.Information($"[Chat2Ex] icon textures: {string.Join(", ", found)}");
+            }
         }
 
         if (iconTexturePath is null)
@@ -355,7 +365,7 @@ public sealed unsafe class MessageRenderer : IDisposable
     ///     Called when a link is activated or when the row is right clicked. The chunk is the link
     ///     that was hit, or <c>null</c> when the row itself was clicked.
     /// </param>
-    public ResNode Build(Message message, Tab tab, float width, Action<Message, Chunk?, LinkAction> onAction)
+    public ResNode Build(Message message, Tab tab, float width, Action<Message, Chunk?, LinkAction> onAction, int repeatCount = 1)
     {
         var row = new ResNode
         {
@@ -379,32 +389,35 @@ public sealed unsafe class MessageRenderer : IDisposable
 
         if (tab.DisplayTimestamp)
         {
-            var stamp = FormatTimestamp(message) + "  ";
-            writer.EmitInline(stamp, TimestampColor, 0.0f);
-            writer.SetIndent(Math.Min(width - 1.0f, Measure(stamp)));
+            var stampText = FormatTimestamp(message);
+            var showStamp = !Plugin.Config.HideSameTimestamps || lastTimestamp != stampText;
+            lastTimestamp = stampText;
+
+            // PrettierTimestamps puts the stamp in its own aligned column; the classic layout puts
+            // it in brackets directly in front of the message.
+            var stamp = Plugin.Config.PrettierTimestamps ? stampText + "  " : $"[{stampText}] ";
+            if (showStamp)
+                writer.EmitInline(stamp, TimestampColor, 0.0f);
+            if (Plugin.Config.PrettierTimestamps)
+                writer.SetIndent(Math.Min(width - 1.0f, Measure(stamp)));
         }
 
         // Chunks without an explicit payload colour fall back to the configured channel colour.
         var fallback = ResolveChannelColor(message);
 
-        Chunk? previousChunk = null;
-        Payload? previousLink = null;
-
+        // Only the chunks the game actually sent are drawn. The original Chat 2 ImGui renderer never
+        // inserted extra marker icons, and doing so here made player links look as if their sprout /
+        // mentor icons had been replaced.
         foreach (var chunk in MergeRuns(message))
         {
             switch (chunk)
             {
                 case TextChunk text when text.Link is null:
-                    writer.AppendText(text.Content, text.Color ?? fallback);
+                    writer.AppendText(Sanitize(text), text.Color ?? fallback);
                     break;
 
                 case TextChunk text:
-                    // Clickable content gets a small marker in front of it, so that it can be told
-                    // apart from ordinary text. The message may already contain the game's own icon.
-                    if (NeedsLinkMarker(text, previousChunk, previousLink))
-                        writer.AppendIcon(new IconChunk(text.Source, null, LinkMarkerIcon(text.Link)));
-
-                    writer.AppendLinkTokens(text, fallback);
+                    writer.AppendLinkTokens(text, fallback, Sanitize(text));
                     break;
 
                 case IconChunk icon:
@@ -412,10 +425,10 @@ public sealed unsafe class MessageRenderer : IDisposable
                     writer.AppendIcon(icon);
                     break;
             }
-
-            previousChunk = chunk;
-            previousLink = chunk.Link;
         }
+
+        if (repeatCount > 1)
+            writer.AppendText($" ({repeatCount}x)", TimestampColor);
 
         writer.FlushLine();
 
@@ -425,41 +438,6 @@ public sealed unsafe class MessageRenderer : IDisposable
 
         return row;
     }
-
-    /// <summary>
-    ///     Whether a clickable chunk needs a marker icon in front of it.
-    /// </summary>
-    private static bool NeedsLinkMarker(TextChunk chunk, Chunk? previousChunk, Payload? previousLink)
-    {
-        // The sender name is a link too, but it is not an actionable piece of content.
-        if (chunk.Source == ChunkSource.Sender)
-            return false;
-
-        // Auto translate markers are already rendered as brackets.
-        if (chunk.Link is AutoTranslatePayload)
-            return false;
-
-        // The game already put an icon in front of this link.
-        if (previousChunk is IconChunk)
-            return false;
-
-        // A link that spans several chunks only needs one marker.
-        if (previousLink is not null && ReferenceEquals(previousLink, chunk.Link))
-            return false;
-
-        return NativePayloadHandler.CanHandle(chunk.Link);
-    }
-
-    /// <summary>
-    ///     The game icon that is shown in front of a clickable piece of content.
-    /// </summary>
-    private static BitmapFontIcon LinkMarkerIcon(Payload? link) => link switch
-    {
-        MapLinkPayload => BitmapFontIcon.Aetheryte,
-        Chat2ExPartyFinderPayload or DalamudPartyFinderPayload => BitmapFontIcon.LookingForParty,
-        ItemPayload or QuestPayload or AchievementPayload => BitmapFontIcon.GoldStar,
-        _ => BitmapFontIcon.Aetheryte,
-    };
 
     /// <summary>
     ///     Resolves the configured colour for the message's chat type, falling back to the channel's
@@ -476,6 +454,23 @@ public sealed unsafe class MessageRenderer : IDisposable
     }
 
     private static readonly CultureInfo TwentyFourHourCulture = CultureInfo.CreateSpecificCulture("de-DE");
+
+    /// <summary>
+    ///     Obfuscates player names in the native chat window when screenshot mode is enabled.
+    /// </summary>
+    private static string Sanitize(TextChunk text)
+    {
+        if (!PlayerUtil.ScreenshotMode)
+            return text.Content;
+
+        if (text.Link is PlayerPayload player)
+            return PlayerUtil.HidePlayerInString(text.Content, player.PlayerName, player.World.RowId);
+
+        if (Plugin.PlayerState.IsLoaded)
+            return PlayerUtil.HidePlayerInString(text.Content, Plugin.PlayerState.CharacterName, Plugin.PlayerState.HomeWorld.RowId);
+
+        return text.Content;
+    }
 
     private string FormatTimestamp(Message message)
     {
@@ -764,53 +759,17 @@ public sealed unsafe class MessageRenderer : IDisposable
         }
 
         /// <summary>
-        ///     Appends one of the game icons (sprout, mentor crown, ...) to the current line. The icons
-        ///     live in a texture atlas, the lookup table for them comes from the game's font data.
+        ///     Renders a game font icon (sprout, mentor crown, ...) with the client's own SeString icon
+        ///     macro. The game owns the gfd atlas and its texture, so there is no managed texture
+        ///     handle and no texture-ownership problem at all -- this is exactly what the vanilla
+        ///     chat log does, and it keeps every icon identical to the original.
         /// </summary>
         public void AppendIcon(IconChunk chunk)
         {
-            // The auto translate markers are not images, they become brackets.
-            if (chunk.Icon is BitmapFontIcon.AutoTranslateBegin or BitmapFontIcon.AutoTranslateEnd)
-            {
-                AppendRaw(chunk.Icon == BitmapFontIcon.AutoTranslateBegin ? "[" : "]");
-                return;
-            }
-
             if (chunk.Icon == BitmapFontIcon.None)
                 return;
 
-            GfdFileView view;
-
-            try
-            {
-                view = IconUtil.GfdFileView;
-            }
-            catch (Exception)
-            {
-                // The font data is not available, the icon is skipped.
-                return;
-            }
-
-            if (!view.TryGetEntry((uint) chunk.Icon, out var entry))
-                return;
-
-            // Without the texture there is nothing that could be drawn, drawing it anyway would
-            // show a black box instead of the icon.
-            // Without the texture there is nothing that could be drawn, drawing it anyway would
-            // show a black box instead of the icon.
-            if (!TryGetIconTexture(out var texturePath, out var textureSize))
-                return;
-
-            // Dalamud loads the texture, so that it is ready when the icon is drawn. The game loads
-            // textures asynchronously, which would show a black box for every icon.
-            var wrap = Plugin.TextureProvider.GetFromGame(texturePath).GetWrapOrDefault();
-
-            if (wrap is null)
-                return;
-
-            // The icon gets a square box that is as tall as the text.
-            var iconHeight = FontSize;
-            var size = new Vector2(iconHeight, iconHeight);
+            var size = new Vector2((float) FontSize, (float) FontSize);
 
             if (x > 0.0f && x + size.X > width)
                 FlushLine();
@@ -818,50 +777,27 @@ public sealed unsafe class MessageRenderer : IDisposable
             // The icon comes after the text of the current line.
             EmitBufferedLine();
 
-            var node = new ImageNode
+            using var builder = new RentedSeStringBuilder();
+            var iconString = builder.Builder
+                .BeginMacro(Lumina.Text.Payloads.MacroCode.Icon)
+                .AppendUIntExpression((uint) chunk.Icon)
+                .EndMacro()
+                .ToReadOnlySeString();
+
+            var node = new TextNode
             {
-                // The icons are centered on the line, so that they line up with the text.
-                Position = new Vector2(x, y + (LineHeight - size.Y) * 0.5f),
-                Size = size,
+                Position = new Vector2(x, y),
+                Size = new Vector2(size.X, LineHeight),
+                FontSize = FontSize,
+                LineSpacing = LineSpacing,
+                AlignmentType = AlignmentType.TopLeft,
+                TextOutlineColor = OutlineColor,
+                String = iconString,
             };
 
-            node.AddPart(new Part
-            {
-                Id = 0,
-            });
-
-            // The texture of Dalamud is already loaded, the game would load it asynchronously and
-            // draw a black box until it is ready.
-            ref var partRef = ref *node.PartsList[0];
-            var kernelTexture = Plugin.TextureProvider.ConvertToKernelTexture(wrap, true);
-
-            if (kernelTexture == IntPtr.Zero)
-                return;
-
-            partRef.UldAsset->AtkTexture.KernelTexture = (Texture*) kernelTexture;
-            partRef.UldAsset->AtkTexture.TextureType = TextureType.KernelTexture;
-
-            // The coordinates of the font data are relative to a texture of the atlas width, a
-            // higher resolution texture is a multiple of it.
-            var atlasScale = wrap.Width / IconAtlasWidth;
-
-            var (offsetX, offsetY) = GetIconAtlasOffset(wrap.Width, wrap.Height);
-
-            // The game draws the icon with the size of the part, so the part has to follow the
-            // font size. The part also defines the area that is taken from the texture, so the
-            // icon is sampled from its centre to keep as much of it as possible.
-            var sampleSize = Math.Min(iconHeight, Math.Min(entry.Width, entry.Height));
-            var centerX = (offsetX + entry.Left + entry.Width * 0.5f) * atlasScale;
-            var centerY = (offsetY + entry.Top + entry.Height * 0.5f) * atlasScale;
-
-            partRef.U = (ushort) Math.Max(0.0f, centerX - sampleSize * atlasScale * 0.5f);
-            partRef.V = (ushort) Math.Max(0.0f, centerY - sampleSize * atlasScale * 0.5f);
-            partRef.Width = (ushort) (sampleSize * atlasScale);
-            partRef.Height = (ushort) (sampleSize * atlasScale);
-
+            ApplyFontSize(node);
             node.AttachNode(row);
 
-            LogIconDiagnostics(chunk.Icon, entry, texturePath, textureSize);
             x += size.X;
             bottom = Math.Max(bottom, y + LineHeight);
         }
@@ -908,13 +844,13 @@ public sealed unsafe class MessageRenderer : IDisposable
         /// <summary>
         ///     Linked chunks keep one node per token so every piece can carry its own events.
         /// </summary>
-        public void AppendLinkTokens(TextChunk chunk, Vector4? fallbackColor)
+        public void AppendLinkTokens(TextChunk chunk, Vector4? fallbackColor, string? contentOverride = null)
         {
             // Emit the buffered text first so the link continues on the same line instead of starting
             // a new one.
             EmitBufferedLine();
 
-            foreach (var token in NativeTextWrap.Tokenize(chunk.Content))
+            foreach (var token in NativeTextWrap.Tokenize(contentOverride ?? chunk.Content))
             {
                 if (token is "\n")
                 {

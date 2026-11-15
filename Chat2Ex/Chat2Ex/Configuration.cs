@@ -87,6 +87,40 @@ public class Configuration : IPluginConfiguration
     public bool ShowEmotes = true;
     public HashSet<string> BlockedEmotes = [];
 
+    public bool ShowHideButton = true;
+    public bool ShowNoviceNetwork;
+    public bool SidebarTabView;
+    public bool CanMove = true;
+    public bool CanResize = true;
+    public bool ShowTitleBar;
+    public bool ShowPopOutTitleBar = true;
+    public bool KeepInputFocus = true;
+
+    public bool FontsEnabled = true;
+    public ExtraGlyphRanges ExtraGlyphRanges = 0;
+    public float FontSizeV2 = 12.75f;
+    public float SymbolsFontSizeV2 = 12.75f;
+    public SingleFontSpec GlobalFontV2 = new()
+    {
+        FontId = new DalamudAssetFontAndFamilyId(DalamudAsset.NotoSansCjkRegular),
+        SizePt = 12.75f,
+    };
+    public SingleFontSpec JapaneseFontV2 = new()
+    {
+        FontId = new DalamudAssetFontAndFamilyId(DalamudAsset.NotoSansCjkMedium),
+        SizePt = 12.75f,
+    };
+    public bool ItalicEnabled;
+    public SingleFontSpec ItalicFontV2 = new()
+    {
+        FontId = new DalamudAssetFontAndFamilyId(DalamudAsset.NotoSansCjkRegular),
+        SizePt = 12.75f,
+    };
+
+    public float TooltipOffset;
+    public bool OverrideStyle;
+    public string? ChosenStyle;
+
     public float WindowAlpha = 100f;
 
     /// <summary>
@@ -167,6 +201,25 @@ public class Configuration : IPluginConfiguration
         Use24HourClock = other.Use24HourClock;
         ShowEmotes = other.ShowEmotes;
         BlockedEmotes = other.BlockedEmotes;
+        ShowHideButton = other.ShowHideButton;
+        ShowNoviceNetwork = other.ShowNoviceNetwork;
+        SidebarTabView = other.SidebarTabView;
+        CanMove = other.CanMove;
+        CanResize = other.CanResize;
+        ShowTitleBar = other.ShowTitleBar;
+        ShowPopOutTitleBar = other.ShowPopOutTitleBar;
+        KeepInputFocus = other.KeepInputFocus;
+        FontsEnabled = other.FontsEnabled;
+        ExtraGlyphRanges = other.ExtraGlyphRanges;
+        FontSizeV2 = other.FontSizeV2;
+        SymbolsFontSizeV2 = other.SymbolsFontSizeV2;
+        GlobalFontV2 = other.GlobalFontV2;
+        JapaneseFontV2 = other.JapaneseFontV2;
+        ItalicEnabled = other.ItalicEnabled;
+        ItalicFontV2 = other.ItalicFontV2;
+        TooltipOffset = other.TooltipOffset;
+        OverrideStyle = other.OverrideStyle;
+        ChosenStyle = other.ChosenStyle;
         WindowAlpha = other.WindowAlpha;
         ChatBackgroundOpacity = other.ChatBackgroundOpacity;
         ChatFontSize = other.ChatFontSize;
@@ -229,6 +282,9 @@ public class Tab
     public bool IndependentOpacity;
     public float Opacity = 100f;
     public bool InputDisabled;
+    public bool SupportsInput;
+    public bool CanMove = true;
+    public bool CanResize = true;
 
     public bool IndependentHide;
     public bool HideDuringCutscenes = true;
@@ -310,6 +366,9 @@ public class Tab
             Opacity = Opacity,
             Identifier = Identifier,
             InputDisabled = InputDisabled,
+            SupportsInput = SupportsInput,
+            CanMove = CanMove,
+            CanResize = CanResize,
             CurrentChannel = CurrentChannel.Clone(),
             IndependentHide = IndependentHide,
             HideDuringCutscenes = HideDuringCutscenes,

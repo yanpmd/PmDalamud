@@ -19,7 +19,16 @@ public sealed class ChatState : IChatWindow
 
     private readonly Plugin Plugin;
 
-    public ChatState(Plugin plugin) => Plugin = plugin;
+    public ChatState(Plugin plugin)
+    {
+        Plugin = plugin;
+        InputHandler = new Chat2Ex.Ui.Handler.InputHandler(plugin);
+    }
+
+    /// <summary>
+    ///     ImGui-side chunk rendering and context menu. All input state is forwarded back here.
+    /// </summary>
+    public Chat2Ex.Ui.Handler.InputHandler InputHandler { get; }
 
     public bool IsHidden { get; set; }
 

@@ -56,19 +56,25 @@ public sealed class Plugin : IDalamudPlugin
     public ChatState ChatLog { get; }
 
     /// <summary>
-    ///     Native tool windows (DB viewer, debugger, SeString debugger).
-    /// </summary>
-    public NativeToolWindows ToolWindows { get; }
-
-    /// <summary>
-    ///     Native (KamiToolKit) UI layer that replaces the ImGui chat log.
+    ///     Native (KamiToolKit) UI layer for the chat window itself. Everything else is ImGui.
     /// </summary>
     public NativeChatUi ChatUi { get; }
 
+    public static FileDialogManager FileDialogManager { get; private set; } = null!;
+
+    public readonly WindowSystem WindowSystem = new(PluginName);
+    public SettingsWindow SettingsWindow { get; }
+    public DbViewer DbViewer { get; }
+    public SeStringDebugger SeStringDebugger { get; }
+    public DebuggerWindow DebuggerWindow { get; }
+    public AutoCompleteWindow AutoComplete { get; }
+
     /// <summary>
-    ///     Native (KamiToolKit) settings window.
+    ///     ImGui context menu for channel selection and other native-window-triggered menus.
     /// </summary>
-    public NativeSettingsUi NativeSettings { get; }
+    public ImGuiMenu Menu { get; } = new();
+
+    public Vector4 DefaultText = Vector4.Zero;
 
     /// <summary>
     ///     Set once KamiToolKit finished initializing; native windows may only be created after that.
@@ -113,6 +119,9 @@ public sealed class Plugin : IDalamudPlugin
                 Config.Tabs.Add(TabsUtil.VanillaGeneral);
 
             LanguageChanged(Interface.UiLanguage);
+            ImGuiUtil.Initialize(this);
+
+            FileDialogManager = new FileDialogManager();
 
             // This is called by followup functions if the player is already logged in
             ServerCore = new ServerCore(this);
@@ -128,10 +137,20 @@ public sealed class Plugin : IDalamudPlugin
 
             ChatLog = new ChatState(this);
             ChatUi = new NativeChatUi(this);
-            NativeSettings = new NativeSettingsUi(this);
-            ToolWindows = new NativeToolWindows(this);
 
-            // All windows are native addons (KamiToolKit); nothing is rendered through ImGui anymore.
+            SettingsWindow = new SettingsWindow(this);
+            DbViewer = new DbViewer(this);
+            SeStringDebugger = new SeStringDebugger(this);
+            DebuggerWindow = new DebuggerWindow(this);
+            AutoComplete = new AutoCompleteWindow();
+
+            WindowSystem.AddWindow(SettingsWindow);
+            WindowSystem.AddWindow(DbViewer);
+            WindowSystem.AddWindow(SeStringDebugger);
+            WindowSystem.AddWindow(DebuggerWindow);
+            WindowSystem.AddWindow(AutoComplete);
+
+            FontManager.BuildFonts();
 
             Interface.UiBuilder.DisableCutsceneUiHide = true;
             Interface.UiBuilder.DisableGposeUiHide = true;
@@ -201,9 +220,12 @@ public sealed class Plugin : IDalamudPlugin
         Framework.Update -= FrameworkUpdate;
         NativeCallback.Safe(() => GameFunctions.GameFunctions.SetChatInteractable(true), "restoring chat interactability");
 
+        WindowSystem.RemoveAllWindows();
+        SettingsWindow?.Dispose();
+        DbViewer?.Dispose();
+        SeStringDebugger?.Dispose();
+        DebuggerWindow?.Dispose();
         ChatUi?.Dispose();
-        NativeSettings?.Dispose();
-        ToolWindows?.Dispose();
         ChatLog?.Dispose();
 
         TypingIpc?.Dispose();
@@ -266,7 +288,18 @@ public sealed class Plugin : IDalamudPlugin
 
         // The native window has to be updated after FinalizeFrame, since it owns the input focus state.
         ChatUi.Update();
-        NativeSettings.Update();
+
+        Interface.UiBuilder.DisableUserUiHide = !Config.HideWhenUiHidden;
+        DefaultText = ImGui.GetStyle().Colors[(int) ImGuiCol.Text];
+
+        using ((Config.FontsEnabled ? FontManager.RegularFont : FontManager.Axis)?.Push())
+        {
+            WindowSystem.Draw();
+            ChatLog.InputHandler.PayloadHandler.Draw();
+            Menu.Draw();
+        }
+
+        FileDialogManager.Draw();
 
         TypingIpc.Update();
     }

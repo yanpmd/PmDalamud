@@ -22,6 +22,14 @@ tags:
   - Chat
   - Replacement
 changelog:  |-
+  **1.41.4**
+  - Restored the ImGui Settings window (12 tabs), DbViewer with date/channel/paging filters and TXT/JSON/HTML export, Debugger and SeString Debugger
+  - All context menus and the channel picker are now ImGui popups; native addon menus are no longer created from game callbacks
+  - Restored the ImGui font system, auto-translate completion, /chat2 hide|show|toggle and /clearlog2 all|help
+  - Wired up pretty/compact timestamps, duplicate-message collapsing, auto-translate sorting and screenshot-mode obfuscation
+  - Chat icons (sprout, mentor, ...) now use the game's own SeString icon macro: identical to the vanilla client, no black boxes and no managed texture ownership
+  - Fixed a native crash from releasing a texture the plugin did not own; addon teardown is now synchronous on unload
+  
   **New Feature Added~**
   - A web interface has been added
   - *This will not function if your game client is offline or you are logged out of the game*

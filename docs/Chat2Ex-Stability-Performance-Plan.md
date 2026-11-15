@@ -142,6 +142,12 @@
   - 三个 `release/<Plugin>/<Plugin>.json` 的 `AssemblyVersion` 已同步；UTF-8 校验 JSON 合法、与 DLL 版本逐一匹配；zip 均包含主 DLL 与 `KamiToolKit.dll`
   - 未受影响（不引用 KTK，未升版）：`Mappy` / `MappyEx` / `PilgrimsTraverse` / `QoLBarEx`
   - 踩坑记录：`Chat2Ex.json` 的 `Punchline` 含 `♪`（UTF-8）。PowerShell 5.1 的 `Get-Content -Raw` 会按 ANSI 读取并把它变成乱码、进而让 `ConvertFrom-Json` 误报"非法 JSON"。校验时务必用 `[System.IO.File]::ReadAllText(path, UTF8)`，不要据此改文件。
+- 2026-11-15 · **11/15 两次崩溃复盘（本次修复确已生效，不是"改了没装上"）**
+  - 生效证据：`ContextMenu.cs` 源文件 11/14 0:54:11 修改 → `KamiToolKit.dll` 0:54:32 编译（晚于源文件）；`installedPlugins` 已是 Chat2Ex **1.41.3.0** / AetherBagsEx **2.0.0.15** / UmbraEx **3.1.18.7**。
+  - `14:18` 崩溃：`C0000005` @ `ffxiv_dx11.exe+676CAC`，路径 `OnFireCallback ×8`（其中 **`KamiToolKit.NativeAddon` 旧命名空间** 2 层，来自 4–7 月打包的老插件）`→ OnAddonClose → OnAddonHide`，链上还有 `OmenTools.ContextMenuManager.FireCallbackDetour`。**崩溃线程内无任何 Chat2Ex 帧**。
+  - `13:11` 崩溃：`C0000005` @ 同一原生地址，但路径完全不同 —— `SimpleTweaksPlugin.SimpleEvent.GlobalEventDetour` + `OmenTools.AtkEventManager.ReceiveGlobalEventDetour`，是 **AtkEvent 全局 hook 链**，与 FireCallback / KTK 无关。
+  - 结论：Chat2Ex 侧的异常屏障、环形增量渲染、窗口大小配置均已随 1.41.3.0 生效；剩余崩溃由**第三方插件携带的旧版 KTK 与各自的全局 hook** 引发。KTK 的 `[ThreadStatic]` 重入保护只在单个 AssemblyLoadContext 内生效，无法切断跨插件链；Chat2Ex 也无法修改他人打包的 `KamiToolKit.dll`。
+  - 处置：新增 `docs/toggle-suspect-plugins.ps1`（**可回退**的隔离实验工具，只重命名版本目录，不删除文件）。目标：`AutoDuty` / `Avarice` / `BossMod` / `DcTraveler` / `ICE` / `Palantir` / `SimpleTweaksPlugin` / `DailyRoutines` / `PilgrimsTraverse`。
 
 ## 改动文件清单
 
