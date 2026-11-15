@@ -55,6 +55,12 @@ public sealed unsafe class MessageRenderer : IDisposable
 
     private static readonly Vector4 TimestampColor = new(0.62f, 0.62f, 0.62f, 1.0f);
 
+    /// <summary>
+    ///     SeString icon macros are immutable per icon id; keeping one pinned buffer per icon avoids
+    ///     allocating (and pinning) an array for every rendered message.
+    /// </summary>
+    private static readonly Dictionary<uint, byte[]> IconMacroCache = [];
+
     // The chat has no background, so a dark outline keeps the text readable over the world.
     private static readonly Vector4 OutlineColor = new(0.0f, 0.0f, 0.0f, 0.85f);
 
@@ -769,6 +775,27 @@ public sealed unsafe class MessageRenderer : IDisposable
             if (chunk.Icon == BitmapFontIcon.None)
                 return;
 
+            GfdFileView view;
+
+            try
+            {
+                view = IconUtil.GfdFileView;
+            }
+            catch (Exception)
+            {
+                return;
+            }
+
+            // Only real gfd icons may become a game icon macro. The auto-translate brackets and
+            // other synthetic Dalamud icon ids have no atlas entry; asking the client's text
+            // renderer to parse one of those crashes inside its UI update.
+            if (!view.TryGetEntry((uint) chunk.Icon, out var entry) || entry.Width <= 0 || entry.Height <= 0)
+            {
+                if (chunk.Icon is BitmapFontIcon.AutoTranslateBegin or BitmapFontIcon.AutoTranslateEnd)
+                    AppendRaw(chunk.Icon == BitmapFontIcon.AutoTranslateBegin ? "[" : "]");
+                return;
+            }
+
             var size = new Vector2((float) FontSize, (float) FontSize);
 
             if (x > 0.0f && x + size.X > width)
@@ -777,12 +804,24 @@ public sealed unsafe class MessageRenderer : IDisposable
             // The icon comes after the text of the current line.
             EmitBufferedLine();
 
-            using var builder = new RentedSeStringBuilder();
-            var iconString = builder.Builder
-                .BeginMacro(Lumina.Text.Payloads.MacroCode.Icon)
-                .AppendUIntExpression((uint) chunk.Icon)
-                .EndMacro()
-                .ToReadOnlySeString();
+            // TextNode.String's setter rents its own RentedSeStringBuilder. Passing it a view into a
+            // rented buffer that is still checked out can invalidate that view (the pool is free to
+            // hand back the same array), producing a malformed SeString for the game to parse.
+            // Copy the macro into a pinned, independent array and release our rental first.
+            var iconId = (uint) chunk.Icon;
+            if (!IconMacroCache.TryGetValue(iconId, out var iconBytes))
+            {
+                using var builder = new RentedSeStringBuilder();
+                var span = builder.Builder
+                    .BeginMacro(Lumina.Text.Payloads.MacroCode.Icon)
+                    .AppendUIntExpression(iconId)
+                    .EndMacro()
+                    .GetViewAsSpan();
+
+                iconBytes = GC.AllocateUninitializedArray<byte>(span.Length, pinned: true);
+                span.CopyTo(iconBytes);
+                IconMacroCache[iconId] = iconBytes;
+            }
 
             var node = new TextNode
             {
@@ -792,7 +831,7 @@ public sealed unsafe class MessageRenderer : IDisposable
                 LineSpacing = LineSpacing,
                 AlignmentType = AlignmentType.TopLeft,
                 TextOutlineColor = OutlineColor,
-                String = iconString,
+                String = new Lumina.Text.ReadOnly.ReadOnlySeString(iconBytes),
             };
 
             ApplyFontSize(node);
