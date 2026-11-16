@@ -22,10 +22,13 @@ tags:
   - Chat
   - Replacement
 changelog:  |-
+  **1.41.6**
+  - Updated KamiToolKit: no longer dereferences native focus-list entries while disposing nodes, fixing random AccessViolation crashes (message trimming, tab edits, clicks)
+
   **1.41.5**
   - Fixed a crash caused by rebuilding the tab bar (and disposing native nodes) on every chat message; unread counts and selection now update in place
   - Added in-place tab label/selection APIs to KamiToolKit
-  
+
   **1.41.4**
   - Restored the ImGui Settings window (12 tabs), DbViewer with date/channel/paging filters and TXT/JSON/HTML export, Debugger and SeString Debugger
   - All context menus and the channel picker are now ImGui popups; native addon menus are no longer created from game callbacks
