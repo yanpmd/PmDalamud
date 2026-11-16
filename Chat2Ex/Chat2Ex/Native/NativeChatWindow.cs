@@ -81,6 +81,8 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     private int renderedTabIndex = -1;
     private int renderedTabCount = -1;
     private int renderedTabListSignature;
+    private readonly List<string> renderedTabLabels = [];
+    private int renderedSelectedTab = -1;
 
     // Cheap comparison inputs for the channel label, so idle frames never build the label string.
     // Stored as object to keep this file independent of the chunk/target type namespaces.
@@ -1175,27 +1177,59 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         var tabs = Plugin.Config.Tabs;
 
-        // Incremental hash instead of joining interpolated strings: idle frames allocate nothing.
-        // Count, selected tab, names, pop-out flags and unread counts all feed the signature.
+        // Only structural changes (add / remove / rename / pop-out) may rebuild the node tree.
+        // Selection and unread counts change on almost every chat message; disposing native nodes
+        // that often makes NodeBase.Dispose walk AtkStage's focus list and can terminate the
+        // process with an AccessViolationException that no managed catch can contain.
         var hash = new HashCode();
         hash.Add(tabs.Count);
-        hash.Add(Plugin.LastTab);
         for (var i = 0; i < tabs.Count; i++)
         {
-            var tab = tabs[i];
-            hash.Add(tab.Name);
-            hash.Add(tab.PopOut);
-            hash.Add(i == Plugin.LastTab || tab.UnreadMode == UnreadMode.None || tab.Unread == 0 ? 0 : tab.Unread);
+            hash.Add(tabs[i].Name);
+            hash.Add(tabs[i].PopOut);
         }
 
         var signature = hash.ToHashCode();
-        if (tabs.Count == renderedTabCount && signature == renderedTabListSignature)
-            return;
+        if (tabs.Count != renderedTabCount || signature != renderedTabListSignature)
+        {
+            renderedTabCount = tabs.Count;
+            renderedTabListSignature = signature;
+            RebuildTabs();
+        }
 
-        renderedTabCount = tabs.Count;
-        renderedTabListSignature = signature;
+        var visible = 0;
+        var selected = -1;
 
-        RebuildTabs();
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            if (tabs[i].PopOut)
+                continue;
+
+            var label = $"{tabs[i].Name}{GetUnreadSuffix(tabs[i], i)}";
+
+            while (renderedTabLabels.Count <= visible)
+                renderedTabLabels.Add(string.Empty);
+
+            if (renderedTabLabels[visible] != label)
+            {
+                tabBar.SetTabLabel(visible, label);
+                renderedTabLabels[visible] = label;
+            }
+
+            if (i == Plugin.LastTab)
+                selected = visible;
+
+            visible++;
+        }
+
+        while (renderedTabLabels.Count > visible)
+            renderedTabLabels.RemoveAt(renderedTabLabels.Count - 1);
+
+        if (selected >= 0 && Plugin.LastTab != renderedSelectedTab)
+        {
+            renderedSelectedTab = Plugin.LastTab;
+            tabBar.SelectTab(selected);
+        }
     }
 
     private string GetUnreadSuffix(Tab tab, int index)
@@ -1207,6 +1241,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     {
         if (tabBar is null)
             return;
+
+        renderedTabLabels.Clear();
+        renderedSelectedTab = -1;
 
         tabBar.Clear();
 
@@ -1247,13 +1284,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         Plugin.Functions.Chat.SetChannelWithExtraChat(tab.CurrentChannel.Channel);
         tab.Unread = 0;
 
-        if (tabBar is not null)
-        {
-            // Force a rebuild on the next frame. -1 can never equal Tabs.Count, so this is
-        // collision-free (unlike a sentinel hash value).
-        renderedTabCount = -1;
-            tabBar.SelectTab($"{tab.Name}{GetUnreadSuffix(tab, index)}");
-        }
+        // Selecting a tab only changes node state. Rebuilding here would dispose every tab node
+        // inside a game callback; SyncTabBar applies the new selection on the next frame.
+        renderedSelectedTab = -1;
 
         renderedTabIndex = -1;
         renderedTabName = string.Empty;
