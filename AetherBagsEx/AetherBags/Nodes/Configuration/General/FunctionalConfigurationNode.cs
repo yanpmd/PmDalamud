@@ -179,7 +179,15 @@ internal sealed class FunctionalConfigurationNode : TabbedVerticalListNode
             OnClick = isChecked =>
             {
                 config.OpenCompanyChestWithGameInventory = isChecked;
-                _hideCompanyChestCheckboxNode?.IsEnabled = isChecked;
+                if (!isChecked && _hideCompanyChestCheckboxNode != null)
+                {
+                    // With no replacement window opening, hiding the vanilla one
+                    // would leave the player with no chest UI at all.
+                    config.HideGameCompanyChest = false;
+                    _hideCompanyChestCheckboxNode.IsChecked = false;
+                }
+                if (_hideCompanyChestCheckboxNode != null)
+                    _hideCompanyChestCheckboxNode.IsEnabled = isChecked;
             }
         };
         AddNode(showCompanyChestWithGameCheckBox);

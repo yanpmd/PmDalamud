@@ -34,6 +34,7 @@ public sealed class MappyExPlugin : IDalamudPlugin
         System.IconConfig = IconConfig.Load();
         System.FlagConfig = FlagConfig.Load();
         System.CustomMarkerConfig = CustomMarkerConfig.Load();
+        System.FavoriteConfig = FavoriteConfig.Load();
 
         // Building the built in catalog reads the Treasure sheet for every entry, do it up front instead of
         // stalling the first frame that draws the map.
@@ -49,11 +50,13 @@ public sealed class MappyExPlugin : IDalamudPlugin
         System.MapWindow = new MapWindow();
 
         System.CustomMarkerWindow = new CustomMarkerWindow();
+        System.FavoriteEditorWindow = new FavoriteEditorWindow();
 
         System.WindowManager = new WindowManager(Service.PluginInterface);
         System.WindowManager.AddWindow(System.ConfigWindow, WindowFlags.IsConfigWindow | WindowFlags.RequireLoggedIn);
         System.WindowManager.AddWindow(System.MapWindow, WindowFlags.RequireLoggedIn);
         System.WindowManager.AddWindow(System.CustomMarkerWindow, WindowFlags.None);
+        System.WindowManager.AddWindow(System.FavoriteEditorWindow, WindowFlags.None);
 
         System.FlagController = new FlagController();
         System.AreaMapController = new AddonAreaMapController();
@@ -85,6 +88,18 @@ public sealed class MappyExPlugin : IDalamudPlugin
             EnableDelegate = _ => System.WindowManager.OpenOrCreateUnique<FlagHistoryWindow>(WindowFlags.OpenImmediately | WindowFlags.RequireLoggedIn),
             DisableDelegate = _ => System.WindowManager.GetWindow<FlagHistoryWindow>()?.Close(),
             ToggleDelegate = _ => System.WindowManager.GetWindow<FlagHistoryWindow>()?.UnCollapseOrToggle(),
+        });
+
+        System.CommandManager.RegisterCommand(new CommandHandler
+        {
+            ActivationPath = "/map/favorite",
+            Delegate = _ => System.MapWindow.ToggleFavoriteSidebar(),
+        });
+
+        System.CommandManager.RegisterCommand(new CommandHandler
+        {
+            ActivationPath = "/map/favorite/add",
+            Delegate = _ => System.MapWindow.AddFavoriteCurrentLocation(),
         });
     }
 
@@ -140,6 +155,7 @@ public sealed class MappyExPlugin : IDalamudPlugin
         AethernetNavigator.Cancel();
 
         System.MapWindow.OnClose();
+        System.FavoriteConfig?.Save();
         System.WindowManager.Dispose();
         System.IntegrationsController.Dispose();
         System.AreaMapController.Dispose();

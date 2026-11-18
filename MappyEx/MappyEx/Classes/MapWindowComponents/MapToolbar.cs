@@ -59,6 +59,9 @@ public unsafe class MapToolbar {
             () => Localization.Get("Toolbar.SearchForMap", "Search for Map"), System.MapWindow.ToggleMapSearch,
             () => System.MapWindow.IsMapSearchOpen),
 
+        new(FontAwesomeIcon.Plus, "favoriteAdd",
+            () => Localization.Get("Toolbar.AddFavorite", "Favorite Current Location"), System.MapWindow.AddFavoriteCurrentLocation),
+
         // Only shown when the selected map actually has marker groups.
         new(FontAwesomeIcon.ListUl, "markerGroups",
             () => Localization.Get("Toolbar.MarkerGroups", "Marker Groups"), MarkerGroupMenu.Open,

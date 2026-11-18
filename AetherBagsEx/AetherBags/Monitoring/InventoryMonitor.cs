@@ -386,7 +386,11 @@ public class InventoryMonitor : IDisposable
         if (IsInUnsafeState())
             return;
 
-        if (System.Config.General.HideGameCompanyChest)
+        GeneralSettings config = System.Config.General;
+        bool vanillaBypassActive = System.AetherBagsAPI?.API.IsVanillaInventoryBypassActive ?? false;
+        // Only hide the vanilla chest when our replacement window is actually going
+        // to be shown; otherwise the player ends up with neither window visible.
+        if (config.OpenCompanyChestWithGameInventory && config.HideGameCompanyChest && !vanillaBypassActive)
         {
             var unitManager = RaptureAtkUnitManager.Instance();
             var chestAddon = unitManager != null ? unitManager->GetAddonByName("FreeCompanyChest") : null;

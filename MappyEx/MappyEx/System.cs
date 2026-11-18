@@ -17,10 +17,12 @@ public static class System {
     public static IconConfig IconConfig { get; set; }
     public static FlagConfig FlagConfig { get; set; }
     public static CustomMarkerConfig CustomMarkerConfig { get; set; }
+    public static FavoriteConfig FavoriteConfig { get; set; }
     public static WindowManager WindowManager { get; set; }
     public static MapWindow MapWindow { get; set; }
     public static ConfigurationWindow ConfigWindow { get; set; }
     public static CustomMarkerWindow CustomMarkerWindow { get; set; }
+    public static FavoriteEditorWindow FavoriteEditorWindow { get; set; }
     public static MapRenderer.MapRenderer MapRenderer { get; set; }
     public static IntegrationsController IntegrationsController { get; set; }
     public static AddonAreaMapController AreaMapController { get; set; }
@@ -57,6 +59,7 @@ public static class System {
         WindowManager?.GetWindow<FlagHistoryWindow>()?.UpdateLocalizedName();
 
         CustomMarkerWindow?.UpdateLocalizedName();
+        FavoriteEditorWindow?.UpdateLocalizedName();
 
         MapWindow?.RefreshTitle();
     }

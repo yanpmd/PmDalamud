@@ -42,7 +42,7 @@ public class MapWindow : Window
     private readonly MapToolbar mapToolbar = new();
     private readonly MapBottomBar mapBottomBar = new();
     private readonly MapContextMenu mapContextMenu = new();
-    private readonly MapSidebar mapSidebar = new();
+    private readonly MapSidebarPanel mapSidebarPanel = new();
     private readonly MapSearchOverlay mapSearch = new();
 
     /// <summary>
@@ -216,10 +216,7 @@ public class MapWindow : Window
 
     private void DrawSidebar(float width, float height)
     {
-        using var sidebar = ImRaii.Child("map_sidebar", new Vector2(width, height), true);
-        if (!sidebar) return;
-
-        mapSidebar.Draw();
+        mapSidebarPanel.Draw(width, height);
 
         if (ImGui.IsItemHovered()) {
             HoveredFlags |= HoverFlags.Sidebar;
@@ -230,11 +227,16 @@ public class MapWindow : Window
 
     public bool IsMapSearchOpen => mapSearch.IsOpen;
 
-    public void ToggleSidebar()
-    {
-        System.SystemConfig.ShowMapSidebar = !System.SystemConfig.ShowMapSidebar;
-        SystemConfig.Save();
-    }
+    /// <summary>
+    /// Favorites share the right hand sidebar with the map browser, switching pages keeps the sidebar open.
+    /// </summary>
+    public void ToggleFavoriteSidebar() => mapSidebarPanel.ToggleFavorites();
+
+    public bool IsFavoriteSidebarOpen => System.SystemConfig.ShowMapSidebar && mapSidebarPanel.Mode is MapSidebarMode.Favorites;
+
+    public void AddFavoriteCurrentLocation() => FavoriteSidebar.AddCurrentLocation();
+
+    public void ToggleSidebar() => mapSidebarPanel.ToggleBrowser();
 
     private void DrawMapElements()
     {

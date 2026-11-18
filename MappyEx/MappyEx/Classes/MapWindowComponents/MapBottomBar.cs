@@ -11,7 +11,7 @@ using KamiLib.Extensions;
 namespace Mappy.Classes.MapWindowComponents;
 
 /// <summary>
-/// Bar along the bottom of the map: the character / cursor coordinates and the map browser toggle.
+/// Bar along the bottom of the map: the character / cursor coordinates and the two sidebar page toggles.
 /// Shares its visibility with the top toolbar, both fit on one line without covering the map twice.
 /// </summary>
 public unsafe class MapBottomBar
@@ -38,40 +38,52 @@ public unsafe class MapBottomBar
         if (!bar) return false;
 
         var rightEdge = ImGui.GetContentRegionMax().X - 2.5f * scale;
-        var buttonWidth = SidebarButtonWidth();
+        var buttonsWidth = SidebarButtonsWidth();
 
         ImGui.SetCursorPos(new Vector2(2.5f * scale, 2.0f * scale));
 
-        // The browser toggle sits at the far right end of the bar.
-        ImGui.SetCursorPosX(rightEdge - buttonWidth);
-        DrawSidebarButton();
+        // The map browser and favorites toggles sit together at the far right end of the bar.
+        ImGui.SetCursorPosX(rightEdge - buttonsWidth);
+        DrawSidebarButtons();
 
         if (System.SystemConfig.ShowCoordinateBar) {
             var characterEnd = DrawCharacterCoordinates();
-            DrawCursorCoordinates(isMapHovered, mapDrawOffset, characterEnd, rightEdge, buttonWidth);
+            DrawCursorCoordinates(isMapHovered, mapDrawOffset, characterEnd, rightEdge, buttonsWidth);
         }
 
         return ImGui.IsMouseHoveringRect(barMin, barMin + barSize);
     }
 
-    private static void DrawSidebarButton()
+    private static void DrawSidebarButtons()
     {
-        var isOpen = System.SystemConfig.ShowMapSidebar;
+        var sidebarOpen = System.SystemConfig.ShowMapSidebar;
 
-        using (ImRaii.PushColor(ImGuiCol.Button, ImGui.GetStyle().GetColor(ImGuiCol.ButtonActive), isOpen)) {
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGui.GetStyle().GetColor(ImGuiCol.ButtonActive), sidebarOpen && !System.MapWindow.IsFavoriteSidebarOpen)) {
             if (MappyGuiTweaks.IconButton(FontAwesomeIcon.FolderTree, "mapSidebar", Localization.Get("Toolbar.ToggleMapSidebar", "Map Browser"))) {
                 System.MapWindow.ToggleSidebar();
+            }
+        }
+
+        ImGui.SameLine();
+
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGui.GetStyle().GetColor(ImGuiCol.ButtonActive), System.MapWindow.IsFavoriteSidebarOpen)) {
+            if (MappyGuiTweaks.IconButton(FontAwesomeIcon.Star, "favoriteSidebar", Localization.Get("Toolbar.ToggleFavorites", "Favorites"))) {
+                System.MapWindow.ToggleFavoriteSidebar();
             }
         }
     }
 
     /// <summary>
-    /// Width of the browser button, the icon font has to be active to measure the glyph.
+    /// Width of both sidebar buttons including their spacing, the icon font has to be active to measure the glyphs.
     /// </summary>
-    private static float SidebarButtonWidth()
+    private static float SidebarButtonsWidth()
     {
         using (Service.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push()) {
-            return ImGui.CalcTextSize(FontAwesomeIcon.FolderTree.ToIconString()).X + ImGui.GetStyle().FramePadding.X * 2.0f;
+            var iconWidth = MathF.Max(
+                ImGui.CalcTextSize(FontAwesomeIcon.FolderTree.ToIconString()).X,
+                ImGui.CalcTextSize(FontAwesomeIcon.Star.ToIconString()).X);
+
+            return iconWidth * 2.0f + ImGui.GetStyle().FramePadding.X * 4.0f + ImGui.GetStyle().ItemSpacing.X;
         }
     }
 
@@ -101,9 +113,9 @@ public unsafe class MapBottomBar
     }
 
     /// <summary>
-    /// Cursor coordinates right before the browser button, skipped when there is no room for them.
+    /// Cursor coordinates right before the sidebar buttons, skipped when there is no room for them.
     /// </summary>
-    private static void DrawCursorCoordinates(bool isMapHovered, Vector2 mapDrawOffset, float characterEnd, float rightEdge, float buttonWidth)
+    private static void DrawCursorCoordinates(bool isMapHovered, Vector2 mapDrawOffset, float characterEnd, float rightEdge, float buttonsWidth)
     {
         if (!isMapHovered) return;
 
@@ -123,9 +135,9 @@ public unsafe class MapBottomBar
 
         var gap = 4.0f * ImGuiHelpers.GlobalScale;
         var textWidth = ImGui.CalcTextSize(cursorText).X;
-        var x = rightEdge - buttonWidth - gap - textWidth;
+        var x = rightEdge - buttonsWidth - gap - textWidth;
 
-        // No room between the character coordinates and the button.
+        // No room between the character coordinates and the buttons.
         if (x < characterEnd + gap) return;
 
         ImGui.SameLine();

@@ -20,9 +20,6 @@ public class MapSidebar
     {
         var currentMapId = AgentMap.Instance()->SelectedMapId;
 
-        ImGui.TextDisabled(Localization.Get("MapSidebar.Title", "Map Browser"));
-        ImGui.Separator();
-
         using var tree = ImRaii.Child("map_sidebar_tree", ImGui.GetContentRegionAvail(), false);
         if (!tree) return;
 

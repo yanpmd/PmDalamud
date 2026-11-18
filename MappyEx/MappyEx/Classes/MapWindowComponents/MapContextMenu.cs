@@ -36,6 +36,10 @@ public unsafe class MapContextMenu
             AddCustomMarker(worldPosition);
         }
 
+        if (ImGui.MenuItem(Localization.Get("Context.AddFavorite", "Favorite Current Location"))) {
+            System.MapWindow.AddFavoriteCurrentLocation();
+        }
+
         if (ImGui.MenuItem(Localization.Get("Context.NavigateHere", "Go Here"))) {
             AethernetNavigator.NavigateToMarker(MarkerContextMenu.FromFlatPosition(worldPosition), AgentMap.Instance()->SelectedMapId, fly: false);
         }
