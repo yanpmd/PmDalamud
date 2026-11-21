@@ -73,6 +73,19 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     private readonly HashSet<int>  _dirtySlots = [];
 
     /// <summary>
+    /// Minimum interval between native appearance refreshes for slots without a cooldown.
+    /// </summary>
+    /// <remarks>
+    /// Only actions (and a few other cooldown-bearing types) need a per-frame refresh. Items, macros,
+    /// emotes and similar slots keep their icon and cost until something actually changes them, so
+    /// polling them every frame was thousands of pointless RaptureHotbarModule calls per second on a
+    /// full bar.
+    /// </remarks>
+    private const long StaticRefreshIntervalMs = 250;
+
+    private long[] _lastStaticRefresh = [];
+
+    /// <summary>
     /// The id of the bar this window belongs to. It is reported along with slot changes so that a
     /// manager owning several bars can tell which one was edited.
     /// </summary>
@@ -316,12 +329,25 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
     /// </para>
     /// </remarks>
     public void UpdateSlots() {
-        foreach (HotbarNode slot in _slots) {
+        long now = Environment.TickCount64;
+        if (_lastStaticRefresh.Length != _slots.Count) _lastStaticRefresh = new long[_slots.Count];
+
+        for (int i = 0; i < _slots.Count; i++) {
+            HotbarNode slot = _slots[i];
+
             // An empty slot has nothing to render: its icon is cleared by ClearSlot, so the native slot
             // render is skipped. With up to 120 slots this avoids thousands of native calls per second
             // for slots that are only placeholders.
             if (slot.IsEmpty) continue;
 
+            // Keybinds and the click animation still have to run at frame rate even when the native
+            // appearance of the slot is only refreshed a few times per second.
+            if (!NeedsFrequentRefresh(slot) && now - _lastStaticRefresh[i] < StaticRefreshIntervalMs) {
+                slot.UpdateInput();
+                continue;
+            }
+
+            _lastStaticRefresh[i] = now;
             slot.Update();
 
             ApplyIconFallback(slot);
@@ -339,6 +365,20 @@ internal sealed unsafe class CustomHotbarAddon : NativeAddon {
         _dirtySlots.Clear();
 
         OnSlotsChanged?.Invoke(BarId, dirty);
+    }
+
+    /// <summary>
+    /// Whether a slot can change its appearance on its own and therefore needs a per-frame native refresh.
+    /// </summary>
+    private static bool NeedsFrequentRefresh(HotbarNode slot) {
+        HotbarSlotContent? content = slot.GetSlotContent();
+
+        return content is {
+            Type: HotbarSlotType.Action
+                or HotbarSlotType.GeneralAction
+                or HotbarSlotType.PetAction
+                or HotbarSlotType.BuddyAction
+        };
     }
 
     /// <summary>

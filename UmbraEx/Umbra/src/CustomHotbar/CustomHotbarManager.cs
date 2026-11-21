@@ -38,6 +38,7 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
     private readonly List<CustomHotbarConfig>    _configs     = [];
     private readonly Dictionary<string, Runtime> _runtimes    = [];
     private readonly IClientState                 _clientState;
+    private readonly UmbraVisibility              _visibility;
 
     /// <summary>
     /// Raised when a bar was added, removed or copied. The argument suggests which bar should become
@@ -55,8 +56,9 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
     /// </summary>
     public IReadOnlyList<CustomHotbarConfig> All => _configs;
 
-    public CustomHotbarManager(IClientState clientState) {
+    public CustomHotbarManager(IClientState clientState, UmbraVisibility visibility) {
         _clientState = clientState;
+        _visibility  = visibility;
 
         ConfigManager.CvarChanged += OnCvarChanged;
 
@@ -272,6 +274,10 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
     /// cooldown/charge/quantity/cost/key-label parts are persistent and updated in place.
     /// </remarks>
     private void RegisterHotkeys() {
+        // A hidden bar must not answer to hotkeys either, otherwise actions fire from a bar the
+        // player cannot see during cutscenes, between areas or while the UI is hidden.
+        if (!_visibility.IsToolbarVisible()) return;
+
         foreach (CustomHotbarConfig config in _configs) {
             if (!config.IsEnabled) continue;
 
@@ -331,7 +337,7 @@ internal sealed unsafe class CustomHotbarManager : IDisposable {
 
         if (runtime.PositionGraceFrames > 0) runtime.PositionGraceFrames--;
 
-        bool visible = ConditionSetManager.IsMatchSafe(config.ConditionSetId);
+        bool visible = _visibility.IsToolbarVisible() && ConditionSetManager.IsMatchSafe(config.ConditionSetId);
 
         if (visible && config.EnableAutoHide) {
             visible = IsCursorNearBar(config, runtime);
