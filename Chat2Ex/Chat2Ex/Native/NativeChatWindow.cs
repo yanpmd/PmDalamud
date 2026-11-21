@@ -288,6 +288,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
             OnInputReceived = OnInputReceived,
             OnFocused = OnInputFocused,
             OnFocusLost = OnInputFocusLost,
+            OnEscapeEntered = OnEscapeEntered,
         };
         inputNode.AttachNode(this);
 
@@ -1635,5 +1636,21 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         Plugin.ChatLog.Activate = false;
         Plugin.ChatUi.HideCommandHelp();
+    }
+
+    /// <summary>
+    ///     Releases the native input focus when escape is pressed so the key is not swallowed by the
+    ///     focused node and the game can open its system menu.
+    /// </summary>
+    private void OnEscapeEntered()
+    {
+        inputNode?.ClearFocus();
+
+        if (!IsMainWindow)
+            return;
+
+        Plugin.ChatLog.Activate = false;
+        Plugin.ChatUi.HideCommandHelp();
+        Plugin.AutoComplete.Hide();
     }
 }

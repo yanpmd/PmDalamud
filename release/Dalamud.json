@@ -86,10 +86,10 @@
         "InternalName": "Chat2Ex",
         "RepoUrl": "https://github.com/yanpmd/PmDalamud",
         "DownloadCount": 1,
-        "LastUpdate": 1795232799,
+        "LastUpdate": 1795249147,
         "DownloadLinkInstall": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Chat2Ex/latest.zip",
         "DownloadLinkUpdate": "https://raw.githubusercontent.com/yanpmd/PmDalamud/main/release/Chat2Ex/latest.zip",
-        "AssemblyVersion": "1.41.6.1",
+        "AssemblyVersion": "1.41.6.2",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15
     }
