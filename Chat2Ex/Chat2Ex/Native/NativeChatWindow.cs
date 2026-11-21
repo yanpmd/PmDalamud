@@ -4,10 +4,14 @@ using Chat2Ex.Code;
 using Chat2Ex.GameFunctions.Types;
 using Chat2Ex.Resources;
 using Chat2Ex.Ui;
+using Chat2Ex.Util;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Text;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.BaseTypes;
+using KamiToolKit.Enums;
 using KamiToolKit.Extensions;
 using KamiToolKit.Nodes;
 using Lumina.Text.ReadOnly;
@@ -76,6 +80,10 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     private bool isDragging;
     private Vector2 dragStartMouse;
     private Vector2 dragStartPos;
+
+    // Idle focus fade: controls (tab bar, input row, resize handle) dim when the pointer leaves the
+    // window and the chat input is not focused, so only the messages stay prominent.
+    private float renderedChromeAlpha = -1.0f;
 
     // Change tracking so we only rebuild when needed.
     private int renderedTabIndex = -1;
@@ -335,26 +343,29 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         contentStart = new Vector2(contentStart.X, top);
         contentSize = new Vector2(contentSize.X, contentSize.Y + (ContentStartPosition.Y - top));
 
-        if (tabBar is not null)
-        {
-            tabBar.Position = contentStart;
-            tabBar.Size = new Vector2(contentSize.X - TabMenuButtonWidth, TabBarHeight);
-        }
+        contentBottom = contentStart.Y + contentSize.Y;
 
-        if (tabMenuButton is not null)
-        {
-            tabMenuButton.Position = new Vector2(contentStart.X + contentSize.X - TabMenuButtonWidth, contentStart.Y);
-            tabMenuButton.Size = new Vector2(TabMenuButtonWidth, TabBarHeight);
-        }
-
-        var scrollTop = contentStart.Y + (IsMainWindow ? TabBarHeight + 4.0f : 0.0f);
+        // The message area now starts right below the drag strip; the tab bar is moved to the very
+        // bottom of the window, underneath the input row.
+        var scrollTop = contentStart.Y;
 
         messageScroll.Position = new Vector2(contentStart.X, scrollTop);
 
         inputStartX = contentStart.X;
         inputTotalWidth = contentSize.X;
         messageTop = scrollTop;
-        contentBottom = contentStart.Y + contentSize.Y;
+
+        if (tabBar is not null)
+        {
+            tabBar.Position = new Vector2(contentStart.X, contentBottom - TabBarHeight);
+            tabBar.Size = new Vector2(contentSize.X - TabMenuButtonWidth, TabBarHeight);
+        }
+
+        if (tabMenuButton is not null)
+        {
+            tabMenuButton.Position = new Vector2(contentStart.X + contentSize.X - TabMenuButtonWidth, contentBottom - TabBarHeight);
+            tabMenuButton.Size = new Vector2(TabMenuButtonWidth, TabBarHeight);
+        }
 
         // The resize handle sits in the top right corner of the message area.
         var handlePosition = new Vector2(contentStart.X + contentSize.X - ResizeHandleSize, scrollTop + 2.0f);
@@ -481,11 +492,12 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Removes the window frame, title text and all header buttons, but keeps the frosted glass
-    ///     background texture so the chat stays readable over the world. The invisible header strip is
-    ///     kept so the window can still be dragged around like any other game window.
+    ///     Removes the window frame, title text and all header buttons. The background nine-grid keeps
+    ///     rendering (it is what makes the opacity slider work) but its corner offsets are zeroed so
+    ///     the texture stretches flat with no rounded corners or border line. The invisible header
+    ///     strip is kept so the window can still be dragged.
     /// </summary>
-    private WindowBackgroundTextureNode? ApplyChrome(WindowNode node)
+    private WindowBackgroundTextureNode ApplyChrome(WindowNode node)
     {
         node.ShowCloseButton = false;
         node.ShowConfigButton = false;
@@ -498,7 +510,11 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         node.BorderTextureNode.IsVisible = false;
         node.DividingLineNode.IsVisible = false;
 
+        // Zero the nine-grid offsets so the WindowA_Bg texture stretches as a flat rectangle: the
+        // rounded corner pieces collapse and only the solid centre remains. Alpha is driven by the
+        // opacity slider in ApplyBackgroundAlpha, exactly as before.
         node.BackgroundTextureNode.IsVisible = true;
+        node.BackgroundTextureNode.Offsets = Vector4.Zero;
 
         return node.BackgroundTextureNode;
     }
@@ -631,7 +647,9 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
         if (channelNode is null || channelMarker is null || channelMarkerHitbox is null || inputNode is null)
             return;
 
-        var inputY = contentBottom - InputHeight;
+        // Reserve room at the bottom for the tab bar when this is the main window.
+        var inputBottom = contentBottom - (IsMainWindow ? TabBarHeight : 0.0f);
+        var inputY = inputBottom - InputHeight;
         var markerWidth = ChannelMarkerWidth;
 
         channelNode.Position = new Vector2(inputStartX, inputY - ChannelNameHeight - 2.0f);
@@ -656,14 +674,18 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Applies the configured opacity to the glass background panel.
+    ///     Applies the configured background colour to the window panel. RGB tints the stretched
+    ///     WindowA_Bg texture via AddColor; the alpha channel controls transparency (0 invisible,
+    ///     1 opaque).
     /// </summary>
     private void ApplyBackgroundAlpha()
     {
         if (backgroundTexture is null)
             return;
 
-        backgroundTexture.Alpha = Math.Clamp(Plugin.Config.ChatBackgroundOpacity / 100.0f, 0.0f, 1.0f);
+        var colour = ColourUtil.RgbaToVector4(Plugin.Config.ChatBackgroundColor) ?? new Vector4(0.0f, 0.0f, 0.0f, 0.65f);
+        backgroundTexture.AddColor = new Vector3(colour.X, colour.Y, colour.Z);
+        backgroundTexture.Alpha = Math.Clamp(colour.W, 0.0f, 1.0f);
     }
 
     /// <summary>
@@ -777,6 +799,7 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         ApplyAlpha();
         ApplyBackgroundAlpha();
+        ApplyIdleFade();
         SyncFontSize();
         SyncChannelLabel();
         SyncLockPosition();
@@ -956,6 +979,37 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
 
         renderedAlpha = alpha;
         RootNode.Alpha = alpha;
+    }
+
+    /// <summary>
+    ///     Dims the controls when the pointer is outside the window and the chat input is not focused,
+    ///     so only the messages stay prominent. The messages themselves are never dimmed.
+    /// </summary>
+    private unsafe void ApplyIdleFade()
+    {
+        var pointerInside = false;
+        if (InternalAddon is not null)
+        {
+            var mouse = ImGui.GetMousePos();
+            var x = InternalAddon->X;
+            var y = InternalAddon->Y;
+            pointerInside = mouse.X >= x && mouse.X <= x + Size.X
+                            && mouse.Y >= y && mouse.Y <= y + Size.Y;
+        }
+
+        var focused = pointerInside || Plugin.ChatLog.InputFocused || isDragging || isResizing;
+        var target = focused ? 1.0f : 0.35f;
+        if (Math.Abs(target - renderedChromeAlpha) < 0.001f)
+            return;
+
+        renderedChromeAlpha = target;
+
+        if (tabBar is not null) tabBar.Alpha = target;
+        if (tabMenuButton is not null) tabMenuButton.Alpha = target;
+        if (channelNode is not null) channelNode.Alpha = target;
+        if (channelMarker is not null) channelMarker.Alpha = target;
+        if (inputNode is not null) inputNode.Alpha = target;
+        if (resizeHandleLabel is not null) resizeHandleLabel.Alpha = target;
     }
 
     private void SyncChannelLabel()
@@ -1443,11 +1497,17 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
                 return;
         }
 
-        // Player links get the full player menu from the shared ImGui payload handler.
-        if (chunk?.Link is PlayerPayload player)
+        // Links with their own ImGui context menu (player, item, uri, status) are handled by the
+        // shared payload handler so they get the same menu as the ImGui chat log. Everything else
+        // falls back to the generic message menu.
+        if (action == LinkAction.Context && chunk is not null)
         {
-            ShowPlayerMenu(message, chunk, player);
-            return;
+            Payload? payload = chunk.Link;
+            if (payload is PlayerPayload or ItemPayload or UriPayload or StatusPayload)
+            {
+                ShowPayloadMenu(message, chunk, payload);
+                return;
+            }
         }
 
         if (action == LinkAction.Context)
@@ -1455,12 +1515,12 @@ public sealed class NativeChatWindow : NativeAddon, IChatWindow
     }
 
     /// <summary>
-    ///     Queues the ImGui player context menu for a player link.
+    ///     Queues the ImGui context menu for a link that has its own payload menu.
     /// </summary>
-    private void ShowPlayerMenu(Message message, Chunk chunk, PlayerPayload player)
+    private void ShowPayloadMenu(Message message, Chunk chunk, Payload payload)
     {
         chunk.Message ??= message;
-        Plugin.ChatLog.InputHandler.PayloadHandler.Request(chunk, player);
+        Plugin.ChatLog.InputHandler.PayloadHandler.Request(chunk, payload);
     }
 
     /// <summary>

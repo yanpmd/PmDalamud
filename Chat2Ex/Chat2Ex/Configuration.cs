@@ -67,9 +67,6 @@ public class Configuration : IPluginConfiguration
     public bool MoreCompactPretty;
     public bool HideSameTimestamps;
     public bool PrintChangelog = true;
-    public bool OnlyPreviewIf;
-    public int PreviewMinimum = 1;
-    public PreviewPosition PreviewPosition = PreviewPosition.Inside;
     public CommandHelpSide CommandHelpSide = CommandHelpSide.None;
     public KeybindMode KeybindMode = KeybindMode.Strict;
     public LanguageOverride LanguageOverride = LanguageOverride.None;
@@ -124,7 +121,14 @@ public class Configuration : IPluginConfiguration
     public float WindowAlpha = 100f;
 
     /// <summary>
-    ///     Opacity of the glass background panel of the native chat window, 0 (invisible) to 100.
+    ///     Background colour of the native chat window, RGBA (alpha included). The RGB tints the
+    ///     window texture and the alpha controls transparency; 0xFF000000 is solid black, 0x00000000
+    ///     is fully transparent.
+    /// </summary>
+    public uint ChatBackgroundColor = 0xA6000000u; // black at 65% alpha
+
+    /// <summary>
+    ///     Legacy opacity field, kept only so old configs load without errors. No longer used.
     /// </summary>
     public float ChatBackgroundOpacity = 65f;
 
@@ -183,9 +187,6 @@ public class Configuration : IPluginConfiguration
         MoreCompactPretty = other.MoreCompactPretty;
         HideSameTimestamps = other.HideSameTimestamps;
         PrintChangelog = other.PrintChangelog;
-        OnlyPreviewIf = other.OnlyPreviewIf;
-        PreviewMinimum = other.PreviewMinimum;
-        PreviewPosition = other.PreviewPosition;
         CommandHelpSide = other.CommandHelpSide;
         KeybindMode = other.KeybindMode;
         LanguageOverride = other.LanguageOverride;
@@ -221,6 +222,7 @@ public class Configuration : IPluginConfiguration
         OverrideStyle = other.OverrideStyle;
         ChosenStyle = other.ChosenStyle;
         WindowAlpha = other.WindowAlpha;
+        ChatBackgroundColor = other.ChatBackgroundColor;
         ChatBackgroundOpacity = other.ChatBackgroundOpacity;
         ChatFontSize = other.ChatFontSize;
         LockWindowPosition = other.LockWindowPosition;
@@ -575,29 +577,6 @@ public class UsedChannel
             TempTellTarget = TempTellTarget?.Clone(),
         };
     }
-}
-
-[Serializable]
-public enum PreviewPosition
-{
-    None,
-    Inside,
-    Top,
-    Bottom,
-    Tooltip,
-}
-
-public static class PreviewPositionExt
-{
-    public static string Name(this PreviewPosition position) => position switch
-    {
-        PreviewPosition.None => Language.Options_Preview_None,
-        PreviewPosition.Inside => Language.Options_Preview_Inside,
-        PreviewPosition.Top => Language.Options_Preview_Top,
-        PreviewPosition.Bottom => Language.Options_Preview_Bottom,
-        PreviewPosition.Tooltip => Language.Options_Preview_Tooltip,
-        _ => throw new ArgumentOutOfRangeException(nameof(position), position, null),
-    };
 }
 
 [Serializable]

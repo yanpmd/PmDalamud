@@ -33,15 +33,19 @@ public sealed class SettingsWindow : Window
 
         Tabs =
         [
-            new Display(Mutable),
-            new ChatLogConfig(Plugin, Mutable),
-            new Emote(Plugin, Mutable),
-            new Preview(Mutable),
+            // Appearance
+            new ChatWindowAppearance(Plugin, Mutable),
             new Fonts(Mutable),
             new ChatColours(Plugin, Mutable),
+            new Display(Mutable),
+            // Chat behaviour
+            new ChatLogConfig(Plugin, Mutable),
+            new Emote(Plugin, Mutable),
             new Tabs(Plugin, Mutable),
+            // Data & integrations
             new Database(Plugin, Mutable),
             new Webinterface(Plugin, Mutable),
+            // Other
             new Miscellaneous(Mutable),
             new Changelog(Mutable),
             new About()

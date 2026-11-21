@@ -18,9 +18,6 @@ public sealed class NativeChatUi : IDisposable
 
     private NativeChatWindow? window;
     private NativeCommandHelp? commandHelp;
-    private NativeInputPreview? inputPreview;
-    private string previewInput = string.Empty;
-    private Message? previewMessage;
     private bool failed;
     private bool disposed;
 
@@ -120,8 +117,6 @@ public sealed class NativeChatUi : IDisposable
             return;
 
         commandHelp?.SetVisible(false);
-        inputPreview?.SetVisible(false);
-        previewInput = string.Empty;
     }
 
     /// <summary>
@@ -275,87 +270,12 @@ public sealed class NativeChatUi : IDisposable
         if (hidden)
         {
             HideCommandHelp();
-            inputPreview?.SetVisible(false);
-            previewInput = string.Empty;
             return;
         }
 
         window.SyncPendingTab();
         window.UpdateContent();
         window.SyncInputFocus();
-        UpdateInputPreview();
-    }
-
-    /// <summary>
-    ///     Rebuilds the input preview window when the typed text changes.
-    /// </summary>
-    private void UpdateInputPreview()
-    {
-        if (window is null || !window.IsOpen)
-            return;
-
-        var handler = Plugin.ChatLog;
-        var input = handler.ChatInput;
-
-        if (!handler.Activate || string.IsNullOrEmpty(input) || input.Length < Plugin.Config.PreviewMinimum)
-        {
-            inputPreview?.SetVisible(false);
-            previewInput = string.Empty;
-            previewMessage = null;
-            return;
-        }
-
-        if (inputPreview is null)
-        {
-            try
-            {
-                inputPreview = new NativeInputPreview(Plugin)
-                {
-                    InternalName = "Chat2Ex_InputPreview",
-                    Title = Plugin.PluginName,
-                    Size = new Vector2(320.0f, 40.0f),
-                    DepthLayer = 13,
-                    DisableFocusability = true,
-                    DisableFocusOnShow = true,
-                    DisableUnfocusedCloseOnEsc = true,
-                    RespectCloseAll = false,
-                };
-
-                inputPreview.Open();
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.Error(ex, "Failed to create the native input preview window");
-                inputPreview = null;
-                return;
-            }
-        }
-
-        if (input != previewInput || previewMessage is null)
-        {
-            previewInput = input;
-            previewMessage = BuildPreviewMessage(input);
-        }
-
-        if (previewMessage is null || (Plugin.Config.OnlyPreviewIf && previewMessage.Content.Count <= 1))
-        {
-            inputPreview.SetVisible(false);
-            return;
-        }
-
-        inputPreview.Show(previewMessage, MainWindowPosition ?? Vector2.Zero, MainWindowSize ?? new Vector2(560.0f, 320.0f));
-    }
-
-    private static Message BuildPreviewMessage(string input)
-    {
-        var bytes = Encoding.UTF8.GetBytes(input.Trim());
-        AutoTranslate.ReplaceWithPayload(ref bytes);
-
-        var chunks = ChunkUtil.ToChunks(SeString.Parse(bytes), ChunkSource.Content, ChatType.Say).ToList();
-        var message = Message.FakeMessage(chunks, new ChatCode(XivChatType.Say, 0, 0));
-        message.DecodeTextParam();
-
-        return message;
     }
 
     // Reused buffer for stale pop-out indices, so the per-frame sweep allocates nothing.
@@ -545,9 +465,6 @@ public sealed class NativeChatUi : IDisposable
         var help = commandHelp;
         commandHelp = null;
 
-        var preview = inputPreview;
-        inputPreview = null;
-
         var popoutWindows = popouts.Values.ToArray();
         popouts.Clear();
 
@@ -558,9 +475,6 @@ public sealed class NativeChatUi : IDisposable
 
             foreach (var popout in popoutWindows)
                 CloseWindow(popout);
-
-            if (preview is not null)
-                CloseWindow(preview);
 
             if (help is not null)
                 CloseWindow(help);
